@@ -65,6 +65,7 @@ pub struct Environment {
     pub global_oxygen_level: f32,
     pub dopamine_multiplier: f32,
     pub toxin_levels: f32,
+    pub seed: u32,
 }
 
 #[link(name = "neuron_kernels", kind = "static")]
@@ -78,5 +79,5 @@ extern "C" {
         current_tick: u32
     );
     
-    pub fn init_neuron(neuron: *mut BaseNeuron, id: u32, type_: NeuronType);
+    pub fn init_neuron(neuron: *mut BaseNeuron, id: u32, type_: NeuronType, seed: u32);
 }

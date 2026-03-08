@@ -100,6 +100,6 @@ typedef struct {
 
 // Orchestrator Function declarations
 void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, Environment env, uint32_t current_tick);
-void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType _type);
+void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed);
 
 } // extern "C"

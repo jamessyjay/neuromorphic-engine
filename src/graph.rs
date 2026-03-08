@@ -37,8 +37,9 @@ impl NetworkGraph {
         };
         
         // Let C++ engine initialize the neuron biology exactly per Spec 05 & 11
+        // Using a combination of global seed and neuron ID
         unsafe {
-            init_neuron(&mut neuron, id, type_);
+            init_neuron(&mut neuron, id, type_, 42 + id);
         }
         
         self.neurons.push(neuron);

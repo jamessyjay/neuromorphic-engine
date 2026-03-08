@@ -59,6 +59,7 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
         global_oxygen_level: 1.0,  
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
+        seed: 42,
     };
     
     let mut data = BenchmarkData {
@@ -212,6 +213,7 @@ fn run_simulation(mut graph: NetworkGraph, total_ticks: u32) -> SimulationData {
         global_oxygen_level: 1.0,  
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
+        seed: 1337,
     };
     
     for tick in 1..=total_ticks {
@@ -313,7 +315,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING STRESS-TEST (Phase 13) ---");
     let mut graph = NetworkGraph::new();
-    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0 };
+    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, seed: 666 };
 
     // Case 1: Hypoxic Shutdown (10 Neurons)
     println!("Case 1: Hypoxic Shutdown...");
@@ -378,7 +380,7 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING DOPAMINE RUSH (Phase 14) ---");
     let mut graph = NetworkGraph::new();
-    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0 };
+    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, seed: 777 };
 
     // Setup: 2 Neurons with a weak connection
     let n1 = graph.add_neuron(NeuronType::Pacemaker); // Source fires constantly
