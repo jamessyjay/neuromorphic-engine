@@ -23,22 +23,39 @@ impl NetworkGraph {
             activation_threshold: 0.0,
             resting_voltage: 0.0,
             energy_atp: 100.0,
+            max_atp: 100.0,
+            leak_coeff: 1.0,
             is_alive: true,
             calcium_level: 0.0,
             vesicles_pool: 100.0,
             refractory_time_left: 0.0,
+            spikes_in_last_window: 0,
+            metabolic_wear: 0.0,
             last_spike_tick: 0,
             inputs_count: 0,
             outputs_count: 0,
         };
         
-        // Let C++ engine initialize the neuron biology exactly per Spec 05
+        // Let C++ engine initialize the neuron biology exactly per Spec 05 & 11
         unsafe {
             init_neuron(&mut neuron, id, type_);
         }
         
         self.neurons.push(neuron);
         id
+    }
+
+    pub fn tick(&mut self, current_tick: u32, env: crate::ffi::Environment) {
+        unsafe {
+            crate::ffi::launch_tick_neurons(
+                self.neurons.as_mut_ptr(),
+                self.neurons.len() as i32,
+                self.synapses.as_mut_ptr(),
+                self.synapses.len() as i32,
+                env,
+                current_tick
+            );
+        }
     }
 
     pub fn connect(&mut self, source_id: u32, target_id: u32, weight: f32, is_inhibitory: bool, is_myelinated: bool) {

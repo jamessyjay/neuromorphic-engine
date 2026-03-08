@@ -27,13 +27,19 @@ pub struct BaseNeuron {
     pub resting_voltage: f32,
 
     pub energy_atp: f32,
+    pub max_atp: f32,
+    pub leak_coeff: f32,
     pub is_alive: bool,
     
-    // Phase 2: Biological States
+    // Phase 2 & 13: Biological States
     pub calcium_level: f32,
     pub vesicles_pool: f32,
     pub refractory_time_left: f32,
     
+    // Evolution & Adaptation (Phase 13)
+    pub spikes_in_last_window: u32,
+    pub metabolic_wear: f32,
+
     pub last_spike_tick: u32,
 
     pub inputs_count: u32,

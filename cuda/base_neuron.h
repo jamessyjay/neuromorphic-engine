@@ -53,14 +53,20 @@ typedef struct {
     float activation_threshold;  
     float resting_voltage;
 
-    float energy_ATP;            // Energy level: 0.0 to 100.0
+    float energy_ATP;            // Current ATP
+    float max_atp;               // Genetic limit (Heterogeneity)
+    float leak_coeff;            // Efficiency of pumps (Heterogeneity)
     bool is_alive;
     
-    // Phase 2: Biological States
-    float calcium_level;         // Internal Calcium (Triggers apoptosis if too high)
+    // Phase 2 & 13: Biological States
+    float calcium_level;         // Internal Calcium
     float vesicles_pool;         // Amount of neurotransmitter packages ready for release
     float refractory_time_left;  // Time left in MS for absolute/relative cooldown
     
+    // Evolution & Adaptation (Phase 13)
+    uint32_t spikes_in_last_window; // Counter for Homeostatic Plasticity
+    float metabolic_wear;           // 0.0 (new) to 1.0 (dead mitochondria)
+
     // Phase 3: Synapse and Output Tracking
     uint32_t last_spike_tick;    // For Hebbian learning (STDP)
 
