@@ -33,8 +33,9 @@ impl Telemetry {
         }
     }
 
-    pub fn print_report(&self, num_neurons: usize, num_synapses: usize) {
+    pub fn print_report(&self, num_neurons: usize, num_synapses: usize, dead_count: usize) {
         println!("\n--- TELEMETRY REPORT ---");
+        println!("Status: {} Alive | {} Dead (Total: {})", num_neurons - dead_count, dead_count, num_neurons);
         println!("Simulation Speed: {:.2}x ({})", 
             self.sim_speed, 
             if self.sim_speed >= 1.0 { "FASTER THAN REALTIME" } else { "SLOWER THAN REALTIME" }

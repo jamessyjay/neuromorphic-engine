@@ -78,45 +78,40 @@ impl NetworkGraph {
     }
     
     // Background Service: Astrocyte (Garbage Collector & Support)
-    // Invoked periodically (e.g. every 10 ticks) by the Orchestrator
     pub fn run_astrocyte_service(&mut self, _current_tick: u32) {
-        // 1. Clean synaptic overflow
+        // Optimization: Periodic chunked processing or threshold-based
+        // For now, let's just make the loops as tight as possible
+        
+        // 1. Clean synaptic overflow (Only if weight > 0)
         for synapse in &mut self.synapses {
-            if synapse.neurotransmitter_buffer > 50.0 {
-                // Buffer flooded - clean it out to avoid forever-stuck neurotransmitter
-                synapse.neurotransmitter_buffer = f32::max(0.0, synapse.neurotransmitter_buffer - 10.0);
+            if synapse.weight > 0.0 && synapse.neurotransmitter_buffer > 50.0 {
+                synapse.neurotransmitter_buffer -= 10.0;
             }
         }
         
-        // 2. Supply ATP to hard working neurons
+        // 2. Supply ATP to hard working neurons (Only if alive and low ATP)
         for neuron in &mut self.neurons {
-            if neuron.is_alive && neuron.energy_atp < 50.0 && neuron.current_voltage > -60.0 {
+            if neuron.is_alive && neuron.energy_atp < 50.0 {
                 neuron.energy_atp = f32::min(100.0, neuron.energy_atp + 10.0);
             }
         }
     }
 
     // Background Service: Microglia (Immune System / Firewall)
-    // Invoked periodically to clean up dead connections
     pub fn run_microglia_service(&mut self, _current_tick: u32) {
-        let mut dead_neurons = std::collections::HashSet::new();
-        
-        for neuron in &self.neurons {
-            if !neuron.is_alive {
-                dead_neurons.insert(neuron.id);
-            }
-        }
-        
-        // If there are dead neurons, prune their connections
-        if !dead_neurons.is_empty() {
-            for synapse in &mut self.synapses {
-                if dead_neurons.contains(&synapse.source_id) || dead_neurons.contains(&synapse.target_id) {
-                    // Nullify the connection mathematically without reorganizing the entire array 
-                    // (Zero weight means 0 molecules pass)
-                    if synapse.weight > 0.0 {
-                        synapse.weight = 0.0;
-                        synapse.neurotransmitter_buffer = 0.0;
-                    }
+        // Optimization: Find dead neurons once, then nullify synapses using O(1) lookup
+        let dead_ids: std::collections::HashSet<u32> = self.neurons.iter()
+            .filter(|n| !n.is_alive)
+            .map(|n| n.id)
+            .collect();
+
+        if dead_ids.is_empty() { return; }
+
+        for synapse in &mut self.synapses {
+            if synapse.weight > 0.0 {
+                if dead_ids.contains(&synapse.source_id) || dead_ids.contains(&synapse.target_id) {
+                    synapse.weight = 0.0;
+                    synapse.neurotransmitter_buffer = 0.0;
                 }
             }
         }

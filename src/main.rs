@@ -99,14 +99,17 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
         let ffi_elapsed = ffi_start.elapsed();
         total_ffi_time += ffi_elapsed;
         
-        // Metrics collection for this tick
+        // Optimized Metrics Collection: Only every 50 ticks to save CPU time at large scales
         let mut spikes = 0;
         let mut atp_sum = 0.0;
         let mut calcium_sum = 0.0;
-        for n in &graph.neurons {
-            if n.current_voltage >= 39.0 { spikes += 1; }
-            atp_sum += n.energy_atp;
-            calcium_sum += n.calcium_level;
+        
+        if tick % 50 == 0 || tick == total_ticks {
+            for n in &graph.neurons {
+                if n.current_voltage >= 39.0 { spikes += 1; }
+                atp_sum += n.energy_atp;
+                calcium_sum += n.calcium_level;
+            }
         }
 
         let mut tick_rust_time = std::time::Duration::new(0, 0);
@@ -120,7 +123,8 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
 
         telemetry.update(tick);
         if tick % 500 == 0 {
-            telemetry.print_report(graph.neurons.len(), graph.synapses.len());
+            let dead_count = graph.neurons.iter().filter(|n| !n.is_alive).count();
+            telemetry.print_report(graph.neurons.len(), graph.synapses.len(), dead_count);
         }
 
         data.ticks.push(tick);
