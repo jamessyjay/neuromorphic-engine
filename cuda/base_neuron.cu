@@ -132,6 +132,9 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
         return; 
     }
 
+    // EMERGENCY GUARD 2.0: Explicit ATP check
+    if (n->energy_ATP < 20.0f) return;
+
     if (n->current_voltage >= n->activation_threshold) {
         if (n->type == TYPE_PHOTORECEPTOR) return; // Sensors don't spike
         
@@ -160,7 +163,7 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
 
 static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, uint32_t current_tick) {
     if (source->is_alive) {
-        int delay = s->is_myelinated ? 0 : 2; // Myelin is purely faster
+        uint8_t delay = s->is_myelinated ? 0 : 2; // Myelin is purely faster
         if (source->type == TYPE_PHOTORECEPTOR) {
             if (source->current_voltage >= -41.0f) {
                 s->neurotransmitter_buffer += 2.0f; // Photoreceptors leak constantly
@@ -335,9 +338,6 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->last_spike_tick = 0;
     neuron->spikes_in_last_window = 0;
     neuron->metabolic_wear = 0.0f;
-    
-    neuron->inputs_count = 0;
-    neuron->outputs_count = 0;
 }
 
 } // extern "C"

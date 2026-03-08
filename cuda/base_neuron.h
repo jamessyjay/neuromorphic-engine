@@ -49,55 +49,46 @@ typedef struct {
     float size;
     float current_voltage;
     
-    // Adaptive thresholds based on NeuronType
+    // Adaptive thresholds
     float activation_threshold;  
     float resting_voltage;
 
-    float energy_ATP;            // Current ATP
-    float max_atp;               // Genetic limit (Heterogeneity)
-    float leak_coeff;            // Efficiency of pumps (Heterogeneity)
+    float energy_ATP;
+    float max_atp;
+    float leak_coeff;
+    
+    // Biological States
+    float calcium_level;
+    float vesicles_pool;
+    float refractory_time_left;
+    
+    // Evolution & Adaptation
+    uint32_t spikes_in_last_window;
+    float metabolic_wear;
+    uint32_t last_spike_tick;
+
     bool is_alive;
-    
-    // Phase 2 & 13: Biological States
-    float calcium_level;         // Internal Calcium
-    float vesicles_pool;         // Amount of neurotransmitter packages ready for release
-    float refractory_time_left;  // Time left in MS for absolute/relative cooldown
-    
-    // Evolution & Adaptation (Phase 13)
-    uint32_t spikes_in_last_window; // Counter for Homeostatic Plasticity
-    float metabolic_wear;           // 0.0 (new) to 1.0 (dead mitochondria)
-
-    // Phase 3: Synapse and Output Tracking
-    uint32_t last_spike_tick;    // For Hebbian learning (STDP)
-
-    // Arrays simulated as counts for the MVP
-    uint32_t inputs_count;
-    uint32_t outputs_count;
 } BaseNeuron;
 
 // Environment Singleton Representation
 typedef struct {
-    float global_oxygen_level;    // 0.0 to 1.0 (multiplier for ATP generation)
-    float dopamine_multiplier;    // 1.0 is baseline, > 1.0 boosts Glutamate/GABA strength
-    float toxin_levels;           // (Future use)
-    float light_level;            // 0.0 (dark) to 1.0 (bright) for Photoreceptors
-    uint32_t seed;                // Global seed for stochastic processes
+    float global_oxygen_level;    // 0.0 to 1.0
+    float dopamine_multiplier;    // > 1.0 boosts signal
+    float toxin_levels;           
+    float light_level;            
+    uint32_t seed;                
 } Environment;
 
-// Synaptic buffer representation (Specs 07 & 05)
+// Synaptic buffer representation (Packed: 24 bytes)
 typedef struct {
     uint32_t source_id;
     uint32_t target_id;
-    float weight;         // receptor_count multiplier
+    float weight;
     float neurotransmitter_buffer;
-    int ticks_until_delivery;
-    bool is_inhibitory;   // if true -> emits GABA (subtractive), else Glutamate (additive)
-    
-    // Hebbian STDP Tracker
-    uint32_t last_activation_tick; // Used to track exact moment Glutamate hits target
-    
-    // Schwann Cell / Myelin sheath
-    bool is_myelinated;   // If true -> delay is 0 (teleports)
+    uint32_t last_activation_tick;
+    uint8_t ticks_until_delivery;
+    bool is_inhibitory;
+    bool is_myelinated;
 } Synapse;
 
 // Orchestrator Function declarations

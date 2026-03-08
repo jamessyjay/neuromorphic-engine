@@ -29,21 +29,18 @@ pub struct BaseNeuron {
     pub energy_atp: f32,
     pub max_atp: f32,
     pub leak_coeff: f32,
-    pub is_alive: bool,
     
-    // Phase 2 & 13: Biological States
+    // Biological States
     pub calcium_level: f32,
     pub vesicles_pool: f32,
     pub refractory_time_left: f32,
     
-    // Evolution & Adaptation (Phase 13)
+    // Evolution & Adaptation
     pub spikes_in_last_window: u32,
     pub metabolic_wear: f32,
-
     pub last_spike_tick: u32,
 
-    pub inputs_count: u32,
-    pub outputs_count: u32,
+    pub is_alive: bool,
 }
 
 #[repr(C)]
@@ -53,9 +50,9 @@ pub struct Synapse {
     pub target_id: u32,
     pub weight: f32,
     pub neurotransmitter_buffer: f32,
-    pub ticks_until_delivery: i32,
-    pub is_inhibitory: bool,
     pub last_activation_tick: u32,
+    pub ticks_until_delivery: u8,
+    pub is_inhibitory: bool,
     pub is_myelinated: bool,
 }
 

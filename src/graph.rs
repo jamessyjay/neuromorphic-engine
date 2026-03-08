@@ -25,15 +25,13 @@ impl NetworkGraph {
             energy_atp: 100.0,
             max_atp: 100.0,
             leak_coeff: 1.0,
-            is_alive: true,
             calcium_level: 0.0,
             vesicles_pool: 100.0,
             refractory_time_left: 0.0,
             spikes_in_last_window: 0,
             metabolic_wear: 0.0,
             last_spike_tick: 0,
-            inputs_count: 0,
-            outputs_count: 0,
+            is_alive: true,
         };
         
         // Let C++ engine initialize the neuron biology exactly per Spec 05 & 11
@@ -65,14 +63,11 @@ impl NetworkGraph {
             target_id,
             weight,
             neurotransmitter_buffer: 0.0,
+            last_activation_tick: 0,
             ticks_until_delivery: 0,
             is_inhibitory,
-            last_activation_tick: 0,
             is_myelinated,
         };
-        
-        self.neurons[source_id as usize].outputs_count += 1;
-        self.neurons[target_id as usize].inputs_count += 1;
         
         self.synapses.push(synapse);
     }
