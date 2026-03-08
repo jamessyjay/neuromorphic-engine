@@ -17,11 +17,11 @@ fn setup_benchmark(neurons_count: u32, synapses_count: u32) -> NetworkGraph {
 
     // Creating neurons
     for _ in 0..neurons_count {
-        // Randomly assign types just for variety
-        let n_type = match rng.random_range(0..4) {
-            0 => NeuronType::Pyramidal,
-            1 => NeuronType::Bipolar,
-            2 => NeuronType::Interneuron,
+        // Biased random types: 70% Pyramidal, others 10% each
+        let n_type = match rng.random_range(0..10) {
+            0..=6 => NeuronType::Pyramidal,
+            7 => NeuronType::Bipolar,
+            8 => NeuronType::Interneuron,
             _ => NeuronType::Pacemaker,
         };
         graph.add_neuron(n_type);

@@ -29,6 +29,9 @@ The project is designed for deployment on edge AI hardware like **NVIDIA Jetson*
 ## Architecture
 
 - **Rust Subsystem:** Handles the `NetworkGraph`, FFI bindings, background services, and native data visualization via `plotters`.
+- **Parallel Processing (Phase 12):** Multi-kernel architecture for maximum GPU throughput:
+  - `tick_neurons_kernel`: Independent biology (metabolism, spiking) per neuron.
+  - `tick_synapses_kernel`: Massive synapse-parallel processing (100k+ connections) using **atomic operations** (`atomicAdd`) for thread-safe voltage updates.
 - **CUDA Subsystem:** High-speed kernels for voltage integration, synaptic processing, and metabolic updates.
 - **FFI Layer:** Zero-copy interaction using raw pointers and C-compatible structs.
 

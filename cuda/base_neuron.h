@@ -11,6 +11,8 @@
     #define __global__
     #define __device__
     #define __host__
+    // Mock atomicAdd for CPU testing - simplified for speed
+    #define atomicAdd(addr, val) (*(addr) += (val))
 #endif
 
 extern "C" {
