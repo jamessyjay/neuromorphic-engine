@@ -144,6 +144,34 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
     Ok(data)
 }
 
+fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SCALING PERFORMANCE ANALYSIS (1K to 1M) ---");
+    let sizes = [1_000, 10_000, 100_000, 1_000_000];
+    let mut results = String::from("# Performance Scaling Report\n\n| Neurons | Synapses | TPS | Total Time (s) | Memory (KB) |\n|---|---|---|---|---|\n");
+
+    for &n in &sizes {
+        println!("\n>> Testing Scale: {} Neurons...", n);
+        let s = n * 10;
+        let start = Instant::now();
+        let _ = run_benchmark_mode(n, s, 500)?; // 500 ticks is enough for scaling trends
+        let elapsed = start.elapsed().as_secs_f64();
+        let tps = 500.0 / elapsed;
+        
+        let neuron_mem = std::mem::size_of::<ffi::BaseNeuron>();
+        let synapse_mem = std::mem::size_of::<ffi::Synapse>();
+        let total_mem_kb = (n * neuron_mem + s * synapse_mem) as f32 / 1024.0;
+
+        results.push_str(&format!("| {} | {} | {:.2} | {:.2} | {:.2} |\n", n, s, tps, elapsed, total_mem_kb));
+    }
+
+    println!("\nSaving report to 'docs/performance_report.md'...");
+    std::fs::create_dir_all("docs")?;
+    std::fs::write("docs/performance_report.md", results)?;
+    println!("Scaling Benchmarks Complete!");
+
+    Ok(())
+}
+
 fn render_benchmark_chart(data: &BenchmarkData, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Rendering Benchmark Dashboard to '{}'...", filename);
     let root = BitMapBackend::new(filename, (1200, 1000)).into_drawing_area();
@@ -313,10 +341,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_dopamine_rush = args.contains(&String::from("--dopamine-rush"));
     let is_reflex_arc = args.contains(&String::from("--reflex-arc"));
     let is_inhibition_loop = args.contains(&String::from("--inhibition-loop"));
+    let is_scaling_test = args.contains(&String::from("--scaling-test"));
 
     if is_benchmark {
         let data = run_benchmark_mode(10000, 100000, 1000)?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
+        return Ok(());
+    }
+
+    if is_scaling_test {
+        run_scaling_benchmarks()?;
         return Ok(());
     }
 
