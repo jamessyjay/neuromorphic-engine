@@ -71,6 +71,7 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
         global_oxygen_level: 1.0,  
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
+        light_level: 0.0,
         seed: 42,
     };
     
@@ -225,6 +226,7 @@ fn run_simulation(mut graph: NetworkGraph, total_ticks: u32) -> SimulationData {
         global_oxygen_level: 1.0,  
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
+        light_level: 0.0,
         seed: 1337,
     };
     
@@ -300,6 +302,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_benchmark = args.contains(&String::from("--benchmark"));
     let is_stress_test = args.contains(&String::from("--stress-test"));
     let is_dopamine_rush = args.contains(&String::from("--dopamine-rush"));
+    let is_reflex_arc = args.contains(&String::from("--reflex-arc"));
 
     if is_benchmark {
         let data = run_benchmark_mode(10000, 100000, 1000)?;
@@ -317,6 +320,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if is_reflex_arc {
+        run_reflex_arc_mode()?;
+        return Ok(());
+    }
+
     let graph = setup_simulation();
     let data = run_simulation(graph, 200);
     render_chart(&data, "graphs/phase8_sensors.png")?;
@@ -324,10 +332,120 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn setup_reflex_arc() -> NetworkGraph {
+    let mut graph = NetworkGraph::new();
+    
+    // 0: Photoreceptor (The Eye)
+    let eye = graph.add_neuron(NeuronType::Photoreceptor);
+    // 1: Interneuron (The Brain/Filter)
+    let brain = graph.add_neuron(NeuronType::Interneuron);
+    // 2: Pyramidal (The Muscle)
+    let muscle = graph.add_neuron(NeuronType::Pyramidal);
+
+    // Connections: Eye -> Brain -> Muscle
+    // Phase 17: Boosted weights to ensure transmission
+    graph.connect(eye, brain, 15.0, false, true);   // Fast myelin connection
+    graph.connect(brain, muscle, 12.0, false, false); // Normal connection
+
+    graph
+}
+
+fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING REFLEX ARC SCENARIO WITH DOPAMINE BOOST (Phase 17) ---");
+    let mut graph = setup_reflex_arc();
+    let mut env = Environment { 
+        global_oxygen_level: 1.0, 
+        dopamine_multiplier: 1.0, 
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 888 
+    };
+
+    let total_ticks = 1200;
+    let mut history = vec![];
+
+    for tick in 1..=total_ticks {
+        // Stimulus: Rhythmic blinking
+        env.light_level = if (tick / 50) % 2 == 0 { 0.8 } else { 0.1 };
+
+        // Phase 17: Dopamine Surge between tick 300 and 800
+        if tick >= 300 && tick <= 800 {
+            env.dopamine_multiplier = 4.0; // RUSH!
+        } else {
+            env.dopamine_multiplier = 1.0;
+        }
+
+        graph.tick(tick, env);
+        
+        if tick % 10 == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        history.push((
+            tick,
+            graph.neurons[0].current_voltage, // Eye
+            graph.neurons[1].current_voltage, // Brain
+            graph.neurons[2].current_voltage, // Muscle
+            graph.neurons[2].energy_atp,      // Muscle ATP
+            graph.synapses[1].weight,          // Brain -> Muscle Weight (STDP)
+        ));
+    }
+
+    render_reflex_arc_chart(&history, "graphs/reflex_arc_boosted.png")?;
+    Ok(())
+}
+
+fn render_reflex_arc_chart(data: &[(u32, f32, f32, f32, f32, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Rendering Reflex Arc Chart to '{}'...", filename);
+    let root = BitMapBackend::new(filename, (1200, 1000)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let areas = root.split_evenly((3, 1));
+
+    // Panel 1: Sensory (Eye)
+    let mut chart1 = ChartBuilder::on(&areas[0])
+        .caption("1. Input: Photoreceptor (The Eye)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, -70f32..-30f32)?;
+    chart1.configure_mesh().y_desc("Voltage (mV)").draw()?;
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, v, _, _, _, _)| (t as f32, v)), &BLUE))?;
+
+    // Panel 2: Logic (Interneuron / Brain)
+    let mut chart2 = ChartBuilder::on(&areas[1])
+        .caption("2. Logic: Interneuron (The Brain)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, -90f32..50f32)?;
+    chart2.configure_mesh().y_desc("Voltage (mV)").draw()?;
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, v, _, _, _)| (t as f32, v)), &MAGENTA))?;
+
+    // Panel 3: Output (Pyramidal / Muscle)
+    let mut chart3 = ChartBuilder::on(&areas[2])
+        .caption("3. Output: Pyramidal (The Muscle)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).right_y_label_area_size(40)
+        .build_cartesian_2d(0f32..1000f32, -90f32..50f32)?
+        .set_secondary_coord(0f32..1000f32, 0f32..110f32);
+    
+    chart3.configure_mesh().y_desc("Voltage (mV)").draw()?;
+    chart3.configure_secondary_axes().y_desc("ATP / Plasticity Weight").draw()?;
+
+    chart3.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, v, _, _)| (t as f32, v)), &RED))?
+        .label("Muscle Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
+    
+    chart3.draw_secondary_series(LineSeries::new(data.iter().map(|&(t, _, _, _, atp, _)| (t as f32, atp)), &GREEN))?
+        .label("Muscle ATP").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], GREEN));
+
+    chart3.draw_secondary_series(LineSeries::new(data.iter().map(|&(t, _, _, _, _, w)| (t as f32, w * 5.0)), &YELLOW))?
+        .label("STDP Weight (x5)").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], YELLOW));
+
+    chart3.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
+
+    root.present()?;
+    Ok(())
+}
+
 fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING STRESS-TEST (Phase 13) ---");
     let mut graph = NetworkGraph::new();
-    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, seed: 666 };
+    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, seed: 666 };
 
     // Case 1: Hypoxic Shutdown (10 Neurons)
     println!("Case 1: Hypoxic Shutdown...");
@@ -392,7 +510,7 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING DOPAMINE RUSH (Phase 14) ---");
     let mut graph = NetworkGraph::new();
-    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, seed: 777 };
+    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, seed: 777 };
 
     // Setup: 2 Neurons with a weak connection
     let n1 = graph.add_neuron(NeuronType::Pacemaker); // Source fires constantly

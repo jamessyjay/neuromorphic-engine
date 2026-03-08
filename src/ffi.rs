@@ -65,6 +65,7 @@ pub struct Environment {
     pub global_oxygen_level: f32,
     pub dopamine_multiplier: f32,
     pub toxin_levels: f32,
+    pub light_level: f32,
     pub seed: u32,
 }
 

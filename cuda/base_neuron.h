@@ -80,6 +80,7 @@ typedef struct {
     float global_oxygen_level;    // 0.0 to 1.0 (multiplier for ATP generation)
     float dopamine_multiplier;    // 1.0 is baseline, > 1.0 boosts Glutamate/GABA strength
     float toxin_levels;           // (Future use)
+    float light_level;            // 0.0 (dark) to 1.0 (bright) for Photoreceptors
     uint32_t seed;                // Global seed for stochastic processes
 } Environment;
 

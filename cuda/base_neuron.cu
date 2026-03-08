@@ -79,6 +79,14 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     if (n->type == TYPE_PACEMAKER) {
         n->current_voltage += 0.7f; 
         n->energy_ATP -= 0.1f * n->leak_coeff;
+    } else if (n->type == TYPE_PHOTORECEPTOR) {
+        // Photoreceptor logic: 
+        // In light -> hyperpolarize (-65mV)
+        // In dark -> depolarize (-40mV, dark current)
+        float target_v = (env.light_level > 0.5f) ? -65.0f : -40.0f;
+        float sens_speed = 0.5f;
+        if (n->current_voltage < target_v) n->current_voltage += sens_speed;
+        else if (n->current_voltage > target_v) n->current_voltage -= sens_speed;
     } else {
         // Drift towards resting potential
         float drift = 0.2f * n->leak_coeff;
