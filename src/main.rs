@@ -1,9 +1,11 @@
 // src/main.rs
 mod ffi;
 mod graph;
+mod telemetry;
 
 use ffi::{NeuronType, Environment};
 use graph::NetworkGraph;
+use telemetry::Telemetry;
 use plotters::prelude::*;
 use std::env;
 use std::time::Instant;
@@ -87,6 +89,7 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
     let start_total = Instant::now();
     let mut total_ffi_time = std::time::Duration::new(0, 0);
     let mut total_rust_time = std::time::Duration::new(0, 0);
+    let mut telemetry = Telemetry::new();
 
     for tick in 1..=total_ticks {
         let num_neurons = graph.neurons.len() as i32;
@@ -113,6 +116,11 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
             graph.run_microglia_service(tick);
             tick_rust_time = rust_start.elapsed();
             total_rust_time += tick_rust_time;
+        }
+
+        telemetry.update(tick);
+        if tick % 500 == 0 {
+            telemetry.print_report(graph.neurons.len(), graph.synapses.len());
         }
 
         data.ticks.push(tick);
@@ -304,6 +312,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_stress_test = args.contains(&String::from("--stress-test"));
     let is_dopamine_rush = args.contains(&String::from("--dopamine-rush"));
     let is_reflex_arc = args.contains(&String::from("--reflex-arc"));
+    let is_inhibition_loop = args.contains(&String::from("--inhibition-loop"));
 
     if is_benchmark {
         let data = run_benchmark_mode(10000, 100000, 1000)?;
@@ -326,10 +335,95 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if is_inhibition_loop {
+        run_inhibition_loop_mode()?;
+        return Ok(());
+    }
+
     let graph = setup_simulation();
     let data = run_simulation(graph, 200);
     render_chart(&data, "graphs/phase8_sensors.png")?;
 
+    Ok(())
+}
+
+fn setup_inhibition_loop() -> NetworkGraph {
+    let mut graph = NetworkGraph::new();
+    
+    // 0: P (Pyramidal, Excitatory)
+    let p = graph.add_neuron(NeuronType::Pyramidal);
+    // 1: I (Interneuron, Inhibitory)
+    let i = graph.add_neuron(NeuronType::Interneuron);
+
+    // Loop: P -> I (Exciting), I -> P (Inhibiting)
+    graph.connect(p, i, 10.0, false, true);  // P excites I
+    graph.connect(i, p, 15.0, true, true);   // I inhibits P (Strong GABA)
+
+    graph
+}
+
+fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING INHIBITION LOOP SCENARIO (Phase 19) ---");
+    let mut graph = setup_inhibition_loop();
+    let env = Environment { 
+        global_oxygen_level: 1.0, 
+        dopamine_multiplier: 1.0, 
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 999 
+    };
+
+    let total_ticks = 1000;
+    let mut history = vec![];
+
+    for tick in 1..=total_ticks {
+        // Subtle constant stimulus to avoid metabolic exhaustion
+        graph.neurons[0].current_voltage += 0.7;
+
+        graph.tick(tick, env);
+        
+        if tick % 10 == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        history.push((
+            tick,
+            graph.neurons[0].current_voltage, // Pyramidal
+            graph.neurons[1].current_voltage, // Interneuron
+        ));
+    }
+
+    render_inhibition_chart(&history, "graphs/inhibition_loop.png")?;
+    Ok(())
+}
+
+fn render_inhibition_chart(data: &[(u32, f32, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Rendering Inhibition Loop Chart to '{}'...", filename);
+    let root = BitMapBackend::new(filename, (1200, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let areas = root.split_evenly((2, 1));
+
+    // Panel 1: Pyramidal (Target)
+    let mut chart1 = ChartBuilder::on(&areas[0])
+        .caption("1. Pyramidal Neuron (Excited with Constant Stimulus + GABA Inhibition)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, -90f32..50f32)?;
+    chart1.configure_mesh().y_desc("Voltage (mV)").draw()?;
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, v, _)| (t as f32, v)), &RED))?
+        .label("Pyramidal Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
+    chart1.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
+
+    // Panel 2: Interneuron (Inhibitor)
+    let mut chart2 = ChartBuilder::on(&areas[1])
+        .caption("2. GABA Interneuron (Driven by Pyramidal Spikes)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, -90f32..50f32)?;
+    chart2.configure_mesh().y_desc("Voltage (mV)").draw()?;
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, v)| (t as f32, v)), &BLUE))?
+        .label("Interneuron Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
+    chart2.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
+
+    root.present()?;
     Ok(())
 }
 

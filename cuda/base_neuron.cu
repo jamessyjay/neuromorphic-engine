@@ -186,8 +186,11 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     }
 
     // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08)
-    if (s->ticks_until_delivery > 0) {
-        s->ticks_until_delivery -= 1;
+    if (s->ticks_until_delivery >= 0) {
+        if (s->ticks_until_delivery > 0) {
+            s->ticks_until_delivery -= 1;
+        }
+        
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
             
             // RECEPTOR SATURATION (Spec 08): Weight is the limit of chemical processing
