@@ -4,23 +4,35 @@
 #include <cmath>
 #include <cstdint>
 
-// --- PHASE 13 & 14 REFINEMENT: THE BIOLOGICAL REALISM UPDATE ---
+#ifdef USE_CUDA
+#include <curand_kernel.h>
+#endif
+
+// --- PHASE 13, 14 & 18 REFINEMENT: THE BIOLOGICAL REALISM & PERFORMANCE UPDATE ---
 
 // Simple PRNG for Mock CPU (Xorshift)
 static float get_random_float_01(uint32_t* seed) {
     *seed ^= *seed << 13;
     *seed ^= *seed >> 17;
     *seed ^= *seed << 5;
-    return (float)(*seed % 1000) / 1000.0f;
+    return (float)(*seed % 10000) / 10000.0f;
 }
 
-// Simple Gaussian Approximation (Box-Muller)
-static float get_gaussian(uint32_t* seed, float mu, float sigma) {
+// Gaussian Random Generation
+static __device__ __host__ float get_gaussian(uint32_t* seed, float mu, float sigma) {
+#ifdef USE_CUDA
+    // On GPU: Use NVIDIA's native high-performance RNG
+    curandState_t state;
+    curand_init(*seed, 0, 0, &state);
+    return mu + sigma * curand_normal(&state);
+#else
+    // On CPU: Use refined Box-Muller transform
     float u1 = get_random_float_01(seed);
     float u2 = get_random_float_01(seed);
-    if (u1 < 0.0001f) u1 = 0.0001f;
-    float z = (float)sqrt(-2.0 * log(u1)) * (float)cos(2.0 * 3.14159 * u2);
+    if (u1 < 0.00001f) u1 = 0.00001f;
+    float z = (float)sqrt(-2.0 * log(u1)) * (float)cos(2.0 * 3.14159265 * u2);
     return mu + sigma * z;
+#endif
 }
 
 // Atomic function: Apoptosis / Death Handler
