@@ -6,7 +6,18 @@ The project is designed for deployment on edge AI hardware like **NVIDIA Jetson*
 
 ---
 
-## Key Features
+## Detailed Documentation
+
+Для глубокого погружения в архитектуру и логику проекта перейдите в папку [docs/](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/):
+
+- 🏗️ [Project Architecture](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/01_project_architecture.md) — Гибридный стек Rust/CUDA и управление памятью.
+- 🧬 [Solution Architecture](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/02_solution_architecture.md) — Биологические алгоритмы, хаос и метаболизм.
+- ⚗️ [API & FFI Reference](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/03_api_reference.md) — Мосты между Rust и C++.
+- 📊 [Visualization & Metrics](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/04_metrics_and_viz.md) — Гайд по тестам и анализу результатов.
+
+---
+
+## 🛠 Features Breakdown
 
 ### Biological Mechanisms
 - **Leaky Integrate-and-Fire (+):** Advanced neuron models with metabolic constraints.
