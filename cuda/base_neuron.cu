@@ -52,16 +52,20 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
         return;
     }
 
-    // 1. ATP Generation (mitochondria) - Spec 02 & 07 + Phase 26 (Glucose)
+    // 1. ATP Generation (mitochondria) - Asymptotic Recovery (Phase 28)
     float baseline_generation = 1.0f * (1.0f - n->metabolic_wear);
     float glucose_factor = env.global_glucose_level;
     float oxygen_factor = env.global_oxygen_level;
     
-    n->energy_ATP += baseline_generation * oxygen_factor * glucose_factor;
+    // Recovery slows down as capacity is reached (Asymptotic)
+    float atp_gap = n->max_atp - n->energy_ATP;
+    n->energy_ATP += (atp_gap / n->max_atp) * baseline_generation * oxygen_factor * glucose_factor;
     if (n->energy_ATP > n->max_atp) n->energy_ATP = n->max_atp;
 
-    // 2. Vesicle Recycling (Phase 26) - Spec 02
-    n->vesicles_pool += 0.5f * (n->energy_ATP / 100.0f);
+    // 2. Vesicle Recycling (Phase 26/28) - Spec 02
+    // Recovery slows down as pool fills
+    float v_gap = 100.0f - n->vesicles_pool;
+    n->vesicles_pool += (v_gap / 100.0f) * 0.5f * (n->energy_ATP / 100.0f);
     if (n->vesicles_pool > 100.0f) n->vesicles_pool = 100.0f;
 
     // 3. Homeostatic Plasticity & Threshold Recovery (Phase 13 & 26)
