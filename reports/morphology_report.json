@@ -1,0 +1,19 @@
+{
+  "simulation_summary": {
+    "total_ticks": 3000,
+    "sim_speed": 71428571.43,
+    "final_neuron_count": 2,
+    "final_synapse_count": 1
+  },
+  "incident_log": {
+    "atp_low_deaths": 0,
+    "calcium_high_deaths": 0,
+    "glucose_starvation_deaths": 0,
+    "neurons_in_emergency_atp": 0
+  },
+  "population_distributions": {
+    "synaptic_weights": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    "synaptic_thickness": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+    "neuron_atp_bins": [0, 0, 1, 1, 0]
+  }
+}
