@@ -6,27 +6,27 @@ The project is designed for deployment on edge AI hardware like **NVIDIA Jetson*
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-### 🧬 Biological Mechanisms
+### Biological Mechanisms
 - **Leaky Integrate-and-Fire (+):** Advanced neuron models with metabolic constraints.
 - **Metabolism Simulation:** Neurons consume **ATP** and generate **Calcium**; critical levels lead to apoptosis (programmed cell death).
 - **Hebbian Learning (STDP):** Synapses strengthen/weaken based on precise spike timing (20ms window) and global **Dopamine** levels.
 - **Neurotransmitter Dynamics:** Detailed modeling of Glutamate/GABA spikes, receptor saturation, and astrocyte-mediated degradation.
 
-### 🔋 Specialized Cell Types
+### Specialized Cell Types
 - **Sensory Cells:** `Photoreceptor` (analog signal processing) and `Nociceptor` (pain sensitization).
 - **Structural Cells:** `SchwannCells` (myelination) providing zero-delay signal transmission.
 - **Circuit Diversity:** `Pyramidal`, `Bipolar`, `Interneuron`, and `Purkinje` cells with unique activation profiles.
 
-### 🛠 Orchestration & Services
+### Orchestration & Services
 - **Astrocyte service:** Manages synaptic health and ATP distribution.
 - **Microglia service:** Automated pruning of dead connections and garbage collection.
 - **Environment:** Global simulation parameters (Oxygen, Dopamine, Toxins).
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 - **Rust Subsystem:** Handles the `NetworkGraph`, FFI bindings, background services, and native data visualization via `plotters`.
 - **CUDA Subsystem:** High-speed kernels for voltage integration, synaptic processing, and metabolic updates.
@@ -34,7 +34,7 @@ The project is designed for deployment on edge AI hardware like **NVIDIA Jetson*
 
 ---
 
-## 📊 Performance & Benchmarking
+## Performance & Benchmarking
 
 The engine includes a dedicated benchmark mode for stress-testing large-scale networks.
 
@@ -45,7 +45,7 @@ The engine includes a dedicated benchmark mode for stress-testing large-scale ne
 
 ---
 
-## 🛠 How to Run
+## How to Run
 
 ### 1. Requirements
 - Rust (Cargo)
@@ -66,11 +66,11 @@ cargo run --release -- --benchmark
 
 ---
 
-## 📂 Directory Structure
+## Directory Structure
 - `src/`: Rust source code (App orchestrator, FFI, Graph management).
 - `cuda/`: C++/CUDA kernels for biological simulation.
 - `specs/`: Detailed technical specifications and mathematical models.
 - `graphs/`: Auto-generated visualization results.
 
 ---
-*Created with ❤️ by the Neuromorphic AI Team.*
+*Created with ❤️ by the DL.*
