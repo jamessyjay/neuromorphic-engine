@@ -335,7 +335,7 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     graph.neurons[n1 as usize].current_voltage = 20.0;
 
     let mut results = vec![];
-    for tick in 0..1000 {
+    for tick in 0..3000 {
         // Trigger Extreme Hypoxia at tick 300
         if tick == 300 { 
             println!(">>> DISASTER: Oxygen Level dropped to 1%: Total Hypoxia!");
