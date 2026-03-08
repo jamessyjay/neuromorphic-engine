@@ -147,7 +147,7 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
     println!("Ticks Per Second (TPS): {:.2}", tps);
     println!("Synapse Parallelism: Verified. Each of {} synapses processed in a unique GPU thread.", synapses_count);
 
-    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "simulation_report.json");
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/simulation_report.json");
 
     Ok(data)
 }
@@ -302,7 +302,7 @@ fn run_simulation(mut graph: NetworkGraph, total_ticks: u32) -> SimulationData {
     // Total Observability (Phase 31)
     let mut telemetry = crate::telemetry::Telemetry::new();
     telemetry.update(total_ticks);
-    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "simulation_report.json");
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/simulation_report.json");
 
     data
 }
@@ -675,7 +675,7 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     // Total Observability (Phase 31)
     let mut telemetry = crate::telemetry::Telemetry::new();
     telemetry.update(results.last().map(|r| r.0).unwrap_or(0));
-    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "stress_report.json");
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/stress_report.json");
 
     Ok(())
 }
@@ -892,7 +892,7 @@ fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     // Total Observability (Phase 31)
     let mut telemetry = crate::telemetry::Telemetry::new();
     telemetry.update(3000); // 3000 ticks in emergence test
-    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "emergence_report.json");
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/emergence_report.json");
 
     Ok(())
 }
@@ -1027,7 +1027,7 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     // Total Observability (Phase 31)
     let mut telemetry = crate::telemetry::Telemetry::new();
     telemetry.update(total_ticks);
-    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "morphology_report.json");
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/morphology_report.json");
 
     Ok(())
 }

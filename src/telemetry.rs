@@ -60,6 +60,7 @@ impl Telemetry {
     }
 
     pub fn export_simulation_report(&self, neurons: &[BaseNeuron], synapses: &[Synapse], filename: &str) {
+        let _ = fs::create_dir_all("reports");
         println!("Exporting population report to '{}'...", filename);
         
         // 1. Death Reasons
