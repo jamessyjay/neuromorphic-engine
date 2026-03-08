@@ -9,11 +9,20 @@ use std::env;
 use std::time::Instant;
 use rand::prelude::*;
 
+// Simple Gaussian sampler (Box-Muller)
+fn get_gaussian(mu: f32, sigma: f32) -> f32 {
+    let mut rng = rand::rng();
+    let u1: f32 = rng.random();
+    let u2: f32 = rng.random();
+    let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+    mu + sigma * z
+}
+
 fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph {
     let mut graph = NetworkGraph::new();
     let mut rng = rand::rng();
 
-    println!("Generating Benchmark Network: {} neurons, {} synapses...", neurons_count, synapses_count);
+    println!("Generating Benchmark Network (Gaussian weights): {} neurons, {} synapses...", neurons_count, synapses_count);
 
     // Creating neurons
     for _ in 0..neurons_count {
@@ -27,11 +36,14 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
         graph.add_neuron(n_type);
     }
 
-    // Creating random synapses
+    // Creating synapses with Gaussian weights (Spec 06/11)
     for _ in 0..synapses_count {
         let source = rng.random_range(0..(neurons_count as u32));
         let target = rng.random_range(0..(neurons_count as u32));
-        let weight = rng.random_range(0.5..5.0);
+        
+        // Use Gaussian distribution for weights: mean=2.0, sigma=1.0, clamp to positive
+        let weight = get_gaussian(2.0, 1.0).max(0.1).min(15.0);
+        
         let is_inhib = rng.random_bool(0.2); // 20% inhibitory
         let is_myelin = rng.random_bool(0.1); // 10% myelinated
 

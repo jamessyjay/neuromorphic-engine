@@ -70,7 +70,12 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
         n->spikes_in_last_window--;
     }
 
-    // Step 3: Voltage drift
+    // Step 3: Voltage drift & CHAOS (Spec 11)
+    // Add small Gaussian noise to simulate ion channel thermal noise / synaptic background
+    uint32_t chaos_seed = env.seed + n->id + current_tick;
+    float noise = get_gaussian(&chaos_seed, 0.0f, 0.1f);
+    n->current_voltage += noise;
+
     if (n->type == TYPE_PACEMAKER) {
         n->current_voltage += 0.7f; 
         n->energy_ATP -= 0.1f * n->leak_coeff;
@@ -272,11 +277,14 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->max_atp = get_gaussian(&local_seed, 100.0f, 10.0f);
     neuron->leak_coeff = get_gaussian(&local_seed, 1.2f, 0.2f);
     
+    // Randomized structural properties
+    neuron->size = get_gaussian(&local_seed, 1.0f, 0.2f);
+    neuron->vesicles_pool = get_gaussian(&local_seed, 100.0f, 20.0f);
+
     neuron->energy_ATP = neuron->max_atp;
     neuron->current_voltage = neuron->resting_voltage;
     
     neuron->calcium_level = 0.0f;
-    neuron->vesicles_pool = 100.0f;
     neuron->refractory_time_left = 0.0f;
     neuron->last_spike_tick = 0;
     neuron->spikes_in_last_window = 0;
