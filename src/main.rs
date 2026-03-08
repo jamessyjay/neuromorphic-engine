@@ -346,6 +346,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_reflex_arc = args.contains(&String::from("--reflex-arc"));
     let is_inhibition_loop = args.contains(&String::from("--inhibition-loop"));
     let is_scaling_test = args.contains(&String::from("--scaling-test"));
+    let is_frequency_test = args.contains(&String::from("--frequency-test"));
 
     if is_benchmark {
         let data = run_benchmark_mode(10000, 100000, 1000)?;
@@ -355,6 +356,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if is_scaling_test {
         run_scaling_benchmarks()?;
+        return Ok(());
+    }
+
+    if is_frequency_test {
+        run_frequency_test_mode()?;
         return Ok(());
     }
 
@@ -731,6 +737,87 @@ fn render_stress_chart(results: &[(u32, f32, usize, f32)], filename: &str) -> Re
         .label("Mitochondrial Wear").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLACK));
 
     chart.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
+    root.present()?;
+    Ok(())
+}
+
+fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING FREQUENCY DISCRIMINATION TEST (Phase 23) ---");
+    let mut graph = NetworkGraph::new();
+    
+    // Setup: 1 Input (Eye), 2 Logic neurons (F1_Detector, F2_Detector)
+    let eye = graph.add_neuron(NeuronType::Photoreceptor);
+    let f1_det = graph.add_neuron(NeuronType::Pyramidal);
+    let f2_det = graph.add_neuron(NeuronType::Pyramidal);
+    
+    // Initial random connections
+    graph.connect(eye, f1_det, 5.0, false, true);
+    graph.connect(eye, f2_det, 5.0, false, true);
+    
+    let total_ticks = 2000;
+    let mut history = vec![];
+    let mut env = Environment { global_oxygen_level: 1.0, dopamine_multiplier: 1.5, toxin_levels: 0.0, light_level: 0.0, seed: 42 };
+
+    for tick in 1..=total_ticks {
+        // Frequency 1: 10Hz (Pulse every 100 ticks)
+        // Frequency 2: 50Hz (Pulse every 20 ticks)
+        if tick < 1000 {
+            // Train on 10Hz
+            env.light_level = if (tick / 50) % 2 == 0 { 0.8 } else { 0.0 };
+        } else {
+            // Test on 50Hz
+            env.light_level = if (tick / 10) % 2 == 0 { 0.8 } else { 0.0 };
+        }
+
+        graph.tick(tick, env);
+        
+        if tick % 10 == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        history.push((
+            tick,
+            graph.neurons[f1_det as usize].current_voltage,
+            graph.neurons[f2_det as usize].current_voltage,
+            graph.synapses[0].weight, // weight to F1
+            graph.synapses[1].weight, // weight to F2
+        ));
+    }
+
+    render_frequency_chart(&history, "graphs/frequency_learning.png")?;
+    println!("Frequency test complete. Check graphs/frequency_learning.png");
+    Ok(())
+}
+
+fn render_frequency_chart(data: &[(u32, f32, f32, f32, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Rendering Frequency Learning Chart to '{}'...", filename);
+    let root = BitMapBackend::new(filename, (1200, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+    let areas = root.split_evenly((2, 1));
+
+    // Panel 1: Voltages
+    let mut chart1 = ChartBuilder::on(&areas[0])
+        .caption("Neuron Responses to Stimuli", ("sans-serif", 30).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..2000f32, -90f32..50f32)?;
+    chart1.configure_mesh().draw()?;
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, v1, _, _, _)| (t as f32, v1)), &RED))?
+        .label("F1 Detector").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, _, v2, _, _)| (t as f32, v2)), &BLUE))?
+        .label("F2 Detector").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
+    chart1.configure_series_labels().background_style(WHITE.mix(0.8)).draw()?;
+
+    // Panel 2: Synaptic Weights (Plasticity)
+    let mut chart2 = ChartBuilder::on(&areas[1])
+        .caption("Synaptic Weight Evolution (STDP)", ("sans-serif", 30).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..2000f32, 0f32..35f32)?;
+    chart2.configure_mesh().draw()?;
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, w1, _)| (t as f32, w1)), &RED))?
+        .label("W1 (F1 Weight)").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, _, w2)| (t as f32, w2)), &BLUE))?
+        .label("W2 (F2 Weight)").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
+    chart2.configure_series_labels().background_style(WHITE.mix(0.8)).draw()?;
+
     root.present()?;
     Ok(())
 }

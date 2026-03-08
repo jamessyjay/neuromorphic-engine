@@ -68,13 +68,19 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     // Step 2: Homeostatic Plasticity (Spec 11) - Dynamic Threshold Scaling
     // If neuron fires too much, it becomes "thick-skinned" (increase threshold)
     if (n->spikes_in_last_window > 20) {
-        n->activation_threshold += 0.02f; // Desensitization
+        n->activation_threshold += 0.05f; // Faster desensitization
         if (n->activation_threshold > 0.0f) n->activation_threshold = 0.0f;
     } else if (n->spikes_in_last_window < 2) {
         // Slow sensitization towards the base threshold
         if (n->activation_threshold > n->resting_voltage + 15.0f) {
             n->activation_threshold -= 0.01f;
         }
+    }
+
+    // Step 2.5: EMERGENCY METABOLIC GUARD (Phase 23)
+    // If ATP is dangerously low, shut down the neuron to recover
+    if (n->energy_ATP < 20.0f) {
+        n->activation_threshold = 20.0f; // Force silence (above spike voltage)
     }
     
     // Slow decay of the spike counter
@@ -175,7 +181,8 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         if (s->neurotransmitter_buffer < 0.0f) s->neurotransmitter_buffer = 0.0f;
     }
 
-    // Dopamine-Modulated STDP (Phase 14)
+    // Dopamine-Modulated STDP (Phase 14 & 23)
+    // LTP (Long Term Potentiation): Source spikes, then Target spikes within 20ms
     if (s->last_activation_tick > 0 && target->last_spike_tick > s->last_activation_tick) {
         if (target->last_spike_tick - s->last_activation_tick <= 20) {
             float learning_rate = 0.02f * env.dopamine_multiplier;
@@ -184,6 +191,22 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             s->last_activation_tick = 0;
         }
     }
+    // LTD (Long Term Depression): Source spikes but Target doesn't spike or spikes too late
+    else if (s->last_activation_tick > 0 && current_tick - s->last_activation_tick > 50) {
+        s->weight -= 0.005f; // Gradual decay of unused/ineffective connections
+        if (s->weight < 0.1f) s->weight = 0.1f;
+        s->last_activation_tick = 0;
+    }
+
+    // Homeostatic Scaling of Weights (Phase 23)
+    // Target neuron is overactive -> reduce input weights
+    if (target->spikes_in_last_window > 25) {
+        s->weight -= 0.001f;
+    } else if (target->spikes_in_last_window < 1 && s->weight < 10.0f) {
+        // Target is silent -> boost weights to find a signal
+        s->weight += 0.0005f;
+    }
+    if (s->weight < 0.1f) s->weight = 0.1f;
 
     // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08)
     if (s->ticks_until_delivery >= 0) {
