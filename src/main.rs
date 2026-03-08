@@ -362,7 +362,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_morphology_audit = args.contains(&String::from("--morphology-audit"));
 
     if is_benchmark {
-        let data = run_benchmark_mode(10000, 100000, 1000)?;
+        let mut neurons = 10000;
+        let mut synapses = 100000;
+        let mut ticks = 1000;
+
+        for i in 1..args.len() {
+            if args[i] == "--neurons" && i + 1 < args.len() {
+                neurons = args[i+1].parse().unwrap_or(neurons);
+            }
+            if args[i] == "--synapses" && i + 1 < args.len() {
+                synapses = args[i+1].parse().unwrap_or(synapses);
+            }
+            if args[i] == "--ticks" && i + 1 < args.len() {
+                ticks = args[i+1].parse().unwrap_or(ticks);
+            }
+        }
+
+        let data = run_benchmark_mode(neurons, synapses, ticks)?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
         return Ok(());
     }
