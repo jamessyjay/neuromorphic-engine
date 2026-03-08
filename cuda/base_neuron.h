@@ -73,6 +73,7 @@ typedef struct {
 // Environment Singleton Representation
 typedef struct {
     float global_oxygen_level;    // 0.0 to 1.0
+    float global_glucose_level;   // 0.0 to 1.0 (Phase 26)
     float dopamine_multiplier;    // > 1.0 boosts signal
     float toxin_levels;           
     float light_level;            

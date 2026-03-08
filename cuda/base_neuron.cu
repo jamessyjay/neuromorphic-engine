@@ -52,44 +52,45 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
         return;
     }
 
-    // Step 1: ATP Generation (Affected by oxygen and WEAR)
-    // Metabolic Stress (Spec 11): Mitochondria efficiency decreases with Wear
-    float efficiency = (1.0f - n->metabolic_wear);
-    float generated_atp = 0.9f * env.global_oxygen_level * efficiency;
-    n->energy_ATP += generated_atp; 
+    // 1. ATP Generation (mitochondria) - Spec 02 & 07 + Phase 26 (Glucose)
+    float baseline_generation = 1.0f * (1.0f - n->metabolic_wear);
+    float glucose_factor = env.global_glucose_level;
+    float oxygen_factor = env.global_oxygen_level;
+    
+    n->energy_ATP += baseline_generation * oxygen_factor * glucose_factor;
     if (n->energy_ATP > n->max_atp) n->energy_ATP = n->max_atp;
 
-    // BASELINE LEAKAGE (Spec 11): Maintenance cost for keeping the gradient
-    // If ATP is low, pumps struggle, and leakage increases.
+    // 2. Vesicle Recycling (Phase 26) - Spec 02
+    n->vesicles_pool += 0.5f * (n->energy_ATP / 100.0f);
+    if (n->vesicles_pool > 100.0f) n->vesicles_pool = 100.0f;
+
+    // 3. Homeostatic Plasticity & Threshold Recovery (Phase 13 & 26)
+    if (n->spikes_in_last_window > 20) {
+        n->activation_threshold += 0.5f; // Raise threshold (Negative Feedback)
+    } else if (n->spikes_in_last_window < 2) {
+        // Recovery: Move back to resting threshold (Spec 11)
+        float base_threshold = -55.0f; // Standard Pyramidal
+        if (n->type == TYPE_PHOTORECEPTOR) base_threshold = 0.0f;
+        
+        if (n->activation_threshold > base_threshold) {
+             n->activation_threshold -= 0.1f;
+        } else if (n->activation_threshold < base_threshold) {
+             n->activation_threshold += 0.1f;
+        }
+    }
+    n->spikes_in_last_window = 0; 
+
+    // BASELINE LEAKAGE (Spec 11)
     float gradient_maintenance = 0.05f * n->leak_coeff;
     if (n->energy_ATP < 30.0f) gradient_maintenance *= 1.5f; 
     n->energy_ATP -= gradient_maintenance;
 
-    // Step 2: Homeostatic Plasticity (Spec 11) - Dynamic Threshold Scaling
-    // If neuron fires too much, it becomes "thick-skinned" (increase threshold)
-    if (n->spikes_in_last_window > 20) {
-        n->activation_threshold += 0.05f; // Faster desensitization
-        if (n->activation_threshold > 0.0f) n->activation_threshold = 0.0f;
-    } else if (n->spikes_in_last_window < 2) {
-        // Slow sensitization towards the base threshold
-        if (n->activation_threshold > n->resting_voltage + 15.0f) {
-            n->activation_threshold -= 0.01f;
-        }
-    }
-
     // Step 2.5: EMERGENCY METABOLIC GUARD (Phase 23)
-    // If ATP is dangerously low, shut down the neuron to recover
     if (n->energy_ATP < 20.0f) {
-        n->activation_threshold = 20.0f; // Force silence (above spike voltage)
+        n->activation_threshold = 20.0f; // Force silence
     }
     
-    // Slow decay of the spike counter
-    if (current_tick % 100 == 0 && n->spikes_in_last_window > 0) {
-        n->spikes_in_last_window--;
-    }
-
     // Step 3: Voltage drift & CHAOS (Spec 11)
-    // Add small Gaussian noise to simulate ion channel thermal noise / synaptic background
     uint32_t chaos_seed = env.seed + n->id + current_tick;
     float noise = get_gaussian(&chaos_seed, 0.0f, 0.1f);
     n->current_voltage += noise;
@@ -163,52 +164,47 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
 
 static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, uint32_t current_tick) {
     if (source->is_alive) {
-        uint8_t delay = s->is_myelinated ? 0 : 2; // Myelin is purely faster
         if (source->type == TYPE_PHOTORECEPTOR) {
             if (source->current_voltage >= -41.0f) {
                 s->neurotransmitter_buffer += 2.0f; // Photoreceptors leak constantly
-                s->ticks_until_delivery = delay;
+                s->ticks_until_delivery = s->is_myelinated ? 0 : 2;
             }
         } else {
             if (source->last_spike_tick == current_tick && source->current_voltage == SPIKE_VOLTAGE) {
                 // Bulk release on spike
                 s->neurotransmitter_buffer += 25.0f; 
-                s->ticks_until_delivery = delay;
+                s->ticks_until_delivery = s->is_myelinated ? 0 : 2; // Myelin Bypass (Phase 26)
             }
         }
     }
 
-    // Neurotransmitter degradation
-    if (s->neurotransmitter_buffer > 0.0f) {
-        s->neurotransmitter_buffer -= 0.2f;
-        if (s->neurotransmitter_buffer < 0.0f) s->neurotransmitter_buffer = 0.0f;
-    }
-
-    // Dopamine-Modulated STDP (Phase 14 & 23)
-    // LTP (Long Term Potentiation): Source spikes, then Target spikes within 20ms
-    if (s->last_activation_tick > 0 && target->last_spike_tick > s->last_activation_tick) {
-        if (target->last_spike_tick - s->last_activation_tick <= 20) {
-            float learning_rate = 0.02f * env.dopamine_multiplier;
+    // STDP Learning Logic (Phase 7 & 23 & 26)
+    float learning_rate = 0.1f * env.dopamine_multiplier;
+    
+    // LTP: Potentiation (Source then Target)
+    if (s->last_activation_tick > 0 && target->last_spike_tick == current_tick) {
+        if (current_tick - s->last_activation_tick <= 20) {
             s->weight += learning_rate;
-            if (s->weight > 30.0f) s->weight = 30.0f; 
-            s->last_activation_tick = 0;
+            s->last_activation_tick = 0; // Consumption
         }
     }
-    // LTD (Long Term Depression): Source spikes but Target doesn't spike or spikes too late
-    else if (s->last_activation_tick > 0 && current_tick - s->last_activation_tick > 50) {
-        s->weight -= 0.005f; // Gradual decay of unused/ineffective connections
-        if (s->weight < 0.1f) s->weight = 0.1f;
-        s->last_activation_tick = 0;
+    
+    // LTD: Depression (Forget non-effective pulses) - Phase 26
+    if (s->last_activation_tick > 0 && current_tick - s->last_activation_tick >= 10) {
+        if (target->last_spike_tick < s->last_activation_tick) {
+            s->weight -= learning_rate * 0.5f;
+            s->last_activation_tick = 0; // Reset after depression
+        }
     }
 
     // Homeostatic Scaling of Weights (Phase 23)
-    // Target neuron is overactive -> reduce input weights
     if (target->spikes_in_last_window > 25) {
         s->weight -= 0.001f;
     } else if (target->spikes_in_last_window < 1 && s->weight < 10.0f) {
-        // Target is silent -> boost weights to find a signal
         s->weight += 0.0005f;
     }
+
+    if (s->weight > 30.0f) s->weight = 30.0f; 
     if (s->weight < 0.1f) s->weight = 0.1f;
 
     // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08)

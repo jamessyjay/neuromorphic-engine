@@ -60,6 +60,7 @@ pub struct Synapse {
 #[derive(Debug, Clone, Copy)]
 pub struct Environment {
     pub global_oxygen_level: f32,
+    pub global_glucose_level: f32,
     pub dopamine_multiplier: f32,
     pub toxin_levels: f32,
     pub light_level: f32,
