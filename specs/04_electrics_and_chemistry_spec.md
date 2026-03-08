@@ -1,30 +1,29 @@
 # Electrics, Timings, and Chemistry
 
+## 1. Electrics and Timings
+* **Resting Potential:** -70 mV. Baseline charge. Maintained by pumps (consumes significant energy).
+* **Activation Threshold:** -55 mV. Trigger for firing. The sum of inputs must bring the charge to this level.
+* **Spike (Fire):** +40 mV. Maximum current jump. Encodes the signal on an "All or Nothing" principle.
+* **Spike Duration:** 1–2 ms. The time during which current physically travels along the cable within a single neuron.
+* **Absolute Refractory Period:** ~1 ms. Channels are blocked. The neuron CANNOT fire under any circumstances.
+* **Relative Refractory Period:** 2–4 ms. Charge dips (down to -80 mV). Firing is possible, but requires an exceptionally strong input.
+* **Synaptic Delay:** 0.5–1 ms. The "Customs" check. Time for re-converting current into chemistry, traveling across the gap, and opening the neighbor's locks.
 
-## 1. Электрика и Тайминги
-* [cite_start]**Потенциал покоя:** -70 мВ[cite: 1]. [cite_start]Базовый заряд[cite: 1]. [cite_start]Поддерживается насосами (жрет дохуя энергии)[cite: 1].
-* [cite_start]**Порог активации:** -55 мВ[cite: 1]. [cite_start]Триггер для выстрела[cite: 1]. [cite_start]Сумма входов должна дотянуть заряд до этой цифры[cite: 1].
-* [cite_start]**Спайк (Выстрел):** +40 мВ[cite: 1]. [cite_start]Максимальный скачок тока[cite: 1]. [cite_start]Кодирует сигнал по принципу "Всё или ничего"[cite: 1].
-* [cite_start]**Длительность спайка:** 1–2 мс[cite: 1]. [cite_start]Время, пока ток физически хуярит по кабелю внутри одного нейрона[cite: 1].
-* [cite_start]**Абсолютный кулдаун:** ~1 мс[cite: 1]. [cite_start]Каналы заблокированы[cite: 1]. [cite_start]Нейрон НЕ МОЖЕТ выстрелить ни при каких условиях[cite: 1].
-* [cite_start]**Относительный кулдаун:** 2–4 мс[cite: 1]. [cite_start]Заряд проседает (до -80 мВ)[cite: 1]. [cite_start]Выстрелить можно, но нужен неебически сильный вход[cite: 1].
-* [cite_start]**Синаптическая задержка:** 0.5–1 мс[cite: 1]. [cite_start]Таможня[cite: 1]. [cite_start]Время на переконвертацию тока в химию, перелет через щель и открытие замков соседа[cite: 1].
+## 2. Network Interfaces and Memory (Synapse)
+* **Vesicles + Calcium:** Signal transmission trigger. Current opens calcium channels -> calcium causes bubbles to release neurotransmitter.
+* **Synaptic Cleft:** Transmission medium (physical gap). Micro-abyss between the terminal and the dendrite.
+* **Ionotropic Receptors:** Fast if/else for data transfer. Fast locks. Chemistry opens the channel, ions change the charge.
+* **Metabotropic (G-proteins):** Modification of network meta-parameters. Slow locks. Change internal cell settings, influence the nucleus.
+* **NMDA Receptors:** Logical "AND". Basis for Hebb's rule. Require both external Glutamate and high internal charge to displace magnesium.
+* **Plasticity (LTP/LTD):** Physical memory (Weights). Growing new receptors (strengthening) or hiding them (weakening).
+* **Cleft Clearing:** Port reset to prevent signal stickiness. Reuptake (vacuuming) or destruction by enzymes.
 
-## 2. Сетевые интерфейсы и Память (Синапс)
-* [cite_start]**Везикулы + Кальций:** Триггер отправки пакета данных[cite: 1]. [cite_start]Ток открывает кальций -> кальций заставляет пузырьки выблевать медиатор[cite: 1].
-* [cite_start]**Синаптическая щель:** Среда передачи (физический разрыв)[cite: 1]. [cite_start]Микро-пропасть между терминалью и дендритом[cite: 1].
-* [cite_start]**Ионотропные рецепторы:** Быстрый if/else для передачи данных[cite: 1]. [cite_start]Быстрые замки[cite: 1]. [cite_start]Химия открывает канал, ионы меняют заряд[cite: 1].
-* [cite_start]**Метаботропные (G-белки):** Изменение мета-параметров сети[cite: 1]. [cite_start]Медленные замки[cite: 1]. [cite_start]Меняют внутренние настройки клетки, лезут в ядро[cite: 1].
-* [cite_start]**NMDA-рецепторы:** Логическое "И" (AND)[cite: 1]. [cite_start]База для правила Хебба[cite: 1]. [cite_start]Требуют и Глутамат снаружи, и высокий заряд внутри, чтобы выбить магний[cite: 1].
-* [cite_start]**Пластичность (LTP/LTD):** Физическая память (Веса)[cite: 1]. [cite_start]Отращивание новых рецепторов (усиление) или их скрытие (ослабление)[cite: 1].
-* [cite_start]**Очистка щели:** Reset порта, чтобы сигнал не залип[cite: 1]. [cite_start]Обратный захват (пылесос) или разрушение ферментами[cite: 1].
-
-## 3. Химия (Типы данных)
-* [cite_start]**Глутамат:** Главный работяга (Газ)[cite: 1]. + (Возбуждение) [cite_start][cite: 1]. [cite_start]Пробивает порог[cite: 1].
-* [cite_start]**ГАМК / Глицин:** Главные тормоза[cite: 1]. - (Торможение) [cite_start][cite: 1]. [cite_start]Гасят активность, уводят заряд в минус[cite: 1].
-* [cite_start]**Дофамин:** Модулятор фокуса и награды[cite: 1]. [cite_start]Подкручивает "громкость" важных сигналов[cite: 1].
-* [cite_start]**Серотонин:** Модулятор фона[cite: 1]. [cite_start]Регулирует общее состояние сети (настроение/сон)[cite: 1].
-* [cite_start]**Ацетилхолин:** Менеджер памяти[cite: 1]. [cite_start]Переводит сеть в режим "записи/обучения"[cite: 1].
-* [cite_start]**Норадреналин/Адреналин:** Будильник / Турбо-кнопка[cite: 1]. [cite_start]Резко сужает фокус, отсекает лишний шум[cite: 1].
-* [cite_start]**Гистамин:** Тонус системы[cite: 1]. [cite_start]Не дает сети "уснуть"[cite: 1].
-* [cite_start]**Эндорфины (Пептиды):** Встроенный морфий[cite: 1]. [cite_start]Глушат перегрузки (боль), работают медленно, но массивно[cite: 1].
+## 3. Chemistry (Data Types)
+* **Glutamate:** Main worker (Gas). + (Excitation). Breaches the threshold.
+* **GABA / Glycine:** Main brakes. - (Inhibition). Dampen activity, push charge into negative territory.
+* **Dopamine:** Modulator of focus and reward. Adjusts the "volume" of important signals.
+* **Serotonin:** Background modulator. Regulates the overall state of the network (mood/sleep).
+* **Acetylcholine:** Memory manager. Switches the network into "recording/learning" mode.
+* **Norepinephrine/Epinephrine:** Alarm clock / Turbo button. Sharply narrows focus, cuts out excess noise.
+* **Histamine:** System tone. Prevents the network from "falling asleep".
+* **Endorphins (Peptides):** Built-in morphine. Cull overloads (pain), work slowly but massively.

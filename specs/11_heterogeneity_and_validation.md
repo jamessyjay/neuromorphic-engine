@@ -1,46 +1,44 @@
 # Heterogeneity, Evolution, and Validation Protocol
 
-Этот документ описывает переход от "идеальных клонов" к биологическому многообразию и методы верификации системы.
+This document describes the transition from "ideal clones" to biological diversity and systems verification methods.
 
-## 1. Гетерогенность (Начальный Рандом)
-В природе нет двух одинаковых нейронов. При инициализации нейрона через `init_neuron` параметры НЕ должны быть константами. Используется нормальное распределение (Gaussian Distribution).
+## 1. Heterogeneity (Initial Randomization)
+In nature, no two neurons are the same. When initializing a neuron via `init_neuron`, parameters should NOT be constants. A Gaussian Distribution is used.
 
-**Формула:** $$Value_{final} = \mu + \sigma \cdot N(0, 1)$$
+**Formula:** $$Value_{final} = \mu + \sigma \cdot N(0, 1)$$
 
-| Параметр | База ($\mu$) | Отклонение ($\sigma$) | Смысл |
+| Parameter | Base ($\mu$) | Deviation ($\sigma$) | Meaning |
 | :--- | :--- | :--- | :--- |
-| `resting_voltage` | -70.0 mV | 2.5 mV | Разный уровень "спокойствия" |
-| `activation_threshold`| -55.0 mV | 1.5 mV | Разная "возбудимость" |
-| `energy_atp_max` | 100.0 | 5.0 | Разный объем метаболических баков |
-| `leak_efficiency` | 1.0 (coeff) | 0.1 | Эффективность насосов |
+| `resting_voltage` | -70.0 mV | 2.5 mV | Different "resting" levels |
+| `activation_threshold`| -55.0 mV | 1.5 mV | Different "excitability" |
+| `energy_atp_max` | 100.0 | 5.0 | Different metabolic tank capacities |
+| `leak_efficiency` | 1.0 (coeff) | 0.1 | Pump efficiency |
 
+## 2. Evolution and Adaptation (Homeostatic Plasticity)
+A neuron must change its parameters "on the fly" (within the CUDA kernel) to survive and operate effectively.
 
+- **Threshold Scaling:** If the average spike frequency over the last 1000 ticks exceeds a limit — the neuron smoothly raises its `activation_threshold` (becomes "thick-skinned").
+- **Metabolic Stress:** If ATP frequently drops below 20%, the efficiency of ATP generation by mitochondria falls (wear-and-tear effect).
+- **BDNF Growth:** Upon successful learning (STDP), neighboring Astrocytes release growth factor, which increases the `receptor_count` (weight) of synapses.
 
-## 2. Эволюция и Адаптация (Homeostatic Plasticity)
-Нейрон должен менять свои параметры "на лету" (в ядре CUDA), чтобы выживать и эффективно работать.
+## 3. Extended Use Cases (Stress-Tests)
 
-- **Threshold Scaling:** Если средняя частота спайков за последние 1000 тактов превышает лимит — нейрон плавно повышает свой `activation_threshold` (становится "толстокожим").
-- **Metabolic Stress:** Если АТФ часто падает ниже 20%, эффективность генерации АТФ митохондриями падает (эффект износа).
-- **BDNF Growth:** При успешном обучении (STDP) соседние Астроциты выделяют фактор роста, что увеличивает `receptor_count` (вес) синапсов.
+### Use Case 1: Synaptic Fatigue
+- **Stimulus:** Applying a 100 Hz signal to a single dendrite.
+- **Expectation:** Depletion of the `vesicles_pool`. The effective signal at the output should fade, even if the input is still "hot."
 
-## 3. Расширенные Юзкейсы (Stress-Tests)
+### Use Case 2: Hypoxic Shutdown (Death from suffocation)
+- **Stimulus:** `Environment.global_oxygen_level = 0.05` for 500 ticks.
+- **Expectation:** ATP collapse -> pumps stop -> voltage drifts toward 0 -> `die_gracefully` call.
 
-### UseCase 1: Synaptic Fatigue (Усталость)
-- **Стимул:** Подача 100 Гц сигнала на один дендрит.
-- **Ожидание:** Истощение `vesicles_pool`. Эффективный сигнал на выходе должен затухать, даже если на входе всё еще "жара".
+### Use Case 3: Epileptic Feedback (Looping)
+- **Stimulus:** Connecting three Pyramidal neurons in a ring with a weight of 5.0.
+- **Expectation:** Uncontrolled self-acceleration -> calcium explosion (`calcium_level >= 100`) -> death of the entire group.
 
-### UseCase 2: Hypoxic Shutdown (Смерть от удушья)
-- **Стимул:** `Environment.global_oxygen_level = 0.05` на 500 тактов.
-- **Ожидание:** Коллапс АТФ -> остановка насосов -> вольтаж дрейфует к 0 -> вызов `die_gracefully`.
+## 4. Validation (Digital Twin)
+To confirm model accuracy, simulation results (CSV/Charts) must be compared with real data (e.g., from the Allen Brain Institute).
 
-### UseCase 3: Epileptic Feedback (Зацикливание)
-- **Стимул:** Соединение трех Пирамидальных нейронов в кольцо с весом 5.0.
-- **Ожидание:** Неконтролируемый саморазгон -> кальциевый взрыв (`calcium_level >= 100`) -> смерть всей группы.
-
-## 4. Валидация (Digital Twin)
-Чтобы подтвердить точность модели, результаты симуляции (CSV/Графики) должны сравниваться с реальными данными (например, из Allen Brain Institute).
-
-**Метрики успеха:**
-1. **Spike Shape:** Форма кривой спайка должна иметь фазы деполяризации, реполяризации и следовой гиперполяризации (просадка до -80mV).
-2. **Frequency-Current (F-I) Curve:** Зависимость частоты выстрелов от силы входящего тока должна быть логарифмической, а не линейной.
-3. **Heatmap Visualization:** На графе сети нейроны должны окрашиваться в зависимости от состояния (Белый: спайк, Красный: кальциевый стресс, Серый: смерть).
+**Success Metrics:**
+1. **Spike Shape:** The spike curve must have phases of depolarization, repolarization, and aftercurrent hyperpolarization (dip to -80mV).
+2. **Frequency-Current (F-I) Curve:** The dependence of firing frequency on the strength of the incoming current should be logarithmic, not linear.
+3. **Heatmap Visualization:** On the network graph, neurons should be colored based on state (White: spike, Red: calcium stress, Gray: death).

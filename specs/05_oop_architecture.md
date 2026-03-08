@@ -1,35 +1,34 @@
 # OOP Architecture
 
+## 1. Base Class: `BaseNeuron`
+**Properties:**
+* `id`: Unique node identifier.
+* `size`: Soma size (default is average).
+* `resting_voltage`: Baseline charge (default -70.0 mV).
+* `activation_threshold`: Firing threshold (default -55.0 mV).
+* `spike_peak`: Spike peak (default +40.0 mV).
+* `energy_ATP`: Current energy level (from 0 to 100%).
+* `is_alive`: Boolean value (true/false).
+* `inputs_array[]`: Array of incoming connections (dendrites).
+* `outputs_array[]`: Array of outgoing connections (axon -> telodendria).
 
-## [cite_start]1. Базовый Класс: `BaseNeuron` [cite: 1]
-**Свойства (Properties):**
-* [cite_start]`id`: Уникальный идентификатор узла[cite: 1].
-* [cite_start]`size`: Размер сомы (по дефолту средний)[cite: 1].
-* [cite_start]`resting_voltage`: Базовый заряд (по дефолту -70.0 mV)[cite: 1].
-* [cite_start]`activation_threshold`: Порог выстрела (по дефолту -55.0 mV)[cite: 1].
-* [cite_start]`spike_peak`: Пик спайка (по дефолту +40.0 mV)[cite: 1].
-* [cite_start]`energy_ATP`: Текущий уровень энергии (от 0 до 100%)[cite: 1].
-* [cite_start]`is_alive`: Булево значение (true/false)[cite: 1].
-* [cite_start]`inputs_array[]`: Массив входящих соединений (дендриты)[cite: 1].
-* [cite_start]`outputs_array[]`: Массив исходящих соединений (аксон -> телодендрия)[cite: 1].
+**Methods:**
+* `calculate_sum()`: Add up all incoming pros and cons.
+* `fire_spike()`: If sum > activation_threshold, fire current up to spike_peak.
+* `release_neurotransmitter(type, amount)`: Release chemistry into the synapse after a spike.
+* `apply_cooldown()`: Block fire_spike() for 1-3 ms (refractory period).
+* `die_gracefully()`: Trigger apoptosis if energy_ATP == 0 or excessive calcium overload occurs.
 
-**Методы (Methods):**
-* [cite_start]`calculate_sum()`: Сложить все входящие плюсы и минусы[cite: 1].
-* [cite_start]`fire_spike()`: Если сумма > activation_threshold, ебануть ток до spike_peak[cite: 1].
-* [cite_start]`release_neurotransmitter(type, amount)`: Выплюнуть химию в синапс после спайка[cite: 1].
-* [cite_start]`apply_cooldown()`: Заблокировать fire_spike() на 1-3 мс (рефрактерный период)[cite: 1].
-* [cite_start]`die_gracefully()`: Запустить апоптоз, если energy_ATP == 0 или жесткий перегруз кальцием[cite: 1].
+## 2. Child Classes (Inheritors)
+* **`PyramidalNeuron`:** Large (Pyramid). Base: -70 mV. Trigger: -55 mV. Main processor. Inherits everything from base. Has an exceptionally complex calculate_sum(), as there are thousands of inputs. Releases Glutamate (excites others).
+* **`PurkinjeCell`:** Huge (2D fan). Base: -70 mV. Trigger: -50 mV. Parallel calculator. inputs_array increased to 200,000. Overridden firing method: can do a regular fire_spike(), or fire_complex_spike() (powerful weight reset for timing training).
+* **`BipolarNeuron`:** Small (Wire). Base: -70 mV. Trigger: -55 mV. Relay node. Strictly 1 input and 1 output. calculate_sum() is almost unnecessary. Simply receives packet -> passes packet. Maximum speed.
+* **`Interneuron`:** Small (Bush). Base: -70 mV. Trigger: -55 mV. Local brake. Lives only locally. Always calls release_neurotransmitter(GABA), distributing negatives to all neighbors to cut out noise and dampen epilepsy.
+* **`PacemakerNeuron`:** Medium. Base: Floating. Trigger: -40 mV. Clock frequency generator. calculate_sum() is ignored. Has a built-in while(is_alive) loop that constantly raises charge to -40 and fires. Sets the rhythm for the entire network.
+* **`Photoreceptor`:** Small (Cone). Base: -40 mV. Trigger: NULL. Analog sensor. fire_spike() is DISABLED. instead, smooth_dimmer() is active. While dark — releases neurotransmitter continuously. As soon as light falls — charge drops to -65 mV, and chemistry release stops (inverted logic).
+* **`Nociceptor`:** Medium (Long). Base: -65 mV. Trigger: Dynamic. Damage (pain) sensor. activation_threshold is not static. With frequent use, the threshold lowers (e.g., to -60 mV), and the sensor starts spamming alerts at the slightest touch (inflammation effect).
 
-## 2. Дочерние Классы (Наследники)
-* [cite_start]**`PyramidalNeuron`:** Крупный (Пирамида)[cite: 1]. [cite_start]Base: -70 мВ[cite: 1]. [cite_start]Trigger: -55 мВ[cite: 1]. [cite_start]Главный процессор[cite: 1]. [cite_start]Наследует всё от базы[cite: 1]. [cite_start]Имеет неебически сложный calculate_sum(), так как входов тысячи[cite: 1]. [cite_start]Выделяет Глутамат (возбуждает других)[cite: 1].
-* [cite_start]**`PurkinjeCell`:** Огромный (2D-веер)[cite: 1]. [cite_start]Base: -70 мВ[cite: 1]. [cite_start]Trigger: -50 мВ[cite: 1]. [cite_start]Параллельный вычислитель [cite: 1][cite_start]. inputs_array увеличен до 200,000[cite: 1]. [cite_start]Переопределен метод стрельбы: может делать обычный fire_spike(), а может fire_complex_spike() (мощный сброс весов для обучения таймингам)[cite: 1].
-* [cite_start]**`BipolarNeuron`:** Мелкий (Провод)[cite: 1]. [cite_start]Base: -70 мВ[cite: 1]. [cite_start]Trigger: -55 мВ[cite: 1]. [cite_start]Ретранслятор[cite: 1]. [cite_start]Строго 1 вход и 1 выход[cite: 1]. [cite_start]Метод calculate_sum() почти не нужен[cite: 1]. [cite_start]Тупо принял пакет -> передал пакет[cite: 1]. [cite_start]Максимальная скорость[cite: 1].
-* [cite_start]**`Interneuron`:** Мелкий (Куст)[cite: 1]. [cite_start]Base: -70 мВ[cite: 1]. [cite_start]Trigger: -55 мВ[cite: 1]. [cite_start]Локальный тормоз[cite: 1]. [cite_start]Обитает только локально[cite: 1]. [cite_start]Всегда вызывает release_neurotransmitter(GABA), то есть раздает всем соседям минусы, чтобы отсекать лишний шум и гасить эпилепсию[cite: 1].
-* [cite_start]**`PacemakerNeuron`:** Средний[cite: 1]. [cite_start]Base: Плавает[cite: 1]. [cite_start]Trigger: -40 мВ[cite: 1]. [cite_start]Генератор тактовой частоты[cite: 1]. [cite_start]Метод calculate_sum() игнорируется[cite: 1]. [cite_start]Встроен while(is_alive) луп, который сам постоянно поднимает заряд до -40 и стреляет[cite: 1]. [cite_start]Задает ритм всей сети[cite: 1].
-* [cite_start]**`Photoreceptor`:** Мелкий (Колбочка)[cite: 1]. [cite_start]Base: -40 мВ[cite: 1]. [cite_start]Trigger: NULL[cite: 1]. [cite_start]Ебанутый аналоговый датчик[cite: 1]. [cite_start]Полностью переписан метод выстрела: fire_spike() ОТКЛЮЧЕН[cite: 1]. [cite_start]Вместо него работает smooth_dimmer()[cite: 1]. [cite_start]Пока темно — льет медиатор без остановки[cite: 1]. [cite_start]Как только падает свет — заряд падает до -65 мВ, и выброс химии стопается (инвертированная логика)[cite: 1].
-* [cite_start]**`Nociceptor`:** Средний (Длинный)[cite: 1]. [cite_start]Base: -65 мВ[cite: 1]. [cite_start]Trigger: Динамический[cite: 1]. [cite_start]Датчик урона (боли)[cite: 1]. [cite_start]Свойство activation_threshold не статично[cite: 1]. [cite_start]При частом использовании порог снижается (например, до -60 мВ), и сенсор начинает спамить алертами от малейшего касания (эффект воспаления)[cite: 1].
-
-## 3. Сервисные Классы (Демоны)
-* [cite_start]**`Astrocyte`:** Garbage Collector (GC) & Resource Manager[cite: 1]. [cite_start]Мониторит синапсы[cite: 1]. [cite_start]Если видит дохуя лишнего Глутамата — вызывает метод clean_synapse()[cite: 1]. [cite_start]Также подкидывает энергию (energy_ATP += 10) активным нейронам[cite: 1].
-* [cite_start]**`SchwannCell / Oligodendrocyte`:** Network Optimizer[cite: 1]. [cite_start]Оборачивает outputs_array (аксон) в миелин (изоленту)[cite: 1]. [cite_start]Меняет физику передачи: вместо медленного поканального вычисления включает teleport_signal(), ускоряя пакет данных в 100 раз[cite: 1].
-* [cite_start]**`Microglia`:** Antivirus / Firewall[cite: 1]. [cite_start]Плавает по сети[cite: 1]. [cite_start]Находит мертвые объекты (is_alive == false), вызывает метод delete() и очищает память от мусора[cite: 1].
+## 3. Service Classes (Daemons)
+* **`Astrocyte`:** Garbage Collector (GC) & Resource Manager. Monitors synapses. If it sees excess Glutamate — calls clean_synapse(). Also boosts ATP (energy_ATP += 10) for active neurons.
+* **`SchwannCell / Oligodendrocyte`:** Network Optimizer. Wraps outputs_array (axon) in myelin (insulation). Changes transmission physics: instead of slow channel-by-channel calculation, enables teleport_signal(), speeding up data packets 100x.
+* **`Microglia`:** Antivirus / Firewall. Swims through the network. Finds dead objects (is_alive == false), calls delete(), and clears memory of trash.

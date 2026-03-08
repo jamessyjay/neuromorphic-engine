@@ -1,36 +1,36 @@
 # Network Protocols and System Limits
 
-Этот документ определяет жесткие границы системы. Нейрон не может стрелять бесконечно, у него есть физические лимиты по энергии, пропускной способности интерфейсов и уровню клеточной токсичности.
+This document defines the hard boundaries of the system. A neuron cannot fire indefinitely; it has physical limits regarding energy, interface throughput, and cellular toxicity levels.
 
-## 1. Протокол связи (Класс `Synapse`)
+## 1. Communication Protocol (`Synapse` Class)
 
-Нейроны НЕ вызывают методы друг друга напрямую. Телепортация данных запрещена. Между выходом Нейрона А и входом Нейрона Б всегда стоит объект-посредник `Synapse`.
-* **Свойства:** `delay_ticks` (задержка передачи, дефолт = 1 тик), `chemical_buffer` (очередь пакетов).
-* **Логика работы:**
-  1. Аксон Нейрона А вызывает метод `Synapse.push(Glutamate_amount)`.
-  2. Синапс кладет этот пакет в буфер на время `delay_ticks`.
-  3. На следующем тике Синапс передает пакет в дендрит Нейрона Б: вызов `NeuronB.receive_signal(Glutamate_amount)`.
-* **Зачем:** Это аппаратно имитирует время, пока химия переплывает микро-пропасть между клетками.
+Neurons do NOT call each other's methods directly. Data teleportation is forbidden. An intermediary `Synapse` object always stands between the output of Neuron A and the input of Neuron B.
+* **Properties:** `delay_ticks` (transmission delay, default = 1 tick), `chemical_buffer` (packet queue).
+* **Work Logic:**
+  1. The axon of Neuron A calls the `Synapse.push(Glutamate_amount)` method.
+  2. The synapse places this packet into the buffer for the duration of `delay_ticks`.
+  3. On the next tick, the synapse transfers the packet to the dendrite of Neuron B: calling `NeuronB.receive_signal(Glutamate_amount)`.
+* **Why:** This hardware-mimics the time it takes for chemistry to swim across the micro-abyss between cells.
 
-## 2. Экономика АТФ (Математика Энергии)
-Энергия не берется из ниоткуда. Без жесткого баланса сеть уйдет в перманентный спам выстрелами.
+## 2. ATP Economics (Energy Math)
+Energy does not appear out of thin air. Without a strict balance, the network would devolve into permanent spike spam.
 * `MAX_ATP` = 100.0%.
-* **Генерация:** `+1.0%` за тик (если `Environment.global_glucose > 0`).
-* **Базовый расход (Насосы):** `-0.1%` за тик (тратится на поддержание `LEAK_RATE` и удержание -70 мВ).
-* **Расход на Спайк (Выстрел):** `-20.0%` за один выстрел! 
-* **Следствие:** Если нейрон выстрелит 5 раз подряд без передышки, его АТФ упадет до нуля. Насосы встанут, выстрелы физически прекратятся, пока митохондрии не наварят новой энергии. Узел "устает".
+* **Generation:** `+1.0%` per tick (if `Environment.global_glucose > 0`).
+* **Base Expenditure (Pumps):** `-0.1%` per tick (spent on maintaining `LEAK_RATE` and holding -70 mV).
+* **Spike Expenditure (Fire):** `-20.0%` per single fire!
+* **Consequence:** If a neuron fires 5 times in a row without a break, its ATP will drop to zero. The pumps will stop, and firing will physically cease until the mitochondria cook up new energy. The node "gets tired."
 
-## 3. Сатурация Рецепторов (Лимит пропускной способности)
+## 3. Receptor Saturation (Throughput Limit)
 
-Нельзя просто бесконечно умножать входящий сигнал на вес. Если "замков" (рецепторов) мало, лишние "ключи" (химия) идут мимо.
-* **Формула:** `Effective_Signal = MIN(Incoming_Neurotransmitter, Receptor_Count)`
-* **Пример:** Если сосед сошел с ума и выплюнул 50 единиц Глутамата, а у нашего принимающего дендрита всего `Receptor_Count = 10`, то внутрь пройдет только 10 единиц сигнала. 
-* Остальные 40 единиц зависнут в синаптической щели (в буфере объекта `Synapse`), пока их не уничтожит мусорщик (класс `Astrocyte`).
+You cannot simply multiply the incoming signal by the weight indefinitely. If there are few "locks" (receptors), the extra "keys" (chemistry) go to waste.
+* **Formula:** `Effective_Signal = MIN(Incoming_Neurotransmitter, Receptor_Count)`
+* **Example:** If a neighbor goes crazy and spits out 50 units of Glutamate, but our receiving dendrite only has `Receptor_Count = 10`, then only 10 units of signal will pass inside.
+* The remaining 40 units will hang in the synaptic cleft (in the `Synapse` object's buffer) until destroyed by the scavenger (`Astrocyte` class).
 
-## 4. Математика Смерти (Кальциевый перегруз)
+## 4. Death Mathematics (Calcium Overload)
 
-Кальций — это счетчик критического урона. Если клетку жестко заспамить, она буквально сварится изнутри.
-* Базовый уровень `calcium_level` = 0.
-* **Накопление (Урон):** При каждом Спайке ИЛИ при мощном открытии NMDA-рецепторов `calcium_level += 10`.
-* **Остывание (Регенерация):** На каждом тике клетка пытается выводить кальций: `calcium_level -= 1` (до минимума 0).
-* **Триггер смерти:** Если `calcium_level >= 100` — вызывается фатальная функция `die_gracefully()`. Клетка навсегда удаляется из симуляции (Апоптоз).
+Calcium is the critical damage counter. If a cell is heavily spammed, it literally cooks from the inside.
+* Base `calcium_level` = 0.
+* **Accumulation (Damage):** With each Spike OR during powerful NMDA receptor opening, `calcium_level += 10`.
+* **Cooling (Regeneration):** Every tick, the cell tries to remove calcium: `calcium_level -= 1` (down to a minimum of 0).
+* **Death Trigger:** If `calcium_level >= 100` — the fatal `die_gracefully()` function is called. The cell is permanently removed from the simulation (Apoptosis).

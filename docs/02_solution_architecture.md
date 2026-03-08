@@ -1,48 +1,48 @@
 # Neuromorphic Engine: Solution Architecture (Biological Logic)
 
-Детальное описание математических моделей и биологических алгоритмов, реализованных в движке.
+Detailed description of the mathematical models and biological algorithms implemented in the engine.
 
 ## 1. Neuron Model (Modified LIF & Metabolism)
 
-Наши нейроны — это не просто сумматоры, а живые сущности с ограниченным ресурсом.
+Our neurons are not just summation units, but living entities with limited resources.
 
-### Метаболизм и АТФ (Spec 02/11)
-Каждый нейрон имеет заряд **ATP** (энергия).
-- **Генерация:** Зависит от `global_oxygen_level` и `metabolic_wear` (износа митохондрий).
-- **Потребление:** Базовая утечка (`leak_coeff`) + колоссальный расход при спайке (`ATP_SPIKE_COST`).
-- **Смерть:** Если ATP < 1.0, вызывается `die_gracefully()`, нейрон перестает функционировать (Apoptosis).
+### Metabolism and ATP (Spec 02/11)
+Each neuron has an **ATP** charge (energy).
+- **Generation:** Depends on `global_oxygen_level` and `metabolic_wear` (mitochondrial wear).
+- **Consumption:** Baseline leakage (`leak_coeff`) + massive consumption during a spike (`ATP_SPIKE_COST`).
+- **Death:** If ATP < 1.0, `die_gracefully()` is called, and the neuron ceases to function (Apoptosis).
 
-### Гетерогенность и Хаос (Spec 11)
-В природе нет одинаковых нейронов. 
-- **Gaussian Heterogeneity:** При создании параметры (`resting_voltage`, `threshold`, `max_atp`) генерируются через распределение Гаусса.
-- **Stochastic Noise:** В каждый тик в вольтаж подмешивается стохастический шум (Гаусс), имитирующий тепловой шум ионных каналов.
+### Heterogeneity and Chaos (Spec 11)
+In nature, no two neurons are the same.
+- **Gaussian Heterogeneity:** Upon creation, parameters (`resting_voltage`, `threshold`, `max_atp`) are generated via a Gaussian distribution.
+- **Stochastic Noise:** Every tick, stochastic noise (Gaussian) is mixed into the voltage, simulating the thermal noise of ion channels.
 
 ## 2. Synaptic Dynamics (Chemical Delivery)
 
 ### Neurotransmitter Buffer (Spec 06)
-При спайке нейрона синапс не мгновенно передает сигнал.
-1. Спайк выбрасывает "порцию" в `neurotransmitter_buffer`.
-2. Задержка (Delay): Сигнал идет по аксону (0 тиков для миелина, 2 тика без него).
-3. Рецепторы: Сигнал считывается из буфера.
+When a neuron spikes, the synapse does not instantly transmit the signal.
+1. A spike releases a "portion" into the `neurotransmitter_buffer`.
+2. Delay: The signal travels along the axon (0 ticks for myelin, 2 ticks without it).
+3. Receptors: The signal is read from the buffer.
 
 ### Receptor Saturation (Spec 08)
-Синапс имеет предел проводимости (количество рецепторов), определяемый его весом (`weight`).
-- Если в буфере больше химии, чем может принять синапс, сигнал ограничивается (`receptor_limit`).
-- Излишки остаются в буфере до следующего тика.
+A synapse has a conductance limit (number of receptors) determined by its `weight`.
+- If there is more chemical in the buffer than the synapse can accept, the signal is limited (`receptor_limit`).
+- Excess remains in the buffer until the next tick.
 
 ## 3. Plasticity (Learning)
 
 ### Dopamine-Modulated STDP (Phases 13-14)
-Обучение (изменение весов) происходит по правилу STDP (Spike-Timing Dependent Plasticity), но с дофаминовым гейтом.
-- Вес растет, если цель (Target) стрельнула вскоре после активации синапса.
-- Множитель дофамина (`dopamine_multiplier`) масштабирует этот рост. При низком дофамине обучение "заморожено".
+Learning (weight change) occurs according to the STDP (Spike-Timing Dependent Plasticity) rule, but with a dopamine gate.
+- Weight grows if the target spikes shortly after synapse activation.
+- The `dopamine_multiplier` scales this growth. At low dopamine, learning is "frozen".
 
 ## 4. Homeostatic Plasticity
 
-Если нейрон стреляет слишком часто, его `activation_threshold` динамически растет (десенсибилизация). Если нейрон "молчит", порог медленно снижается, делая нейрон более чувствительным (сенсибилизация).
+If a neuron spikes too frequently, its `activation_threshold` dynamically increases (desensitization). If the neuron is "silent", the threshold slowly decreases, making the neuron more sensitive (sensitization).
 
 ## 5. Wear & Aging
 
-**Mitochondrial Wear:** С каждым спайком параметр `metabolic_wear` увеличивается. 
-- Чем выше износ, тем медленнее регенерирует АТФ. 
-- Это ограничивает максимальную частоту разряда нейрона на длинных дистанциях и имитирует биологическое утомление.
+**Mitochondrial Wear:** With each spike, the `metabolic_wear` parameter increases.
+- The higher the wear, the slower ATP regenerates.
+- This limits the maximum discharge frequency of the neuron over long periods and simulates biological fatigue.

@@ -1,34 +1,32 @@
 # Neuron Specification (Full Biological Architecture)
 
+## 1. Internal Factory (Organelles and States)
+Each node has internal modules operating in the background:
+- **Mitochondria:** Generate `ATP_energy` every unit of time (tick). Consume `glucose` and `oxygen` (global environment variables).
+- **Sodium-Potassium Pumps:** Operate constantly. Spend `ATP_energy` to maintain `current_voltage` at the `RESTING_VOLTAGE` level.
+- **Nucleus and ER (Endoplasmic Reticulum):** Database and factory. Create new receptors (changing synapse weights) if a signal arrives from metabotropic receptors.
+- **Golgi Apparatus:** Packages neurotransmitters into vesicles (bubbles) for shipping.
 
-
-## 1. Внутренний завод (Органеллы и Состояния)
-Каждый узел имеет внутренние модули, работающие в фоновом режиме:
-- **Митохондрии:** Каждую единицу времени (tick) генерируют `ATP_energy`. Потребляют `glucose` и `oxygen` (глобальные переменные среды).
-- **Натрий-калиевые насосы:** Работают постоянно. Тратят `ATP_energy`, чтобы удерживать `current_voltage` на уровне `RESTING_VOLTAGE`.
-- **Ядро (Nucleus) и ЭПР (Эндоплазматический ретикулум):** База данных и фабрика. Создают новые рецепторы (изменяют веса синапсов), если приходит сигнал от метаботропных рецепторов.
-- **Аппарат Гольджи:** Упаковывает нейромедиаторы в везикулы (пузырьки) для отправки.
-
-## 2. Физические константы
+## 2. Physical Constants
 - `RESTING_VOLTAGE`: -70.0 mV.
 - `THRESHOLD_VOLTAGE`: -55.0 mV.
 - `SPIKE_VOLTAGE`: +40.0 mV.
-- `REFRACTORY_PERIOD_ABSOLUTE`: 1 ms (Полная блокировка).
-- `REFRACTORY_PERIOD_RELATIVE`: 3 ms (Сниженная чувствительность, заряд падает до -80.0 mV).
+- `REFRACTORY_PERIOD_ABSOLUTE`: 1 ms (Full block).
+- `REFRACTORY_PERIOD_RELATIVE`: 3 ms (Reduced sensitivity, charge drops to -80.0 mV).
 
-## 3. Динамические переменные (State)
-- `current_voltage`: Текущий заряд.
-- `current_ATP`: Уровень энергии (0-100%). Если падает в 0 — насосы останавливаются, `current_voltage` ползет к 0, нейрон глохнет.
-- `calcium_level`: Уровень ионов кальция внутри. Если превышает критическую отметку — триггер смерти (Апоптоз).
-- `vesicles_pool`: Запас пакетов с медиаторами на выходе.
+## 3. Dynamic Variables (State)
+- `current_voltage`: Current charge.
+- `current_ATP`: Energy level (0-100%). If it drops to 0 — pumps stop, `current_voltage` drifts towards 0, and the neuron stalls.
+- `calcium_level`: Levels of calcium ions inside. If it exceeds a critical mark — a trigger for death (Apoptosis).
+- `vesicles_pool`: Supply of neurotransmitter packets at the output.
 
-## 4. Интерфейсы взаимодействия (Сложные порты)
-- **Dendrites (Входы):** Принимают объекты химических сигналов (Глутамат, ГАМК, Дофамин). У каждого входа есть параметр `receptor_count` (вес связи).
-- **Axon Terminals (Выходы):** При генерации Спайка потребляют кальций и конвертируют электричество в химический пакет, который отсылается дальше.
+## 4. Interaction Interfaces (Complex Ports)
+- **Dendrites (Inputs):** Accept chemical signal objects (Glutamate, GABA, Dopamine). Each input has a `receptor_count` parameter (connection weight).
+- **Axon Terminals (Outputs):** Upon Spike generation, they consume calcium and convert electricity into a chemical packet that is sent further.
 
-## 5. Главный цикл (Tick System)
-В каждом такте (1 ms) параллельно происходят:
-1. **Фаза метаболизма:** Митохондрии дают АТФ, насосы жрут АТФ и выравнивают заряд (Leak).
-2. **Фаза приема:** Чтение химии на дендритах -> открытие ионных каналов -> изменение `current_voltage`.
-3. **Фаза вычислений (Аксонный холмик):** Проверка `current_voltage` против `THRESHOLD_VOLTAGE`.
-4. **Фаза реакции:** Если Спайк -> вольтаж в +40, списание АТФ, включение кулдауна, выброс химии из терминалей.
+## 5. Main Loop (Tick System)
+In each tick (1 ms), the following occur in parallel:
+1. **Metabolism Phase:** Mitochondria provide ATP, pumps consume ATP and balance the charge (Leak).
+2. **Reception Phase:** Reading chemistry at the dendrites -> opening ion channels -> changing `current_voltage`.
+3. **Calculation Phase (Axon Hillock):** Checking `current_voltage` against `THRESHOLD_VOLTAGE`.
+4. **Reaction Phase:** If Spike -> voltage to +40, ATP deduction, cooldown initiation, chemistry release from terminals.

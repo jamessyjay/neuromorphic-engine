@@ -1,50 +1,50 @@
 # Use Cases & Tick Flow Diagram
 
-Эта схема описывает жесткую последовательность действий (Decision Tree) внутри одного узла за 1 такт времени (Tick = 1 ms). Агент обязан реализовать главный цикл `update_tick()` строго по этой логике.
+This scheme describes the rigid sequence of actions (Decision Tree) within a single node for 1 unit of time (Tick = 1 ms). The agent must implement the main `update_tick()` cycle strictly according to this logic.
 
 ```mermaid
 graph TD
-    %% Точка входа
-    Start((Начало Тика)) --> IsAlive{Клетка жива?}
-    IsAlive -- Нет --> DeadEnd([Пропуск такта])
+    %% Entry Point
+    Start((Tick Start)) --> IsAlive{Is cell alive?}
+    IsAlive -- No --> DeadEnd([Skip tick])
     
-    %% Блок 1: Состояние и Кулдауны
-    IsAlive -- Да --> CooldownCheck{Состояние Кулдауна?}
-    CooldownCheck -- Absolute (1ms) --> AbsoluteBlock[Заряд заблокирован на -80mV] --> MetabolicPhase
-    CooldownCheck -- Relative (3ms) --> Penalty[Задрать Threshold до -40mV] --> InputPhase
-    CooldownCheck -- Свободен --> InputPhase
+    %% Block 1: State and Cooldowns
+    IsAlive -- Yes --> CooldownCheck{Cooldown State?}
+    CooldownCheck -- Absolute (1ms) --> AbsoluteBlock[Charge blocked at -80mV] --> MetabolicPhase
+    CooldownCheck -- Relative (3ms) --> Penalty[Raise Threshold to -40mV] --> InputPhase
+    CooldownCheck -- Free --> InputPhase
 
-    %% Блок 2: Прием данных (Юзкейс 2 и 3)
-    InputPhase[Забрать пакеты из буфера Synapse] --> CalcVolt[Суммация: <br> (Glutamate - GABA) * Dopamine]
-    CalcVolt --> EnvCheck[Запрос ресурсов из Environment]
+    %% Block 2: Data Reception (Use Cases 2 and 3)
+    InputPhase[Collect packets from Synapse buffer] --> CalcVolt[Summation: <br> (Glutamate - GABA) * Dopamine]
+    CalcVolt --> EnvCheck[Request resources from Environment]
 
-    %% Блок 3: Метаболизм (Юзкейс 1)
-    EnvCheck --> ATPGen[АТФ +1% <br> если есть Глюкоза]
-    ATPGen --> LeakPump[Leak Rate: <br> Тянуть заряд к -70mV. <br> АТФ -0.1%]
-    AbsoluteBlock --> MetabolicPhase[Метаболизм работает фоном] --> ATPGen
-    LeakPump --> ApplyVoltage[Применить итоговый заряд <br> к current_voltage]
+    %% Block 3: Metabolism (Use Case 1)
+    EnvCheck --> ATPGen[ATP +1% <br> if Glucose present]
+    ATPGen --> LeakPump[Leak Rate: <br> Pull charge to -70mV. <br> ATP -0.1%]
+    AbsoluteBlock --> MetabolicPhase[Metabolism works in background] --> ATPGen
+    LeakPump --> ApplyVoltage[Apply final charge <br> to current_voltage]
 
-    %% Блок 4: Проверка выстрела (Юзкейс 2)
+    %% Block 4: Spike Verification (Use Case 2)
     ApplyVoltage --> ThresholdCheck{current_voltage >= Threshold?}
     
-    %% Ветка простоя или Торможения (Юзкейс 1 и 3)
-    ThresholdCheck -- Нет --> CalciumCool[Остывание: Кальций -1] --> TickEnd((Конец Тика))
+    %% Idle or Inhibition path (Use Cases 1 and 3)
+    ThresholdCheck -- No --> CalciumCool[Cooling: Calcium -1] --> TickEnd((Tick End))
 
-    %% Ветка Спайка (Юзкейс 2)
-    ThresholdCheck -- Да --> SpikeAction[СПАЙК! <br> Заряд = +40mV]
-    SpikeAction --> ATPDrop[АТФ -20.0%]
-    ATPDrop --> StartCD[Запустить Absolute Cooldown]
-    StartCD --> SendChem[Отправить медиатор <br> в исходящие Synapse]
+    %% Spike Branch (Use Case 2)
+    ThresholdCheck -- Yes --> SpikeAction[SPIKE! <br> Charge = +40mV]
+    SpikeAction --> ATPDrop[ATP -20.0%]
+    ATPDrop --> StartCD[Start Absolute Cooldown]
+    StartCD --> SendChem[Send transmitter <br> to outgoing Synapses]
 
-    %% Блок 5: Пластичность и Память (Юзкейс 4)
-    SendChem --> NMDACheck{Был сильный Глутамат <br> прямо перед Спайком?}
-    NMDACheck -- Да --> LTP[NMDA открыт! <br> update_weights: Вес входа +0.01]
-    NMDACheck -- Нет --> CalciumSpike[Накопление урона: <br> Кальций +10]
+    %% Block 5: Plasticity and Memory (Use Case 4)
+    SendChem --> NMDACheck{Was Glutamate high <br> just before Spike?}
+    NMDACheck -- Yes --> LTP[NMDA Open! <br> update_weights: Input weight +0.01]
+    NMDACheck -- No --> CalciumSpike[Accumulate damage: <br> Calcium +10]
     LTP --> CalciumSpike
 
-    %% Блок 6: Проверка на смерть (Юзкейс 5)
-    CalciumSpike --> DeathCheck{Кальций >= 100 <br> ИЛИ <br> АТФ == 0?}
-    DeathCheck -- Да --> Die[die_gracefully: <br> Апоптоз / Отключение]
+    %% Block 6: Death Check (Use Case 5)
+    CalciumSpike --> DeathCheck{Calcium >= 100 <br> OR <br> ATP == 0?}
+    DeathCheck -- Yes --> Die[die_gracefully: <br> Apoptosis / Shutdown]
     Die --> TickEnd
-    DeathCheck -- Нет --> TickEnd
+    DeathCheck -- No --> TickEnd
 ```

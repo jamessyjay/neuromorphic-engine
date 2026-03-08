@@ -1,40 +1,40 @@
 # Neuromorphic Engine: API & FFI Reference
 
-Техническое описание интерфейсов взаимодействия между Rust и C++/CUDA.
+Technical description of interaction interfaces between Rust and C++/CUDA.
 
 ## Rust Structures (ffi.rs)
 
-Все структуры помечены `#[repr(C)]` для бинарной совместимости.
+All structures are marked `#[repr(C)]` for binary compatibility.
 
 ### `Environment`
-Глобальные параметры симуляции.
+Global simulation parameters.
 ```rust
 pub struct Environment {
     pub global_oxygen_level: f32,  // 0.0 - 1.0
     pub dopamine_multiplier: f32,  // 1.0 baseline
     pub toxin_levels: f32,
-    pub seed: u32,                 // Глобальный сид хаоса
+    pub seed: u32,                 // Global chaos seed
 }
 ```
 
 ### `BaseNeuron`
-Основная структура клетки (должна совпадать с `base_neuron.h`).
-- `current_voltage`: Текущий потенциал (mV).
-- `energy_ATP`: Текущий запас энергии.
-- `metabolic_wear`: Износ митохондрий (0.0 - 1.0).
-- `is_alive`: Флаг жизни.
+Main cell structure (must match `base_neuron.h`).
+- `current_voltage`: Current potential (mV).
+- `energy_ATP`: Current energy reserve.
+- `metabolic_wear`: Mitochondrial wear (0.0 - 1.0).
+- `is_alive`: Life flag.
 
 ## C++ Orchestration Functions
 
-### `initial_neuron`
-Инициализирует нейрон с учетом типа и гетерогенности.
+### `init_neuron`
+Initializes a neuron based on type and heterogeneity.
 ```cpp
 void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed);
 ```
-- Использует `seed + id` для генерации уникальных параметров по Гауссу.
+- Uses `seed + id` to generate unique Gaussian parameters.
 
 ### `launch_tick_neurons`
-Основной цикл симуляции.
+Main simulation cycle.
 ```cpp
 void launch_tick_neurons(
     BaseNeuron* neurons, 
@@ -45,20 +45,20 @@ void launch_tick_neurons(
     uint32_t current_tick
 );
 ```
-- Запускает расчет метаболизма и проводимости.
-- На GPU выполняется как два последовательных ядра с барьером.
+- Triggers metabolism and conduction calculations.
+- On GPU, executes as two consecutive kernels with a barrier.
 
 ## CUDA Kernels
 
 ### `tick_neurons_kernel`
-- Обрабатывает: `update_metabolism`, `update_calcium`, `process_spike`.
-- Сложность: O(1) на поток.
+- Processes: `update_metabolism`, `update_calcium`, `process_spike`.
+- Complexity: O(1) per thread.
 
 ### `tick_synapses_kernel`
-- Обрабатывает: `process_synapse` (включая STDP и доставку).
-- Сложность: O(1) на поток.
+- Processes: `process_synapse` (including STDP and delivery).
+- Complexity: O(1) per thread.
 
 ## Rust Services (Orchestration)
-Вызываются из `main.rs` на стороне CPU:
-- `astrocyte_service`: Очистка токсинов, поддержка метаболизма.
-- `microglia_service`: Удаление мертвых нейронов (Apoptosis Cleanup).
+Called from `main.rs` on the CPU side:
+- `astrocyte_service`: Toxin cleanup, metabolic support.
+- `microglia_service`: Apoptosis cleanup (removing dead neurons).

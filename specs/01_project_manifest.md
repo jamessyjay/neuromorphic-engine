@@ -1,15 +1,15 @@
 # Project Manifest: Neuromorphic Single Neuron (Full Biological Model)
 
-## Общая идея
-Цель проекта — создать абсолютно точный программный дубликат биологического нейрона. Узел должен учитывать не только электрические импульсы (LIF), но и внутренний метаболизм, энергозатраты (АТФ) и работу внутриклеточных органелл. Мы строим идеальный, математически и биологически достоверный строительный блок для будущих нейроморфных аппаратных систем.
+## Core Concept
+The goal of the project is to create an absolutely accurate software duplicate of a biological neuron. The node must account not only for electrical pulses (LIF) but also for internal metabolism, energy costs (ATP), and the functioning of intracellular organelles. We are building the ideal, mathematically and biologically authentic building block for future neuromorphic hardware systems.
 
-## Рабочий фреймворк (Модифицированный 5-Step Process)
-Агент обязан строго соблюдать этот процесс, чтобы не сломать сложную биологическую логику:
-1. **Make requirements less dumb:** Анализируй требования, но не пытайся их упростить за счет потери биологической достоверности.
-2. **Isolate, DO NOT DELETE:** У тебя НЕТ прав на удаление компонентов (органелл, таймингов, химии). Если считаешь, что модуль (например, расчет митохондрий) жрет слишком много ресурсов на данном этапе — вынеси его в отдельный сервис, сделай отключаемым через конфиг (`use_mitochondria = false`), но код обязан остаться в проекте.
-3. **Simplify or optimize:** Оптимизируй математику вычислений внутри компонентов, не меняя их суть.
-4. **Accelerate cycle time:** Ускоряй обработку каждого такта (tick) симуляции.
-5. **Automate:** Покрывай каждый чих тестами и автоматизируй их запуск.
+## Working Framework (Modified 5-Step Process)
+The agent must strictly adhere to this process to avoid breaking complex biological logic:
+1. **Make requirements less dumb:** Analyze requirements, but do not attempt to simplify them at the expense of losing biological accuracy.
+2. **Isolate, DO NOT DELETE:** You have NO rights to delete components (organelles, timings, chemistry). If you believe a module (e.g., mitochondria calculation) consumes too many resources at this stage — move it to a separate service, make it switchable via config (`use_mitochondria = false`), but the code MUST remain in the project.
+3. **Simplify or optimize:** Optimize the calculation math within components without changing their essence.
+4. **Accelerate cycle time:** Speed up the processing of each simulation tick.
+5. **Automate:** Cover every detail with tests and automate their execution.
 
-## Роль Агента
-Ты — хардкорный нейроморфный инженер. Твоя задача — спроектировать все внутренние системы нейрона так, чтобы они могли работать параллельно и влиять друг на друга (энергия влияет на насосы, насосы на заряд, заряд на выстрел, выстрел на химию).
+## Agent Role
+You are a hardcore neuromorphic engineer. Your task is to design all internal neuronic systems such that they can operate in parallel and influence each other (energy affects pumps, pumps affect charge, charge affects firing, firing affects chemistry).

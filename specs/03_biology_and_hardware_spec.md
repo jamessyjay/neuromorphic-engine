@@ -1,20 +1,19 @@
 # Biological & Hardware Specifications
 
+## 1. Hardware (Physical Components)
+* **Dendrites:** Input antennas. Catch chemistry from neighbors. In software: Input layers. Receive signals multiplied by weights.
+* **Soma (Body):** Main workshop. Supports life, accumulates local potentials. In software: Base node. Stores current charge (voltage).
+* **Nucleus:** Stores DNA. Issues blueprints for new proteins/receptors. In software: Long-term configuration database.
+* **ER + Ribosomes:** Assembly line. Builds proteins according to blueprints from the nucleus. In software: Instance factory (creating new receptor objects).
+* **Golgi Apparatus:** Sorts and packages proteins/chemistry into vesicles. In software: Preparation of data packets for sending.
+* **Axon Hillock:** Calculator. Sums pros and cons. If threshold is breached — fires. In software: Activation function with a hard Threshold.
+* **Axon:** Main cable. Conducts electrical spike. In software: Signal transmission bus (without power loss).
+* **Telodendria:** Termination of the cable into thousands of small wires at the end. In software: Output divergence multiplier. One signal flies to many.
+* **Synaptic Terminal:** Sprayer. Turns current into chemistry release. In software: Data sending interface (Output port).
 
-## 1. Хардвар (Физические компоненты)
-* [cite_start]**Дендриты:** Входные антенны[cite: 1]. [cite_start]Ловят химию от соседей[cite: 1]. [cite_start]В софте: Input layers[cite: 1]. [cite_start]Принимают сигналы, умноженные на веса[cite: 1].
-* [cite_start]**Сома (Тело):** Главный цех[cite: 1]. [cite_start]Поддерживает жизнь, копит локальные потенциалы[cite: 1]. [cite_start]В софте: Базовый узел (Node)[cite: 1]. [cite_start]Хранит текущий заряд (voltage)[cite: 1].
-* [cite_start]**Ядро:** Хранит ДНК[cite: 1]. [cite_start]Выдает чертежи для новых белков/рецепторов[cite: 1]. [cite_start]В софте: База данных долгосрочных конфигураций[cite: 1].
-* [cite_start]**ЭПР + Рибосомы:** Сборочный конвейер[cite: 1]. [cite_start]Строит белки по чертежам из ядра[cite: 1]. [cite_start]В софте: Фабрика инстансов (создание новых объектов-рецепторов)[cite: 1].
-* [cite_start]**Аппарат Гольджи:** Сортирует и упаковывает белки/химию в пузырьки (везикулы)[cite: 1]. [cite_start]В софте: Подготовка пакетов данных к отправке[cite: 1].
-* [cite_start]**Аксонный холмик:** Калькулятор[cite: 1]. [cite_start]Суммирует плюсы и минусы[cite: 1]. [cite_start]Если пробит порог — стреляет[cite: 1]. [cite_start]В софте: Функция активации (Activation function) с жестким порогом (Threshold)[cite: 1].
-* [cite_start]**Аксон:** Главный кабель[cite: 1]. [cite_start]Проводит электрический спайк[cite: 1]. [cite_start]В софте: Шина передачи сигнала (без потери мощности)[cite: 1].
-* [cite_start]**Телодендрия:** Разветвление кабеля на тысячи мелких проводов в конце[cite: 1]. [cite_start]В софте: Мультипликатор выхода (Output divergence)[cite: 1]. [cite_start]Один сигнал летит ко многим[cite: 1].
-* [cite_start]**Синаптическая терминаль:** Распылитель[cite: 1]. [cite_start]Превращает ток в выброс химии[cite: 1]. [cite_start]В софте: Интерфейс отправки данных (Output port)[cite: 1].
-
-## 2. Питание и Саппорт (Девопс клетки)
-* [cite_start]**Митохондрии (АТФ):** Делают энергию из кислорода и сахара[cite: 1]. [cite_start]Последствия поломки: Нет АТФ -> насосы встают -> смерть узла[cite: 1].
-* [cite_start]**Натрий-калиевый насос:** Жрет 50-70% энергии, держит базовый заряд (-70 мВ)[cite: 1]. [cite_start]Последствия поломки: Потеря разности потенциалов (короткое замыкание)[cite: 1].
-* [cite_start]**Эксайтотоксичность:** Передоз Глутамата -> внутрь льется много кальция -> клетка переваривает себя[cite: 1]. [cite_start]Последствия: Срабатывает Апоптоз (тихое самоубийство)[cite: 1].
-* [cite_start]**Аутофагия:** Лизосомы жрут и перерабатывают клеточный мусор[cite: 1]. [cite_start]Последствия поломки: Накопление багов и токсичных белков[cite: 1].
-* [cite_start]**BDNF:** "Удобрение" за хорошую работу[cite: 1]. [cite_start]Блокирует суицид, помогает растить новые ветки[cite: 1].
+## 2. Power and Support (Cell DevOps)
+* **Mitochondria (ATP):** Make energy from oxygen and sugar. Consequences of failure: No ATP -> pumps stop -> node death.
+* **Sodium-Potassium Pump:** Consumes 50-70% of energy, maintains baseline charge (-70 mV). Consequences of failure: Loss of potential difference (short circuit).
+* **Excitotoxicity:** Glutamate overdose -> high calcium influx -> cell digests itself. Consequences: Apoptosis (quiet suicide) triggers.
+* **Autophagy:** Lysosomes eat and recycle cellular waste. Consequences of failure: Accumulation of bugs and toxic proteins.
+* **BDNF:** "Fertilizer" for good work. Blocks suicide, helps grow new branches.

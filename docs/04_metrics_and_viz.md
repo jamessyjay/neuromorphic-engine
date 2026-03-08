@@ -1,36 +1,36 @@
 # Neuromorphic Engine: Visualization & Metrics
 
-Гайд по использованию инструментов анализа и визуализации.
+Guide to using analysis and visualization tools.
 
 ## CLI Commands
 
-Движок поддерживает несколько режимов тестирования и демонстрации:
+The engine supports several testing and demonstration modes:
 
-| Команда | Описание | Основной результат |
+| Command | Description | Primary Result |
 |---------|----------|-------------------|
-| `cargo run --release` | Базовая симуляция Spec 8 | `graphs/phase8_sensors.png` |
-| `cargo run --release -- --benchmark` | Тест 10k нейронов / 100k синапсов | `graphs/benchmark_load.png` |
-| `cargo run --release -- --stress-test` | Эпилепсия и гипоксия | `graphs/stress_test_results.png` |
-| `cargo run --release -- --dopamine-rush` | Обучение под дофамином | `graphs/dopamine_rush_results.png` |
+| `cargo run --release` | Base Spec 8 simulation | `graphs/phase8_sensors.png` |
+| `cargo run --release -- --benchmark` | 10k neurons / 100k synapses test | `graphs/benchmark_load.png` |
+| `cargo run --release -- --stress-test` | Epilepsy and hypoxia test | `graphs/stress_test_results.png` |
+| `cargo run --release -- --dopamine-rush` | Learning under dopamine rush | `graphs/dopamine_rush_results.png` |
 
-## Интерпретация графиков
+## Interpreting Charts
 
 ### 1. Activity & Biology (Benchmark)
-- **Top Panel:** Гистограмма спайков. Показывает общую активность сети.
-- **Middle Panel:** ATP vs Calcium. Если ATP падает ниже 30%, это тревожный знак. Рост Calcium выше 80 приводит к риску смерти.
-- **Bottom Panel:** Время обработки (FFI vs Rust). Позволяет найти узкие места в параллелизации.
+- **Top Panel:** Spike histogram. Shows overall network activity.
+- **Middle Panel:** ATP vs Calcium. If ATP falls below 30%, it's a warning sign. Calcium growth above 80 leads to mortality risk.
+- **Bottom Panel:** Processing time (FFI vs Rust). Allows identifying parallelization bottlenecks.
 
 ### 2. Stress Test Analysis
-- Позволяет увидеть момент смерти нейронов. 
-- Изучает влияние `global_oxygen_level` на кривую выживаемости.
-- Визуализирует рост `metabolic_wear` при высокой частоте спайков.
+- Allows seeing the moment of neuron death.
+- Studies the influence of `global_oxygen_level` on the survival curve.
+- Visualizes `metabolic_wear` growth at high spike frequencies.
 
 ### 3. Plasticity (Dopamine Rush)
-- Показывает корреляцию между уровнем дофамина и ростом веса синапса (`weight`).
-- Демонстрирует сатурацию: вес не может расти бесконечно, он упирается в биологический лимит.
+- Shows the correlation between dopamine level and synapse `weight` growth.
+- Demonstrates saturation: weight cannot grow indefinitely, hitting biological limits.
 
-## Добавление новых метрик
-Для добавления метрика:
-1. Добавьте поле в структуру данных в `main.rs` (например, `BenchmarkData`).
-2. В цикле тика считайте нужное значение (среднее или сумму).
-3. Обновите соответствующую функцию `render_..._chart` с использованием библиотеки `plotters`.
+## Adding New Metrics
+To add a metric:
+1. Add a field to the data structure in `main.rs` (e.g., `BenchmarkData`).
+2. Calculate the required value (average or sum) in the tick loop.
+3. Update the corresponding `render_..._chart` function using the `plotters` library.

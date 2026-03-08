@@ -1,16 +1,17 @@
 # Testing Protocol & Tasks
 
-## Базовые тесты (Виртуальный осциллограф)
-1. **Тест Насосов (Leak):** Возбудить клетку до -60mV. Проверить, что заряд плавно стекает к -70mV, затрачивая `energy_ATP`.
-2. **Суммация (Spatial/Temporal):** Убедиться, что мелкие возбуждающие сигналы складываются и способны пробить `activation_threshold`.
-3. **Торможение (Inhibition):** Подать ГАМК. Убедиться, что `current_voltage` уходит ниже -70mV, блокируя последующие выстрелы.
-4. **Кулдаун:** Убедиться, что вызов `fire_spike()` невозможен в течение `apply_cooldown()` времени.
-5. **Специфичные тесты:** - Проверить аналоговую работу `Photoreceptor` (отсутствие спайков).
-    - Проверить бесконечный цикл `PacemakerNeuron`.
+## Base Tests (Virtual Oscilloscope)
+1. **Pumps Test (Leak):** Excite the cell to -60mV. Verify that the charge smoothly drains to -70mV, consuming `energy_ATP`.
+2. **Summation (Spatial/Temporal):** Ensure that small excitatory signals add up and are capable of breaching the `activation_threshold`.
+3. **Inhibition:** Apply GABA. Ensure that `current_voltage` drops below -70mV, blocking subsequent fires.
+4. **Cooldown:** Ensure that calling `fire_spike()` is impossible during the `apply_cooldown()` period.
+5. **Specific Tests:**
+    - Verify analog operation of `Photoreceptor` (absence of spikes).
+    - Verify infinite loop of `PacemakerNeuron`.
 
-## Пул задач (Development Tasks)
-1. Реализовать абстрактный класс `BaseNeuron` со всеми свойствами и методами.
-2. Имплементировать внутренний цикл (Tick System), привязать расход АТФ к `resting_voltage`.
-3. Создать дочерние классы, переопределив их параметры согласно архитектуре.
-4. Реализовать сервис-воркеры (`Astrocyte`, `Microglia`) для фонового управления памятью и ресурсами.
-5. Покрыть каждый класс тестами из Протокола. Никаких коммитов, пока тесты не будут зелеными.
+## Task Pool (Development Tasks)
+1. Implement the `BaseNeuron` abstract class with all properties and methods.
+2. Implement the internal cycle (Tick System), binding ATP consumption to `resting_voltage`.
+3. Create child classes, overriding their parameters according to the architecture.
+4. Implement service workers (`Astrocyte`, `Microglia`) for background memory and resource management.
+5. Cover each class with tests from the Protocol. No commits until tests are green.

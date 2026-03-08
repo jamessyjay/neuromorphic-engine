@@ -1,42 +1,42 @@
 # neuromorphic-engine: MacOS Local Environment Setup
 
-Так как на Маке (Apple Silicon / Intel) нет ни ядер CUDA, ни Unified Memory от Nvidia (это фича Jetson Devices), мы используем подход заглушек.
+Since CUDA cores and Nvidia's Unified Memory are not available on Mac (Apple Silicon / Intel) — features typical of Jetson Devices — we use a stub-based approach.
 
-## 1. Как работает код на Маке
-Когда ты запускаешь проект на macOS:
-* Скрипт `build.rs` детектит, что это яблоко.
-* Он собирает CUDA-файл `cuda/base_neuron.cu` как обычный C++ код, просто используя системный компилятор (clang из Xcode).
-* Макросы `__global__`, `__device__` и другие CUDA-специфичные штуки — скрываются через препроцессор: они пустые (`#define __global__`). 
-* Вместо `cudaMallocManaged` используется дефолтный системный `malloc`.
-* Логика ядра (например, расчет Leak Rate или Calcium) выполняется последовательно (в for-цикле) просто на CPU Мака.
+## 1. How the Code Works on Mac
+When you run the project on macOS:
+* The `build.rs` script detects that it's an Apple platform.
+* It compiles the CUDA file `cuda/base_neuron.cu` as regular C++ code, using the system compiler (clang from Xcode).
+* Macros like `__global__`, `__device__`, and other CUDA-specific qualifiers are hidden via the preprocessor: they are defined as empty (`#define __global__`). 
+* Instead of `cudaMallocManaged`, the default system `malloc` is used.
+* The kernel logic (e.g., calculation of Leuk Rate or Calcium) is executed sequentially (in a for-loop) directly on the Mac's CPU.
 
-Это позволяет проверять математику, работу FFI и логику оркестратора **не имея Jetson под рукой**.
+This allows you to verify math, FFI operations, and orchestrator logic **without having a Jetson device on hand**.
 
-## 2. Подготовка
+## 2. Preparation
 
-**Шаг 1. Убедиться, что установлен Rust**
+**Step 1. Ensure Rust is installed**
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustc --version
 ```
 
-**Шаг 2. Установить C++ компилятор (если еще нет)**
+**Step 2. Install the C++ compiler (if not already present)**
 ```bash
 xcode-select --install
 ```
 
-**Шаг 3. Установка инструментов сборки**
-Для работы C/C++ оберток (`cc` в `build.rs`):
-Обычно ничего дополнительного не нужно, `cc` сам найдет `clang` на Маке.
+**Step 3. Installing Build Tools**
+For C/C++ wrappers to work (`cc` in `build.rs`):
+Usually, nothing additional is needed; `cc` will find `clang` on the Mac by itself.
 
-## 3. Запуск
+## 3. Launching
 
-Просто перейди в папку проекта `neuromorphic-engine` и набери:
+Simply go to the `neuromorphic-engine` project folder and type:
 
 ```bash
 cargo run
 ```
 
-Она сама скомпилирует `base_neuron.cu` в `librust_kernels.a`, линканет с Rust и выведет в терминал тестовые тики. 
+It will automatically compile `base_neuron.cu` into `librust_kernels.a`, link it with Rust, and output the test ticks to the terminal.
 
-Если код падает с FFI-ошибками, убедись, что структуры `BaseNeuron` в `cuda/base_neuron.h` 1 в 1 совпадают с `BaseNeuron` в `src/ffi.rs` (порядок, размер и тип полей!).
+If the code crashes with FFI errors, ensure that the `BaseNeuron` structures in `cuda/base_neuron.h` match the `BaseNeuron` in `src/ffi.rs` 1:1 (order, size, and field types!).
