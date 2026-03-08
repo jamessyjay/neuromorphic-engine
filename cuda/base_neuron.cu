@@ -36,8 +36,9 @@ static __device__ __host__ float get_gaussian(uint32_t* seed, float mu, float si
 }
 
 // Atomic function: Apoptosis / Death Handler
-static inline __device__ void die_gracefully(BaseNeuron* n) {
+static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
     n->is_alive = false;
+    n->death_reason = reason;
     n->current_voltage = 0.0f; 
     n->energy_ATP = 0.0f;
     n->calcium_level = 0.0f;
@@ -48,7 +49,7 @@ static inline __device__ void die_gracefully(BaseNeuron* n) {
 // Atomic function: metabolism
 static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, uint32_t current_tick) {
     if (n->energy_ATP <= 1.0f) {
-        die_gracefully(n);
+        die_gracefully(n, DEATH_ATP_LOW);
         return;
     }
 
@@ -59,7 +60,14 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     
     // Recovery slows down as capacity is reached (Asymptotic)
     float atp_gap = n->max_atp - n->energy_ATP;
-    n->energy_ATP += (atp_gap / n->max_atp) * baseline_generation * oxygen_factor * glucose_factor;
+    // Phase 28/30: Ensure recovery is effective even at high ATP
+    float recovery_rate = (atp_gap / (n->max_atp * 0.5f)) * baseline_generation; 
+    
+    // Metabolic Floor: Ensure recovery can overcome baseline leak at rest (Phase 30)
+    if (recovery_rate < 0.15f * baseline_generation) recovery_rate = 0.15f * baseline_generation;
+    if (recovery_rate > baseline_generation) recovery_rate = baseline_generation;
+    
+    n->energy_ATP += recovery_rate * oxygen_factor * glucose_factor;
     if (n->energy_ATP > n->max_atp) n->energy_ATP = n->max_atp;
 
     // 2. Vesicle Recycling (Phase 26/28) - Spec 02
@@ -127,7 +135,7 @@ static inline __device__ void update_calcium(BaseNeuron* n) {
         n->calcium_level -= 0.5f; // Slower recovery
         if (n->calcium_level < 0.0f) n->calcium_level = 0.0f;
     }
-    if (n->calcium_level >= FATAL_CALCIUM_LEVEL) die_gracefully(n);
+    if (n->calcium_level >= FATAL_CALCIUM_LEVEL) die_gracefully(n, DEATH_CALCIUM_HIGH);
 }
 
 static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick) {
@@ -138,7 +146,10 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
     }
 
     // EMERGENCY GUARD 2.0: Explicit ATP check
-    if (n->energy_ATP < 20.0f) return;
+    if (n->energy_ATP < 10.0f) {
+        die_gracefully(n, DEATH_ATP_LOW);
+        return;
+    }
 
     if (n->current_voltage >= n->activation_threshold) {
         if (n->type == TYPE_PHOTORECEPTOR) return; // Sensors don't spike
@@ -182,21 +193,23 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         }
     }
 
-    // STDP Learning Logic (Phase 7 & 23 & 26)
+    // STDP Learning Logic (Phase 7 & 23 & 26 & 30)
     float learning_rate = 0.1f * env.dopamine_multiplier;
     
-    // LTP: Potentiation (Source then Target)
+    // LTP: Potentiation + Thickness Growth (Phase 30)
     if (s->last_activation_tick > 0 && target->last_spike_tick == current_tick) {
         if (current_tick - s->last_activation_tick <= 20) {
             s->weight += learning_rate;
+            s->thickness += learning_rate * 0.1f; // Physical growth
             s->last_activation_tick = 0; // Consumption
         }
     }
     
-    // LTD: Depression (Forget non-effective pulses) - Phase 26
+    // LTD: Depression + Thinning (Phase 30)
     if (s->last_activation_tick > 0 && current_tick - s->last_activation_tick >= 10) {
         if (target->last_spike_tick < s->last_activation_tick) {
             s->weight -= learning_rate * 0.5f;
+            s->thickness -= learning_rate * 0.05f; // Structural decay
             s->last_activation_tick = 0; // Reset after depression
         }
     }
@@ -208,19 +221,36 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         s->weight += 0.0005f;
     }
 
+    // Limits
     if (s->weight > 30.0f) s->weight = 30.0f; 
-    if (s->weight < 0.1f) s->weight = 0.1f;
+    if (s->weight < 0.0f) s->weight = 0.0f; // Pruning threshold is 0.05 in Rust
+    
+    if (s->thickness > 5.0f) s->thickness = 5.0f;
+    if (s->thickness < 0.0f) s->thickness = 0.0f;
 
-    // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08)
+    // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08 + Phase 30)
     if (s->ticks_until_delivery >= 0) {
         if (s->ticks_until_delivery > 0) {
             s->ticks_until_delivery -= 1;
         }
         
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
-            
-            // RECEPTOR SATURATION (Spec 08): Weight is the limit of chemical processing
-            // DOPAMINE MODULATION (Spec 06): Dopamine scales the binding affinity
+            // 1. Reliability Check (Phase 30/31): Thin synapses are unreliable
+            if (s->thickness < 0.3f) {
+                // Stochastic signal failure
+                // Using a simple deterministic-random based on tick and IDs for mock CPU compatibility
+                float failure_roll = (float)((current_tick + s->source_id + s->target_id) % 100) / 100.0f;
+                if (failure_roll > s->thickness) {
+                    s->neurotransmitter_buffer *= 0.8f; // Waste chemistry on failure
+                    return; 
+                }
+            }
+
+            // 2. Buffer Capacity (Phase 30): Thickness limits chemical volume
+            float max_buffer = s->thickness * 100.0f;
+            if (s->neurotransmitter_buffer > max_buffer) s->neurotransmitter_buffer = max_buffer;
+
+            // RECEPTOR SATURATION (Spec 08)
             float available_chemical = s->neurotransmitter_buffer * env.dopamine_multiplier;
             float receptor_limit = s->weight;
             
@@ -338,6 +368,8 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->last_spike_tick = 0;
     neuron->spikes_in_last_window = 0;
     neuron->metabolic_wear = 0.0f;
+    neuron->is_alive = true;
+    neuron->death_reason = DEATH_NONE;
 }
 
 } // extern "C"

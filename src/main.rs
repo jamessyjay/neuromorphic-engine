@@ -10,6 +10,7 @@ use plotters::prelude::*;
 use std::env;
 use std::time::Instant;
 use rand::prelude::*;
+use rand::RngExt;
 
 // Simple Gaussian sampler (Box-Muller)
 fn get_gaussian(mu: f32, sigma: f32) -> f32 {
@@ -49,7 +50,7 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
         let is_inhib = rng.random_bool(0.2); // 20% inhibitory
         let is_myelin = rng.random_bool(0.1); // 10% myelinated
 
-        graph.connect(source, target, weight, is_inhib, is_myelin);
+        graph.connect(source, target, weight, 1.0, is_inhib, is_myelin);
     }
 
     println!("Network generation complete.");
@@ -146,6 +147,8 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
     println!("Ticks Per Second (TPS): {:.2}", tps);
     println!("Synapse Parallelism: Verified. Each of {} synapses processed in a unique GPU thread.", synapses_count);
 
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "simulation_report.json");
+
     Ok(data)
 }
 
@@ -233,7 +236,7 @@ fn setup_simulation() -> NetworkGraph {
     let pyr_target = graph.add_neuron(NeuronType::Pyramidal);       // 1 - Target Learner
 
     // Target starts with a stable connection and SchwannCell (Myelin = true)
-    graph.connect(photo_source, pyr_target, 5.0, false, true);       
+    graph.connect(photo_source, pyr_target, 5.0, 1.0, false, true);       
 
     graph
 }
@@ -295,6 +298,12 @@ fn run_simulation(mut graph: NetworkGraph, total_ticks: u32) -> SimulationData {
     }
 
     println!("Simulation Complete!");
+    
+    // Total Observability (Phase 31)
+    let mut telemetry = crate::telemetry::Telemetry::new();
+    telemetry.update(total_ticks);
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "simulation_report.json");
+
     data
 }
 
@@ -349,6 +358,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_inhibition_loop = args.contains(&String::from("--inhibition-loop"));
     let is_scaling_test = args.contains(&String::from("--scaling-test"));
     let is_frequency_test = args.contains(&String::from("--frequency-test"));
+    let is_emergence_test = args.contains(&String::from("--emergence-test"));
+    let is_morphology_audit = args.contains(&String::from("--morphology-audit"));
 
     if is_benchmark {
         let data = run_benchmark_mode(10000, 100000, 1000)?;
@@ -358,6 +369,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if is_scaling_test {
         run_scaling_benchmarks()?;
+        return Ok(());
+    }
+
+    if is_emergence_test {
+        run_emergence_test_mode()?;
+        return Ok(());
+    }
+
+    if is_morphology_audit {
+        run_morphology_audit()?;
         return Ok(());
     }
 
@@ -402,8 +423,8 @@ fn setup_inhibition_loop() -> NetworkGraph {
     let i = graph.add_neuron(NeuronType::Interneuron);
 
     // Loop: P -> I (Exciting), I -> P (Inhibiting)
-    graph.connect(p, i, 10.0, false, true);  // P excites I
-    graph.connect(i, p, 15.0, true, true);   // I inhibits P (Strong GABA)
+    graph.connect(p, i, 10.0, 1.0, false, true);  // P excites I
+    graph.connect(i, p, 15.0, 1.0, true, true);   // I inhibits P (Strong GABA)
 
     graph
 }
@@ -486,8 +507,8 @@ fn setup_reflex_arc() -> NetworkGraph {
 
     // Connections: Eye -> Brain -> Muscle
     // Phase 17: Boosted weights to ensure transmission
-    graph.connect(eye, brain, 15.0, false, true);   // Fast myelin connection
-    graph.connect(brain, muscle, 12.0, false, false); // Normal connection
+    graph.connect(eye, brain, 15.0, 1.0, false, true);   // Fast myelin connection
+    graph.connect(brain, muscle, 12.0, 1.0, false, false); // Normal connection
 
     graph
 }
@@ -607,9 +628,9 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
     let n3 = graph.add_neuron(NeuronType::Pyramidal);
     // Connect in a reinforced loop
-    graph.connect(n1, n2, 15.0, false, false);
-    graph.connect(n2, n3, 15.0, false, false);
-    graph.connect(n3, n1, 15.0, false, false);
+    graph.connect(n1, n2, 15.0, 1.0, false, false);
+    graph.connect(n2, n3, 15.0, 1.0, false, false);
+    graph.connect(n3, n1, 15.0, 1.0, false, false);
     
     // Kickstart the loop with a high voltage on n1
     graph.neurons[n1 as usize].current_voltage = 20.0;
@@ -651,9 +672,11 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("Final State: {}/{} neurons survived.", graph.neurons.len() - results.last().unwrap().2, graph.neurons.len());
     println!("Peak Metabolic Wear: {:.4}", results.last().unwrap().3);
     
-    // We can also render a special chart for this
-    render_stress_chart(&results, "graphs/stress_test_results.png")?;
-    
+    // Total Observability (Phase 31)
+    let mut telemetry = crate::telemetry::Telemetry::new();
+    telemetry.update(results.last().map(|r| r.0).unwrap_or(0));
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "stress_report.json");
+
     Ok(())
 }
 
@@ -672,7 +695,7 @@ fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     // Setup: 2 Neurons with a weak connection
     let n1 = graph.add_neuron(NeuronType::Pacemaker); // Source fires constantly
     let n2 = graph.add_neuron(NeuronType::Pyramidal); // Target
-    graph.connect(n1, n2, 1.0, false, true);
+    graph.connect(n1, n2, 1.0, 1.0, false, true);
 
     let mut weight_history = vec![];
     
@@ -769,8 +792,8 @@ fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let f2_det = graph.add_neuron(NeuronType::Pyramidal);
     
     // Initial random connections
-    graph.connect(eye, f1_det, 5.0, false, true);
-    graph.connect(eye, f2_det, 5.0, false, true);
+    graph.connect(eye, f1_det, 5.0, 1.0, false, true);
+    graph.connect(eye, f2_det, 5.0, 1.0, false, true);
     
     let total_ticks = 2000;
     let mut history = vec![];
@@ -801,17 +824,106 @@ fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             graph.run_microglia_service(tick);
         }
 
+        let s1_w = if !graph.synapses.is_empty() { graph.synapses[0].weight } else { 0.0 };
+        let s2_w = if graph.synapses.len() > 1 { graph.synapses[1].weight } else { 0.0 };
+
         history.push((
             tick,
             graph.neurons[f1_det as usize].current_voltage,
             graph.neurons[f2_det as usize].current_voltage,
-            graph.synapses[0].weight, // weight to F1
-            graph.synapses[1].weight, // weight to F2
+            s1_w,
+            s2_w,
         ));
     }
 
     render_frequency_chart(&history, "graphs/frequency_learning.png")?;
     println!("Frequency test complete. Check graphs/frequency_learning.png");
+    Ok(())
+}
+
+fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING EMERGENCE FROM CHAOS (Phase 29) ---");
+    let mut graph = NetworkGraph::new();
+    let num_neurons = 500;
+    
+    // Spawn neurons with 0 INITIAL CONNECTIONS
+    for _ in 0..num_neurons {
+        graph.add_neuron(NeuronType::Pyramidal);
+    }
+    
+    let total_ticks = 3000;
+    let mut history = vec![];
+    let env = Environment { 
+        global_oxygen_level: 1.0, 
+        global_glucose_level: 1.0, 
+        dopamine_multiplier: 5.0, // Maximum survival drive
+        toxin_levels: 0.0, 
+        light_level: 0.0, 
+        seed: 1234 
+    };
+
+    for tick in 1..=total_ticks {
+        // Stimulate specific cluster (Central Hub) - First 200 neurons
+        for i in 0..200 {
+            graph.neurons[i].current_voltage += 15.0; 
+        }
+
+        graph.tick(tick, env);
+        
+        if tick % 10 == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+            graph.run_neurogenesis_service(tick);
+        }
+
+        if tick % 100 == 0 {
+            println!("Tick {}: Synapse Count: {}", tick, graph.synapses.len());
+        }
+
+        history.push((
+            tick,
+            graph.synapses.len() as u32,
+            graph.neurons[250].current_voltage, // Remote neuron
+        ));
+    }
+
+    render_emergence_chart(&history, "graphs/emergence_growth.png")?;
+    
+    // Total Observability (Phase 31)
+    let mut telemetry = crate::telemetry::Telemetry::new();
+    telemetry.update(3000); // 3000 ticks in emergence test
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "emergence_report.json");
+
+    Ok(())
+}
+
+fn render_emergence_chart(data: &[(u32, u32, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Rendering Emergence Analysis to '{}'...", filename);
+    let root = BitMapBackend::new(filename, (1200, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let areas = root.split_evenly((2, 1));
+
+    // Panel 1: Structural Growth
+    let max_syn = data.iter().map(|&(_, s, _)| s).max().unwrap_or(100).max(100);
+    let mut chart1 = ChartBuilder::on(&areas[0])
+        .caption("1. Structural Growth (Synaptogenesis)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..2000f32, 0u32..max_syn + 50)?;
+    chart1.configure_mesh().y_desc("Synapse Count").draw()?;
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, s, _)| (t as f32, s)), &GREEN))?
+        .label("Active Synapses").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], GREEN));
+    chart1.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
+
+    // Panel 2: Signal Penetration (Functional Connectivity)
+    let mut chart2 = ChartBuilder::on(&areas[1])
+        .caption("2. Signal Reach (Remote Neuron Activity)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..2000f32, -80f32..50f32)?;
+    chart2.configure_mesh().y_desc("Voltage (mV)").draw()?;
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, v)| (t as f32, v)), &BLUE))?
+        .label("Neuron 250 Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
+    chart2.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
+
+    root.present()?;
     Ok(())
 }
 
@@ -842,6 +954,118 @@ fn render_frequency_chart(data: &[(u32, f32, f32, f32, f32)], filename: &str) ->
     chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, _, w2)| (t as f32, w2)), &BLUE))?
         .label("W2 (F2 Weight)").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
     chart2.configure_series_labels().background_style(WHITE.mix(0.8)).draw()?;
+
+    root.present()?;
+    Ok(())
+}
+fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SYNAPTIC MORPHOLOGY AUDIT (Phase 30) ---");
+    let mut graph = NetworkGraph::new();
+    
+    // Setup: Source -> Target Pair
+    let source = graph.add_neuron(NeuronType::Pyramidal);
+    let target = graph.add_neuron(NeuronType::Pyramidal);
+    
+    // Scenario: A very strong "seed" synapse to ensure survival
+    graph.connect(source, target, 5.0, 2.0, false, false);
+    
+    let total_ticks = 3000;
+    let mut history = vec![];
+    let env = Environment { 
+        global_oxygen_level: 1.0, 
+        global_glucose_level: 1.0, 
+        dopamine_multiplier: 2.0, // Stable growth
+        toxin_levels: 0.0, 
+        light_level: 0.0, 
+        seed: 777 
+    };
+
+    println!("Initial: Weight={}, Thickness={}", graph.synapses[0].weight, graph.synapses[0].thickness);
+
+    for tick in 1..=total_ticks {
+        // Stimulate source to spike and drive LTP
+        if tick % 25 == 0 {
+            graph.neurons[source as usize].current_voltage += 35.0; 
+        }
+
+        graph.tick(tick, env);
+        
+        if tick % 10 == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        if tick % 500 == 0 {
+            let s_atp = graph.neurons[source as usize].energy_atp;
+            let t_atp = graph.neurons[target as usize].energy_atp;
+            let n_alive = graph.neurons[source as usize].is_alive && graph.neurons[target as usize].is_alive;
+            println!("Tick {}: Synapses={}, SourceATP={:.1}, TargetATP={:.1}, Alive={}", 
+                tick, graph.synapses.len(), s_atp, t_atp, n_alive);
+        }
+
+        let sw = if !graph.synapses.is_empty() { graph.synapses[0].weight } else { 0.0 };
+        let st = if !graph.synapses.is_empty() { graph.synapses[0].thickness } else { 0.0 };
+        let sb = if !graph.synapses.is_empty() { graph.synapses[0].neurotransmitter_buffer } else { 0.0 };
+
+        history.push((
+            tick,
+            sw,
+            st,
+            graph.neurons[target as usize].current_voltage,
+            sb,
+        ));
+    }
+
+    render_morphology_chart(&history, "graphs/morphology_audit.png")?;
+    
+    if !graph.synapses.is_empty() {
+        println!("Final: Weight={:.2}, Thickness={:.2}", graph.synapses[0].weight, graph.synapses[0].thickness);
+    } else {
+        println!("Final: Synapse was pruned.");
+    }
+
+    // Total Observability (Phase 31)
+    let mut telemetry = crate::telemetry::Telemetry::new();
+    telemetry.update(total_ticks);
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "morphology_report.json");
+
+    Ok(())
+}
+
+fn render_morphology_chart(data: &[(u32, f32, f32, f32, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Rendering Morphology Audit to '{}'...", filename);
+    let root = BitMapBackend::new(filename, (1200, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let areas = root.split_evenly((2, 1));
+
+    // Panel 1: Synaptic Growth (Weight & Thickness)
+    let mut chart1 = ChartBuilder::on(&areas[0])
+        .caption("1. Synaptic Growth (Structural Plasticity)", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..3000f32, 0f32..10f32)?;
+    chart1.configure_mesh().y_desc("Value").draw()?;
+    
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, w, _, _, _)| (t as f32, w)), &RED))?
+        .label("Syaptic Weight").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
+    
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, _, th, _, _)| (t as f32, th)), &BLUE))?
+        .label("Synaptic Thickness").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
+    
+    chart1.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
+
+    // Panel 2: Transmission Reliability & Buffer
+    let mut chart2 = ChartBuilder::on(&areas[1])
+        .caption("2. Transmission Performance & Capacity", ("sans-serif", 20).into_font())
+        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..3000f32, -90f32..100f32)?;
+    chart2.configure_mesh().draw()?;
+    
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, v, _)| (t as f32, v)), &MAGENTA))?
+        .label("Target Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], MAGENTA));
+
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, _, buff)| (t as f32, buff)), &GREEN))?
+        .label("NT Buffer Volume").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], GREEN));
+
+    chart2.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
 
     root.present()?;
     Ok(())

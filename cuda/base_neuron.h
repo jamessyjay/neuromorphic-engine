@@ -29,6 +29,11 @@ extern "C" {
 #define CALCIUM_SPIKE_GAIN 10.0f
 #define FATAL_CALCIUM_LEVEL 100.0f
 
+#define DEATH_NONE 0
+#define DEATH_ATP_LOW 1
+#define DEATH_CALCIUM_HIGH 2
+#define DEATH_GLUCOSE_STARVATION 3
+
 // Base C-struct matching the BaseNeuron specification (specs/05_oop_architecture.md).
 // Extended with Biology specs (specs/02_neuron_spec.md)
 
@@ -67,6 +72,8 @@ typedef struct {
     float metabolic_wear;
     uint32_t last_spike_tick;
 
+    float x, y, z;
+    uint8_t death_reason;
     bool is_alive;
 } BaseNeuron;
 
@@ -88,6 +95,8 @@ typedef struct {
     float neurotransmitter_buffer;
     uint32_t last_activation_tick;
     uint8_t ticks_until_delivery;
+    float thickness;
+    uint32_t ticks_below_threshold;
     bool is_inhibitory;
     bool is_myelinated;
 } Synapse;

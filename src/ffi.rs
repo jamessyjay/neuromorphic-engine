@@ -40,6 +40,10 @@ pub struct BaseNeuron {
     pub metabolic_wear: f32,
     pub last_spike_tick: u32,
 
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub death_reason: u8,
     pub is_alive: bool,
 }
 
@@ -52,6 +56,8 @@ pub struct Synapse {
     pub neurotransmitter_buffer: f32,
     pub last_activation_tick: u32,
     pub ticks_until_delivery: u8,
+    pub thickness: f32,
+    pub ticks_below_threshold: u32,
     pub is_inhibitory: bool,
     pub is_myelinated: bool,
 }

@@ -58,4 +58,72 @@ impl Telemetry {
         }
         println!("------------------------\n");
     }
+
+    pub fn export_simulation_report(&self, neurons: &[BaseNeuron], synapses: &[Synapse], filename: &str) {
+        println!("Exporting population report to '{}'...", filename);
+        
+        // 1. Death Reasons
+        let mut atp_deaths = 0;
+        let mut calcium_deaths = 0;
+        let mut glucose_deaths = 0;
+        
+        for n in neurons {
+            match n.death_reason {
+                1 => atp_deaths += 1,
+                2 => calcium_deaths += 1,
+                3 => glucose_deaths += 1,
+                _ => {}
+            }
+        }
+        
+        // 2. Distributions
+        let mut weight_bins = vec![0; 10];
+        let mut thickness_bins = vec![0; 10];
+        let mut atp_bins = vec![0; 5]; // 0-20, 20-40, 40-60, 60-80, 80-100
+        
+        for s in synapses {
+            let w_idx = (s.weight as usize / 3).min(9);
+            weight_bins[w_idx] += 1;
+            
+            let t_idx = (s.thickness as usize).min(9);
+            thickness_bins[t_idx] += 1;
+        }
+        
+        let mut low_atp_count = 0;
+        for n in neurons {
+            if n.is_alive {
+                let a_idx = (n.energy_atp as usize / 20).min(4);
+                atp_bins[a_idx] += 1;
+                if n.energy_atp < 20.0 { low_atp_count += 1; }
+            }
+        }
+        
+        // 3. JSON Generation (Manual for zero-dependency)
+        let json = format!(r#"{{
+  "simulation_summary": {{
+    "total_ticks": {},
+    "sim_speed": {:.2},
+    "final_neuron_count": {},
+    "final_synapse_count": {}
+  }},
+  "incident_log": {{
+    "atp_low_deaths": {},
+    "calcium_high_deaths": {},
+    "glucose_starvation_deaths": {},
+    "neurons_in_emergency_atp": {}
+  }},
+  "population_distributions": {{
+    "synaptic_weights": {:?},
+    "synaptic_thickness": {:?},
+    "neuron_atp_bins": {:?}
+  }}
+}}"#, 
+            self.total_ticks, self.sim_speed, neurons.len(), synapses.len(),
+            atp_deaths, calcium_deaths, glucose_deaths, low_atp_count,
+            weight_bins, thickness_bins, atp_bins
+        );
+        
+        let _ = fs::write(filename, json);
+        println!("Report generated successfully.");
+    }
 }
