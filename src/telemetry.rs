@@ -80,7 +80,7 @@ impl Telemetry {
         
         // 2. Distributions
         let mut weight_bins = vec![0; 10];
-        let mut thickness_bins = vec![0; 10];
+        let thickness_bins = vec![0; 10];
         let mut atp_bins = vec![0; 5]; // 0-20, 20-40, 40-60, 60-80, 80-100
         
         for s in synapses {

@@ -1,5 +1,7 @@
 // src/constants.rs
 // Centralized registry for all neuromorphic engine constants
+// Some constants are reserved for future use (e.g. on Jetson Orin Nano with real CUDA).
+#![allow(dead_code)]
 
 // --- Simulation Timing & Intervals ---
 pub const SERVICE_TICK_INTERVAL: u32 = 10;

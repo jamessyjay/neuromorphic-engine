@@ -11,9 +11,7 @@ use constants::*;
 use plotters::prelude::*;
 use std::env;
 use std::time::Instant;
-use rand::prelude::*;
 use rand::RngExt;
-use std::collections::HashMap;
 
 // Simple Gaussian sampler (Box-Muller)
 fn get_gaussian(mu: f32, sigma: f32) -> f32 {
@@ -75,7 +73,7 @@ fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     println!("[TEST] All branches initially dead");
 
     // 1-10: 10 Pre-synaptic Pacemakers
-    for i in 1..=10 {
+    for _ in 1..=10 {
         let id = graph.add_neuron(NeuronType::Pacemaker);
         graph.neurons[id as usize].current_voltage = -40.0; // Pre-charge for faster test
     }
@@ -898,6 +896,7 @@ fn render_plasticity_chart(history: &[(u32, f32, f32)], filename: &str) -> Resul
     Ok(())
 }
 
+#[allow(dead_code)]
 fn render_stress_chart(results: &[(u32, f32, usize, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Rendering Stress Analysis to '{}'...", filename);
     let root = BitMapBackend::new(filename, (1024, 768)).into_drawing_area();
