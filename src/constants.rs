@@ -42,3 +42,21 @@ pub const NMDA_SPIKE_THRESHOLD: f32 = 5.0;
 pub const RESTING_VOLTAGE: f32 = -70.0;
 pub const THRESHOLD_VOLTAGE: f32 = -55.0;
 pub const SPIKE_VOLTAGE: f32 = 40.0;
+
+// --- Telemetry & Analytics ---
+pub const SECONDS_PER_TICK: f64 = 0.001; // 1 tick = 1ms of biological time
+pub const WEIGHT_BINS_COUNT: usize = 10;
+pub const ATP_BINS_COUNT: usize = 5;
+pub const MAX_U16_AS_F32: f32 = 65535.0; // Normalization constant for 16-bit fixed-point metrics
+pub const FATIGUE_SLEEP_THRESHOLD: f32 = 40000.0; // Metabolic wear limit to trigger Sleep Cycle
+
+// --- Constants from Phase 34 Tests ---
+pub const VOLTAGE_10_PACKED: u16 = 11000;  // (10.0 + 100.0) * 100.0
+pub const VOLTAGE_50_PACKED: u16 = 15000;  // (50.0 + 100.0) * 100.0
+pub const VOLTAGE_60_PACKED: u16 = 16000;  // (60.0 + 100.0) * 100.0
+
+// --- Data Packing & Geometry ---
+pub const MAX_COORD: f32 = 100.0; // Spatial boundary size (100x100x100)
+pub const COORD_SCALE: f32 = 655.35; // 65535.0 / 100.0 (maps 0.0..100.0 to 0..65535)
+pub const ZERO_VOLTAGE_PACKED: u16 = 10000; // (0.0 + 100.0) * 100.0
+pub const NMDA_THRESHOLD_PACKED: u16 = 10500; // (5.0 + 100.0) * 100.0

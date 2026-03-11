@@ -37,14 +37,14 @@ static __device__ __host__ float get_gaussian(uint32_t* seed, float mu, float si
 
 // --- HELPER MACROS FOR FIXED-POINT ---
 static inline __device__ __host__ uint16_t pack_voltage(float v) {
-    float shifted = v + 100.0f;
+    float shifted = v + VOLTAGE_SHIFT;
     if (shifted < 0.0f) shifted = 0.0f;
-    if (shifted > 655.35f) shifted = 655.35f;
-    return (uint16_t)(shifted * 100.0f);
+    if (shifted > MAX_U16_FLOAT / VOLTAGE_SCALE) shifted = MAX_U16_FLOAT / VOLTAGE_SCALE;
+    return (uint16_t)(shifted * VOLTAGE_SCALE);
 }
 
 static inline __device__ __host__ float unpack_voltage(uint16_t v) {
-    return ((float)v / 100.0f) - 100.0f;
+    return ((float)v / VOLTAGE_SCALE) - VOLTAGE_SHIFT;
 }
 
 // Atomic function: Apoptosis / Death Handler
@@ -66,7 +66,7 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     }
 
     // 1. ATP Generation (mitochondria) - Asymptotic Recovery (Phase 28)
-    float wear_f = (float)n->metabolic_wear / 65535.0f;
+    float wear_f = (float)n->metabolic_wear / MAX_U16_FLOAT;
     float baseline_generation = 1.0f * (1.0f - wear_f);
     float glucose_factor = env.global_glucose_level;
     float oxygen_factor = env.global_oxygen_level;
@@ -85,9 +85,9 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
 
     // 2. Vesicle Recycling (Phase 26/28) - Spec 02
     // Recovery slows down as pool fills
-    float v_gap = 100.0f - n->vesicles_pool;
-    n->vesicles_pool += (v_gap / 100.0f) * 0.5f * (n->energy_ATP / 100.0f);
-    if (n->vesicles_pool > 100.0f) n->vesicles_pool = 100.0f;
+    float v_gap = MAX_VESICLES - n->vesicles_pool;
+    n->vesicles_pool += (v_gap / MAX_VESICLES) * 0.5f * (n->energy_ATP / MAX_ATP);
+    if (n->vesicles_pool > MAX_VESICLES) n->vesicles_pool = MAX_VESICLES;
 
     // 3. Homeostatic Plasticity & Threshold Recovery (Phase 13 & 26)
     if (n->spikes_in_last_window > 20) {
@@ -222,10 +222,10 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
         n->spikes_in_last_window++;
         
         // SPIKE-DRIVEN WEAR (The "Aging" effect)
-        float wear_f = (float)n->metabolic_wear / 65535.0f;
-        wear_f += 0.0005f; 
+        float wear_f = (float)n->metabolic_wear / MAX_U16_FLOAT;
+        wear_f += AGING_WEAR_INC; 
         if (wear_f > 0.98f) wear_f = 0.98f;
-        n->metabolic_wear = (uint16_t)(wear_f * 65535.0f);
+        n->metabolic_wear = (uint16_t)(wear_f * MAX_U16_FLOAT);
 
         if (n->vesicles_pool >= 5.0f) n->vesicles_pool -= 5.0f;
         

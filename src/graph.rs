@@ -40,7 +40,7 @@ impl NetworkGraph {
         if alive_count == 0 { return false; }
         
         let avg_wear = total_wear / alive_count as f32;
-        avg_wear > 40000.0 // Threshold from Phase 35
+        avg_wear > FATIGUE_SLEEP_THRESHOLD // Threshold from Phase 35
     }
 
     pub fn initiate_sleep_cycle(&mut self) {
@@ -174,9 +174,9 @@ impl NetworkGraph {
             last_spike_tick: 0,
             spikes_in_last_window: 0,
             metabolic_wear: 0,
-            x: (rng.random_range(0.0..100.0) * 655.35) as u16,
-            y: (rng.random_range(0.0..100.0) * 655.35) as u16,
-            z: (rng.random_range(0.0..100.0) * 655.35) as u16,
+            x: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
+            y: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
+            z: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             _pad2: 0,
             branches: [crate::ffi::Compartment {
                 branch_type: 0,
@@ -302,13 +302,13 @@ impl NetworkGraph {
             if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 80.0 { continue; } // TODO: ATP Constant
 
             // 2. Spatial Check: Are they close? (Simulating clusters via distance)
-            let x1 = n_source.x as f32 / 655.35;
-            let y1 = n_source.y as f32 / 655.35;
-            let z1 = n_source.z as f32 / 655.35;
+            let x1 = n_source.x as f32 / COORD_SCALE;
+            let y1 = n_source.y as f32 / COORD_SCALE;
+            let z1 = n_source.z as f32 / COORD_SCALE;
             
-            let x2 = n_target.x as f32 / 655.35;
-            let y2 = n_target.y as f32 / 655.35;
-            let z2 = n_target.z as f32 / 655.35;
+            let x2 = n_target.x as f32 / COORD_SCALE;
+            let y2 = n_target.y as f32 / COORD_SCALE;
+            let z2 = n_target.z as f32 / COORD_SCALE;
 
             let dx = x1 - x2;
             let dy = y1 - y2;
@@ -350,8 +350,8 @@ impl NetworkGraph {
             let idx = indices[i];
             let b_type = rng.random_range(1..=3) as u8;
             n.branches[idx].branch_type = b_type;
-            n.branches[idx].nmda_threshold = ((NMDA_SPIKE_THRESHOLD + 100.0) * 100.0) as u16;
-            n.branches[idx].voltage = 10000; // 0.0f is packed as (0 + 100) * 100 = 10000
+            n.branches[idx].nmda_threshold = NMDA_THRESHOLD_PACKED;
+            n.branches[idx].voltage = ZERO_VOLTAGE_PACKED; // 0.0f is packed as (0 + 100) * 100 = 10000
             n.branches[idx].refractory_timer = 0;
         }
     }

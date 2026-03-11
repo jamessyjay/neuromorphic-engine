@@ -18,6 +18,12 @@
 extern "C" {
 
 // Physical Constants (From specs/02_neuron_spec.md & 07_network_and_limits.md)
+// --- Magic Numbers extracted from Phase 35 Cleanup ---
+#define MAX_U16_FLOAT 65535.0f
+#define VOLTAGE_SHIFT 100.0f
+#define VOLTAGE_SCALE 100.0f
+#define MAX_VESICLES 100.0f
+
 #define RESTING_VOLTAGE -70.0f
 #define THRESHOLD_VOLTAGE -55.0f
 #define SPIKE_VOLTAGE 40.0f

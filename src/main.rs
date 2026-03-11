@@ -114,12 +114,12 @@ fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
         branch_type: 1,
         refractory_timer: 0,
-        voltage: 10000, // 0.0 packed
-        nmda_threshold: 10500, // 5.0 packed = (5.0 + 100.0) * 100.0
+        voltage: ZERO_VOLTAGE_PACKED, // 0.0 packed
+        nmda_threshold: NMDA_THRESHOLD_PACKED, // 5.0 packed = (5.0 + 100.0) * 100.0
         _padding: [0; 2],
     };
     for i in 0..8usize {
-        if i != 1 { graph.neurons[target as usize].branches[i].voltage = 10000; }
+        if i != 1 { graph.neurons[target as usize].branches[i].voltage = ZERO_VOLTAGE_PACKED; }
     }
 
     for i in 1..=10 {
@@ -495,8 +495,8 @@ fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
     graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
         branch_type: 1, // Basal
         refractory_timer: 0,
-        voltage: 10000, // 0.0 packed
-        nmda_threshold: 15000, // 50.0 packed = (50.0 + 100.0) * 100.0
+        voltage: ZERO_VOLTAGE_PACKED, // 0.0 packed
+        nmda_threshold: VOLTAGE_50_PACKED, // 50.0 packed = (50.0 + 100.0) * 100.0
         _padding: [0; 2],
     };
 
@@ -511,7 +511,7 @@ fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("[TEST] Injecting sub-threshold signal to branch 1 (Voltage = 10.0mV)");
     // Inject 10.0mV directly into the branch
-    graph.neurons[target as usize].branches[1].voltage = 11000; // 10.0 packed = (10.0 + 100.0) * 100.0
+    graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED; // 10.0 packed = (10.0 + 100.0) * 100.0
     
     // Tick 1: Check passive leak
     graph.tick(1, env);
@@ -530,7 +530,7 @@ fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
 
     // Now test Refractory Timer (Fix 3)
     println!("\n[TEST] Forcing NMDA Spike to trigger Refractory Period");
-    graph.neurons[target as usize].branches[1].voltage = 16000; // 60.0 packed (above 50.0 threshold)
+    graph.neurons[target as usize].branches[1].voltage = VOLTAGE_60_PACKED; // 60.0 packed (above 50.0 threshold)
     graph.tick(2, env);
     
     let ref_timer = graph.neurons[target as usize].branches[1].refractory_timer;
@@ -543,7 +543,7 @@ fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("[TEST] Injecting signal while branch is in refractory...");
-    graph.neurons[target as usize].branches[1].voltage = 11000; // 10.0 packed
+    graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED; // 10.0 packed
     graph.tick(3, env); // Timer should drop to 2, voltage should be reset to 0.0
     
     let blocked_v = (graph.neurons[target as usize].branches[1].voltage as f32 / 100.0) - 100.0;

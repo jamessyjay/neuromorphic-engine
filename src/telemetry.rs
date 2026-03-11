@@ -30,7 +30,7 @@ impl Telemetry {
         if elapsed.as_secs_f64() > 0.0 {
             self.tps = current_tick as f64 / elapsed.as_secs_f64();
             // Assuming 1 tick = 1ms of biological time
-            self.sim_speed = (current_tick as f64 * 0.001) / elapsed.as_secs_f64();
+            self.sim_speed = (current_tick as f64 * SECONDS_PER_TICK) / elapsed.as_secs_f64();
         }
     }
 
@@ -79,22 +79,24 @@ impl Telemetry {
         }
         
         // 2. Distributions
-        let mut weight_bins = vec![0; 10];
-        let thickness_bins = vec![0; 10];
-        let mut atp_bins = vec![0; 5]; // 0-20, 20-40, 40-60, 60-80, 80-100
+        let mut weight_bins = vec![0; WEIGHT_BINS_COUNT];
+        let thickness_bins = vec![0; WEIGHT_BINS_COUNT];
+        let mut atp_bins = vec![0; ATP_BINS_COUNT]; // e.g. 0-20, 20-40, 40-60, 60-80, 80-100
         
+        let weight_bin_size = (MAX_SYNAPSE_WEIGHT / WEIGHT_BINS_COUNT as f32) as usize;
         for s in synapses {
-            let w_idx = (s.weight as usize / 3).min(9);
+            let w_idx = (s.weight as usize / weight_bin_size).min(WEIGHT_BINS_COUNT - 1);
             weight_bins[w_idx] += 1;
             
             // Removed thickness tracking
         }
         
         let mut low_atp_count = 0;
+        let atp_bin_size = (MAX_ATP / ATP_BINS_COUNT as f32) as usize;
         for n in neurons {
             if n.is_alive {
-                let _wear_f = n.metabolic_wear as f32 / 65535.0;
-                let a_idx = (n.energy_atp as usize / 20).min(4);
+                let _wear_f = n.metabolic_wear as f32 / MAX_U16_AS_F32;
+                let a_idx = (n.energy_atp as usize / atp_bin_size).min(ATP_BINS_COUNT - 1);
                 atp_bins[a_idx] += 1;
                 if n.energy_atp < EMERGENCY_ATP_THRESHOLD { low_atp_count += 1; }
             }
