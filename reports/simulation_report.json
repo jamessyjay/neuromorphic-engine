@@ -1,7 +1,7 @@
 {
   "simulation_summary": {
     "total_ticks": 1000,
-    "sim_speed": 8.87,
+    "sim_speed": 39.49,
     "final_neuron_count": 1000,
     "final_synapse_count": 597
   },

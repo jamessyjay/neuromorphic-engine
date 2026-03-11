@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuromorphic Engine Visualizer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: black;
+            color: #ccc;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .stats {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        h1 { margin: 0 0 5px 0; font-size: 16px; color: #fff; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="stats">
+            <h1>Neuromorphic Engine - Live</h1>
+            <div id="status">Connecting...</div>
+            <div id="tick">Tick: 0</div>
+            <div id="neurons">Neurons: 0</div>
+            <div id="synapses">Synapses: 0</div>
+        </div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const tickEl = document.getElementById('tick');
+        const neuronsEl = document.getElementById('neurons');
+        const synapsesEl = document.getElementById('synapses');
+
+        let width, height;
+        let neuronsData = [];
+        let synapsesData = [];
+        let latestTick = 0;
+        let lastDrawTime = 0;
+
+        // Constants from Engine (used for scaling)
+        // Coords are u16 mapped: (0 - 65535) represents (0.0 - 100.0) usually
+        // We will just scale 0-65535 to canvas width/height
+        const MAX_COORD = 65535;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Connect to Rust WebSocket Streamer
+        function connect() {
+            const ws = new WebSocket('ws://127.0.0.1:3030/stream');
+
+            ws.onopen = () => {
+                statusEl.innerText = "Status: CONNECTED (Streaming)";
+                statusEl.style.color = "#0f0";
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                latestTick = data.tick;
+                neuronsData = data.neurons; // [id, x, y, visual_state]
+                synapsesData = data.synapses; // [source, target, weight]
+                
+                tickEl.innerText = `Tick: ${latestTick}`;
+                neuronsEl.innerText = `Neurons: ${neuronsData.length}`;
+                synapsesEl.innerText = `Synapses: ${synapsesData.length}`;
+            };
+
+            ws.onclose = () => {
+                statusEl.innerText = "Status: DISCONNECTED (Retrying...)";
+                statusEl.style.color = "#f00";
+                setTimeout(connect, 1000);
+            };
+
+            ws.onerror = (err) => {
+                console.error("WS Error:", err);
+            };
+        }
+
+        connect();
+
+        // Drawing Loop (requestAnimationFrame) decoupled from WS receipt
+        function draw(time) {
+            requestAnimationFrame(draw);
+
+            // Motion blur / trail effect instead of hard clear
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, width, height);
+
+            if (neuronsData.length === 0) return;
+
+            // Map neurons by ID for fast lookup when drawing synapses
+            const nodeMap = new Map();
+            for (let i = 0; i < neuronsData.length; i++) {
+                const [id, x, y, state] = neuronsData[i];
+                // Scale coordinates
+                const sx = (x / MAX_COORD) * width;
+                const sy = (y / MAX_COORD) * height;
+                nodeMap.set(id, { sx, sy, state });
+            }
+
+            // Draw Synapses
+            ctx.lineWidth = 1;
+            for (let i = 0; i < synapsesData.length; i++) {
+                const [source_id, target_id, weight] = synapsesData[i];
+                const source = nodeMap.get(source_id);
+                const target = nodeMap.get(target_id);
+
+                if (source && target) {
+                    ctx.beginPath();
+                    ctx.moveTo(source.sx, source.sy);
+                    ctx.lineTo(target.sx, target.sy);
+                    
+                    // Alpha based on weight (assuming weight is roughly 0.0 - 10.0+)
+                    const alpha = Math.min(1.0, weight / 15.0);
+                    ctx.strokeStyle = `rgba(100, 200, 255, ${alpha})`;
+                    ctx.stroke();
+                }
+            }
+
+            // Draw Neurons
+            for (const [id, node] of nodeMap.entries()) {
+                ctx.beginPath();
+                
+                let radius = 2;
+                if (node.state === 1) {
+                    // Spiking
+                    ctx.fillStyle = 'rgba(255, 255, 100, 1.0)';
+                    radius = 4;
+                    // Flash effect
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = 'rgba(255, 255, 200, 0.8)';
+                } else if (node.state === 2) {
+                    // Starving
+                    ctx.fillStyle = 'rgba(255, 50, 50, 0.8)';
+                    radius = 3;
+                    ctx.shadowBlur = 5;
+                    ctx.shadowColor = 'rgba(255, 0, 0, 0.5)';
+                } else {
+                    // Resting
+                    ctx.fillStyle = 'rgba(50, 150, 255, 0.5)';
+                    radius = 2;
+                    ctx.shadowBlur = 0;
+                }
+
+                ctx.arc(node.sx, node.sy, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0; // reset
+            }
+        }
+
+        requestAnimationFrame(draw);
+    </script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+pub mod streamer;
 // src/main.rs
 mod ffi;
 mod graph;
@@ -9,6 +10,7 @@ use graph::NetworkGraph;
 use telemetry::Telemetry;
 use constants::*;
 use plotters::prelude::*;
+use tokio::sync::broadcast;
 use std::env;
 use std::time::Instant;
 use rand::RngExt;
@@ -191,7 +193,7 @@ struct BenchmarkData {
     avg_calcium: Vec<f32>,
 }
 
-fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
+fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
     let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         println!("Awakening network from brain_save.bin...");
         loaded_graph
@@ -231,6 +233,33 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
         graph.tick(tick, env);
         let ffi_elapsed = ffi_start.elapsed();
         total_ffi_time += ffi_elapsed;
+        // Phase 36: WebSocket Streaming (every 300 ticks)
+        if let Some(ref tx) = tx {
+            if tick % 300 == 0 {
+                let mut snapshot = streamer::StateSnapshot {
+                    tick,
+                    neurons: Vec::with_capacity(graph.neurons.len()),
+                    synapses: Vec::with_capacity(graph.synapses.len()),
+                };
+                for n in &graph.neurons {
+                    let state = if n.current_voltage > 0.0 || n.spikes_in_last_window > 0 {
+                        1 // Spiking
+                    } else if n.energy_atp < 20.0 {
+                        2 // Starving
+                    } else {
+                        0 // Resting
+                    };
+                    snapshot.neurons.push((n.id, n.x, n.y, state));
+                }
+                for s in &graph.synapses {
+                    snapshot.synapses.push((s.source_id, s.target_id, s.weight));
+                }
+                if let Ok(json) = serde_json::to_string(&snapshot) {
+                    let _ = tx.send(json); // Ignore error if no clients
+                }
+            }
+        }
+
         
         // Phase 35: The Sleep Cycle
         if tick % 1000 == 0 && graph.is_sleep_needed() {
@@ -299,7 +328,7 @@ fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
         println!("\n>> Testing Scale: {} Neurons...", n);
         let s = n * 10;
         let start = Instant::now();
-        let _ = run_benchmark_mode(n, s, 500)?; // 500 ticks is enough for scaling trends
+        let _ = run_benchmark_mode(n, s, 500, None)?; // 500 ticks is enough for scaling trends
         let elapsed = start.elapsed().as_secs_f64();
         let tps = 500.0 / elapsed;
         
@@ -637,7 +666,8 @@ fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing neuromorphic-engine Hybrid Engine...");
 
     let args: Vec<String> = env::args().collect();
@@ -647,6 +677,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_reflex_arc = args.contains(&String::from("--reflex-arc"));
     let is_inhibition_loop = args.contains(&String::from("--inhibition-loop"));
     let is_scaling_test = args.contains(&String::from("--scaling-test"));
+
+    let (tx, _rx) = broadcast::channel(100);
+    
+    // Spawn WebSocket server
+    let tx_clone = tx.clone();
+    tokio::spawn(async move {
+        crate::streamer::start_server(tx_clone).await;
+    });
+
     let is_frequency_test = args.contains(&String::from("--frequency-test"));
     let is_emergence_test = args.contains(&String::from("--emergence-test"));
     let is_morphology_audit = args.contains(&String::from("--morphology-audit"));
@@ -676,7 +715,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        let data = run_benchmark_mode(neurons, synapses, ticks)?;
+        let data = run_benchmark_mode(neurons, synapses, ticks, None)?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
         return Ok(());
     }
