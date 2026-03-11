@@ -152,7 +152,7 @@ static inline __device__ void update_calcium(BaseNeuron* n) {
 }
 
 static inline __device__ void evaluate_branches(BaseNeuron* n) {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < NUM_BRANCHES; i++) {
         Compartment* b = &n->branches[i];
         if (b->branch_type == 0) continue;
 
@@ -242,14 +242,14 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
                 s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK; // Photoreceptors leak constantly
                 uint8_t is_myelinated = (s->flags & 0x10) != 0;
-                s->ticks_until_delivery = is_myelinated ? 0 : 2;
+                s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
             }
         } else {
             if (source->last_spike_tick == current_tick && source->current_voltage == SPIKE_VOLTAGE) {
                 // Bulk release on spike
                 s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
                 uint8_t is_myelinated = (s->flags & 0x10) != 0;
-                s->ticks_until_delivery = is_myelinated ? 0 : 2; // Myelin Bypass (Phase 26)
+                s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS; // Myelin Bypass (Phase 26)
             }
         }
     }
@@ -297,7 +297,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             // 1. Reliability Check: (Simplified since thickness is gone from struct)
             // We use weight as a proxy for maturity
             if (s->weight < SYNAPSE_RELIABILITY_THRESHOLD) {
-                float failure_roll = (float)((current_tick + s->source_id + s->target_id) % 100) / 100.0f;
+                float failure_roll = (float)((current_tick + s->source_id + s->target_id) % RANDOM_MODULO_BASE) / (float)RANDOM_MODULO_BASE;
                 if (failure_roll > SYNAPSE_RELIABILITY_THRESHOLD) {
                     s->neurotransmitter_buffer *= SYNAPSE_RELIABILITY_PENALTY; 
                     return; 
@@ -365,7 +365,7 @@ extern "C" {
 
 void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, Environment env, uint32_t current_tick) {
 #ifdef USE_CUDA
-    int t_per_b = 256;
+    int t_per_b = THREADS_PER_BLOCK;
     int n_blocks = (count + t_per_b - 1) / t_per_b;
     tick_neurons_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
     cudaDeviceSynchronize(); 
@@ -391,7 +391,7 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed) {
     neuron->id = id;
     neuron->type = type;
-    neuron->size = 1.0f; 
+    neuron->size = INIT_SIZE_MEAN; 
     
     uint32_t local_seed = seed + id;
 
@@ -401,22 +401,22 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     
     switch(type) {
         case TYPE_PYRAMIDAL:
-            base_threshold = -52.0f; // More excitable
+            base_threshold = PYRAMIDAL_THRESHOLD; // More excitable
             break;
         case TYPE_INTERNEURON:
-            base_resting = -65.0f; // Faster reset
-            base_threshold = -50.0f;
+            base_resting = INTERNEURON_RESTING; // Faster reset
+            base_threshold = INTERNEURON_THRESHOLD;
             break;
         case TYPE_PACEMAKER:
-            base_resting = -60.0f;
-            base_threshold = -55.0f; 
+            base_resting = PACEMAKER_RESTING;
+            base_threshold = PACEMAKER_THRESHOLD; 
             break;
         case TYPE_PHOTORECEPTOR:
             base_resting = PHOTO_HYPERPOLARIZED;
-            base_threshold = 0.0f; // Doesn't spike
+            base_threshold = PHOTO_THRESHOLD; // Doesn't spike
             break;
         case TYPE_NOCICEPTOR:
-            base_threshold = -45.0f; // High pain threshold
+            base_threshold = NOCICEPTOR_THRESHOLD; // High pain threshold
             break;
         default:
             break;
@@ -425,10 +425,10 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->resting_voltage = get_gaussian(&local_seed, base_resting, DEFAULT_RESTING_VAR); // Wider variance
     neuron->activation_threshold = get_gaussian(&local_seed, base_threshold, DEFAULT_THRESHOLD_VAR);
     neuron->max_atp = get_gaussian(&local_seed, MAX_ATP, DEFAULT_ATP_VAR);
-    neuron->leak_coeff = get_gaussian(&local_seed, 1.2f, DEFAULT_LEAK_VAR);
+    neuron->leak_coeff = get_gaussian(&local_seed, INIT_LEAK_COEFF_MEAN, DEFAULT_LEAK_VAR);
     
     // Randomized structural properties
-    neuron->size = get_gaussian(&local_seed, 1.0f, DEFAULT_SIZE_VAR);
+    neuron->size = get_gaussian(&local_seed, INIT_SIZE_MEAN, DEFAULT_SIZE_VAR);
     neuron->vesicles_pool = get_gaussian(&local_seed, MAX_VESICLES, DEFAULT_VESICLES_VAR);
 
     neuron->energy_ATP = neuron->max_atp;
@@ -452,7 +452,7 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->y = (uint16_t)(y_f * (MAX_U16_FLOAT / MAX_COORD));
     neuron->z = (uint16_t)(z_f * (MAX_U16_FLOAT / MAX_COORD));
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < NUM_BRANCHES; i++) {
         neuron->branches[i].branch_type = 0;
         neuron->branches[i].refractory_timer = 0;
         neuron->branches[i].voltage = pack_voltage(0.0f);
