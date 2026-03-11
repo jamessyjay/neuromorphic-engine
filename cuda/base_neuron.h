@@ -65,15 +65,20 @@ typedef enum {
 } NeuronType;
 
 typedef struct {
-    uint8_t branch_type; // 0=Empty, 1=Basal, 2=Trunk, 3=Tuft
-    float voltage;
-    float nmda_threshold;
-    uint8_t _padding[3]; // Align to 8 bytes
+    uint8_t branch_type;      // 1 byte: 0=Empty, 1=Basal, 2=Trunk, 3=Tuft
+    uint8_t refractory_timer; // 1 byte: Cooldown ticks for the branch
+    uint16_t voltage;         // 2 bytes: Fixed-point (-100 to +100 mV)
+    uint16_t nmda_threshold;  // 2 bytes: Fixed-point
+    uint8_t _padding[2];      // 2 bytes: Align to 8 bytes total
 } Compartment;
 
-typedef struct {
+typedef struct alignas(64) {
     uint32_t id;
-    NeuronType type;
+    uint8_t type;             // 1 byte: NeuronType
+    uint8_t death_reason;     // 1 byte
+    bool is_alive;            // 1 byte
+    uint8_t _pad1;            // 1 byte
+    
     float size;
     float current_voltage;
     
@@ -91,17 +96,16 @@ typedef struct {
     float refractory_time_left;
     
     // Evolution & Adaptation
-    uint32_t spikes_in_last_window;
-    float metabolic_wear;
     uint32_t last_spike_tick;
+    uint16_t spikes_in_last_window;
+    uint16_t metabolic_wear; // Packed 0.0-1.0 to 0-65535
 
-    float x, y, z;
-    uint8_t death_reason;
-    bool is_alive;
+    uint16_t x, y, z;        // Packed 0.0-100.0 to 0-65535
+    uint16_t _pad2;          // Align to 8 bytes for the base struct before branches
     
     // Dendritic Tree (Phase 33)
-    Compartment branches[8]; 
-} BaseNeuron;
+    Compartment branches[8]; // 8 * 8 = 64 bytes
+} BaseNeuron; // Total: 64 (base) + 64 (branches) = 128 bytes (exactly 2 cache lines)
 
 // Environment Singleton Representation
 typedef struct {

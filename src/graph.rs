@@ -20,7 +20,10 @@ impl NetworkGraph {
         let id = self.neurons.len() as u32;
         let mut neuron = BaseNeuron {
             id,
-            type_,
+            type_: type_ as u8,
+            death_reason: 0,
+            is_alive: true,
+            _pad1: 0,
             size: 1.0,
             current_voltage: 0.0,
             activation_threshold: 0.0,
@@ -31,19 +34,19 @@ impl NetworkGraph {
             calcium_level: 0.0,
             vesicles_pool: MAX_ATP, // Shared constant for pool size
             refractory_time_left: 0.0,
-            spikes_in_last_window: 0,
-            metabolic_wear: 0.0,
             last_spike_tick: 0,
-            x: rng.random_range(0.0..100.0),
-            y: rng.random_range(0.0..100.0),
-            z: rng.random_range(0.0..100.0),
-            death_reason: 0,
-            is_alive: true,
+            spikes_in_last_window: 0,
+            metabolic_wear: 0,
+            x: (rng.random_range(0.0..100.0) * 655.35) as u16,
+            y: (rng.random_range(0.0..100.0) * 655.35) as u16,
+            z: (rng.random_range(0.0..100.0) * 655.35) as u16,
+            _pad2: 0,
             branches: [crate::ffi::Compartment {
                 branch_type: 0,
-                voltage: 0.0,
-                nmda_threshold: 0.0,
-                _padding: [0; 3],
+                refractory_timer: 0,
+                voltage: 0,
+                nmda_threshold: 0,
+                _padding: [0; 2],
             }; 8],
         };
         
@@ -162,9 +165,17 @@ impl NetworkGraph {
             if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 80.0 { continue; } // TODO: ATP Constant
 
             // 2. Spatial Check: Are they close? (Simulating clusters via distance)
-            let dx = n_source.x - n_target.x;
-            let dy = n_source.y - n_target.y;
-            let dz = n_source.z - n_target.z;
+            let x1 = n_source.x as f32 / 655.35;
+            let y1 = n_source.y as f32 / 655.35;
+            let z1 = n_source.z as f32 / 655.35;
+            
+            let x2 = n_target.x as f32 / 655.35;
+            let y2 = n_target.y as f32 / 655.35;
+            let z2 = n_target.z as f32 / 655.35;
+
+            let dx = x1 - x2;
+            let dy = y1 - y2;
+            let dz = z1 - z2;
             let dist_sq = dx*dx + dy*dy + dz*dz;
 
             if dist_sq < CLUSTERING_RADIUS_SQ { 
@@ -202,8 +213,9 @@ impl NetworkGraph {
             let idx = indices[i];
             let b_type = rng.random_range(1..=3) as u8;
             n.branches[idx].branch_type = b_type;
-            n.branches[idx].nmda_threshold = NMDA_SPIKE_THRESHOLD;
-            n.branches[idx].voltage = 0.0;
+            n.branches[idx].nmda_threshold = ((NMDA_SPIKE_THRESHOLD + 100.0) * 100.0) as u16;
+            n.branches[idx].voltage = 10000; // 0.0f is packed as (0 + 100) * 100 = 10000
+            n.branches[idx].refractory_timer = 0;
         }
     }
 }

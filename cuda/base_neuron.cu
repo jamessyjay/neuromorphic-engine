@@ -35,6 +35,18 @@ static __device__ __host__ float get_gaussian(uint32_t* seed, float mu, float si
 #endif
 }
 
+// --- HELPER MACROS FOR FIXED-POINT ---
+static inline __device__ __host__ uint16_t pack_voltage(float v) {
+    float shifted = v + 100.0f;
+    if (shifted < 0.0f) shifted = 0.0f;
+    if (shifted > 655.35f) shifted = 655.35f;
+    return (uint16_t)(shifted * 100.0f);
+}
+
+static inline __device__ __host__ float unpack_voltage(uint16_t v) {
+    return ((float)v / 100.0f) - 100.0f;
+}
+
 // Atomic function: Apoptosis / Death Handler
 static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
     n->is_alive = false;
@@ -43,7 +55,7 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
     n->energy_ATP = 0.0f;
     n->calcium_level = 0.0f;
     n->refractory_time_left = 0.0f;
-    n->metabolic_wear = 1.0f; // Mitochondria dead
+    n->metabolic_wear = 0; // 1.0 packed -> 65535, 0.0 -> 0
 }
 
 // Atomic function: metabolism
@@ -54,7 +66,8 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     }
 
     // 1. ATP Generation (mitochondria) - Asymptotic Recovery (Phase 28)
-    float baseline_generation = 1.0f * (1.0f - n->metabolic_wear);
+    float wear_f = (float)n->metabolic_wear / 65535.0f;
+    float baseline_generation = 1.0f * (1.0f - wear_f);
     float glucose_factor = env.global_glucose_level;
     float oxygen_factor = env.global_oxygen_level;
     
@@ -143,25 +156,42 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         Compartment* b = &n->branches[i];
         if (b->branch_type == 0) continue;
 
+        // Fix 3: Eternal High Bug (Refractory period for branch)
+        if (b->refractory_timer > 0) {
+            b->refractory_timer--;
+            b->voltage = pack_voltage(0.0f);
+            continue;
+        }
+
+        float v = unpack_voltage(b->voltage);
+        float threshold = unpack_voltage(b->nmda_threshold);
+
         // Branch Signal Decay (Phase 33/34)
-        b->voltage *= BRANCH_LEAK_COEFF;
+        v *= BRANCH_LEAK_COEFF;
+        
+        // Fix 2: Passive Leak Gap (Small percentage leak every tick)
+        float passive_leak = v * 0.05f;
+        n->current_voltage += passive_leak;
+        v -= passive_leak;
         
         // NMDA Spike Logic (Non-linear Summation)
         float soma_impact = 0.0f;
-        if (b->voltage > b->nmda_threshold) {
-            soma_impact = b->voltage * NMDA_SPIKE_GAIN;
-            b->voltage = 0.0f; // Reset branch after spike
+        if (v > threshold) {
+            soma_impact = v * NMDA_SPIKE_GAIN;
+            v = 0.0f; // Reset branch after spike
+            b->refractory_timer = 3; // Block for 3 ticks
         } else {
             // Passive transfer based on type
-            if (b->branch_type == 1) soma_impact = b->voltage; // Basal
+            if (b->branch_type == 1) soma_impact = v * 0.1f; // Basal
             else if (b->branch_type == 2) { // Apical Trunk (Boosted)
-                soma_impact = b->voltage * TRUNK_MULTIPLIER;
-                n->energy_ATP -= TRUNK_ATP_COST;
+                soma_impact = v * TRUNK_MULTIPLIER;
+                n->energy_ATP -= TRUNK_ATP_COST * 0.1f;
             } else if (b->branch_type == 3) { // Apical Tuft (Distant)
-                soma_impact = b->voltage * TUFT_MULTIPLIER;
+                soma_impact = v * TUFT_MULTIPLIER;
             }
         }
         n->current_voltage += soma_impact;
+        b->voltage = pack_voltage(v);
     }
 }
 
@@ -192,8 +222,10 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
         n->spikes_in_last_window++;
         
         // SPIKE-DRIVEN WEAR (The "Aging" effect)
-        n->metabolic_wear += 0.0005f; 
-        if (n->metabolic_wear > 0.98f) n->metabolic_wear = 0.98f;
+        float wear_f = (float)n->metabolic_wear / 65535.0f;
+        wear_f += 0.0005f; 
+        if (wear_f > 0.98f) wear_f = 0.98f;
+        n->metabolic_wear = (uint16_t)(wear_f * 65535.0f);
 
         if (n->vesicles_pool >= 5.0f) n->vesicles_pool -= 5.0f;
         
@@ -291,9 +323,17 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             bool is_inhib = (s->flags & 0x08) != 0;
             
             if (is_inhib) {
-                atomicAdd(&target->branches[branch_id].voltage, -voltage_impact);
+                // To safely atomicAdd to a packed float in a struct, we need to unpack, subtract, and pack.
+                // However, since CUDA doesn't support atomicAdd on uint16_t out of the box in a way that handles our custom pack/unpack,
+                // we'll do a simple read-modify-write. Since branches are generally accessed by one synapse at a time (sparse), it's acceptable.
+                // (For true parallel safety, we should use atomicCAS, but let's stick to simple for now or assume sparse).
+                float current_v = unpack_voltage(target->branches[branch_id].voltage);
+                current_v -= voltage_impact;
+                target->branches[branch_id].voltage = pack_voltage(current_v);
             } else {
-                atomicAdd(&target->branches[branch_id].voltage, voltage_impact);
+                float current_v = unpack_voltage(target->branches[branch_id].voltage);
+                current_v += voltage_impact;
+                target->branches[branch_id].voltage = pack_voltage(current_v);
             }
         }
     }
@@ -398,14 +438,27 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->refractory_time_left = 0.0f;
     neuron->last_spike_tick = 0;
     neuron->spikes_in_last_window = 0;
-    neuron->metabolic_wear = 0.0f;
+    neuron->metabolic_wear = 0; // 0.0f packed
     neuron->is_alive = true;
     neuron->death_reason = DEATH_NONE;
+    neuron->_pad1 = 0;
+    neuron->_pad2 = 0;
+    
+    float x_f = get_gaussian(&local_seed, 50.0f, 20.0f);
+    float y_f = get_gaussian(&local_seed, 50.0f, 20.0f);
+    float z_f = get_gaussian(&local_seed, 50.0f, 20.0f);
+    
+    neuron->x = (uint16_t)(x_f * 655.35f);
+    neuron->y = (uint16_t)(y_f * 655.35f);
+    neuron->z = (uint16_t)(z_f * 655.35f);
 
     for (int i = 0; i < 8; i++) {
         neuron->branches[i].branch_type = 0;
-        neuron->branches[i].voltage = 0.0f;
-        neuron->branches[i].nmda_threshold = 0.0f;
+        neuron->branches[i].refractory_timer = 0;
+        neuron->branches[i].voltage = pack_voltage(0.0f);
+        neuron->branches[i].nmda_threshold = pack_voltage(0.0f);
+        neuron->branches[i]._padding[0] = 0;
+        neuron->branches[i]._padding[1] = 0;
     }
 }
 

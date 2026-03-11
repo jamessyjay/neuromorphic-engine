@@ -113,12 +113,13 @@ fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     // Activate branch 1 now
     graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
         branch_type: 1,
-        voltage: 0.0,
-        nmda_threshold: 5.0,
-        _padding: [0; 3],
+        refractory_timer: 0,
+        voltage: 10000, // 0.0 packed
+        nmda_threshold: 10500, // 5.0 packed = (5.0 + 100.0) * 100.0
+        _padding: [0; 2],
     };
     for i in 0..8usize {
-        if i != 1 { graph.neurons[target as usize].branches[i].voltage = 0.0; }
+        if i != 1 { graph.neurons[target as usize].branches[i].voltage = 10000; }
     }
 
     for i in 1..=10 {
@@ -470,6 +471,83 @@ fn render_chart(data: &SimulationData, filename: &str) -> Result<(), Box<dyn std
     Ok(())
 }
 
+fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING PASSIVE LEAK & REFRACTORY TEST (Fix 2 & 3 Validation) ---");
+    let mut graph = NetworkGraph::new();
+    
+    let target = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[target as usize].current_voltage = -70.0; // Resting
+    
+    // Setup a single active branch with a very high NMDA threshold so it won't spike
+    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
+        branch_type: 1, // Basal
+        refractory_timer: 0,
+        voltage: 10000, // 0.0 packed
+        nmda_threshold: 15000, // 50.0 packed = (50.0 + 100.0) * 100.0
+        _padding: [0; 2],
+    };
+
+    let env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 42,
+    };
+
+    println!("[TEST] Injecting sub-threshold signal to branch 1 (Voltage = 10.0mV)");
+    // Inject 10.0mV directly into the branch
+    graph.neurons[target as usize].branches[1].voltage = 11000; // 10.0 packed = (10.0 + 100.0) * 100.0
+    
+    // Tick 1: Check passive leak
+    graph.tick(1, env);
+    
+    let soma_v = graph.neurons[target as usize].current_voltage;
+    let branch_v = (graph.neurons[target as usize].branches[1].voltage as f32 / 100.0) - 100.0;
+    
+    println!("Tick 1 - Soma Voltage: {:.2} mV (Expected > -70.0 due to leak)", soma_v);
+    println!("Tick 1 - Branch Voltage: {:.2} mV (Expected < 10.0 due to leak)", branch_v);
+    
+    if soma_v > -70.0 {
+        println!("✅ FIX 2 PASS: Passive leak successfully transferred sub-threshold charge to soma.");
+    } else {
+        println!("❌ FIX 2 FAIL: Soma voltage did not increase from passive leak.");
+    }
+
+    // Now test Refractory Timer (Fix 3)
+    println!("\n[TEST] Forcing NMDA Spike to trigger Refractory Period");
+    graph.neurons[target as usize].branches[1].voltage = 16000; // 60.0 packed (above 50.0 threshold)
+    graph.tick(2, env);
+    
+    let ref_timer = graph.neurons[target as usize].branches[1].refractory_timer;
+    println!("Tick 2 - Branch Refractory Timer: {} (Expected 3)", ref_timer);
+    
+    if ref_timer == 3 {
+        println!("✅ FIX 3 PASS: Branch entered refractory period after NMDA spike.");
+    } else {
+        println!("❌ FIX 3 FAIL: Refractory timer not set correctly.");
+    }
+
+    println!("[TEST] Injecting signal while branch is in refractory...");
+    graph.neurons[target as usize].branches[1].voltage = 11000; // 10.0 packed
+    graph.tick(3, env); // Timer should drop to 2, voltage should be reset to 0.0
+    
+    let blocked_v = (graph.neurons[target as usize].branches[1].voltage as f32 / 100.0) - 100.0;
+    let new_timer = graph.neurons[target as usize].branches[1].refractory_timer;
+    
+    println!("Tick 3 - Branch Voltage: {:.2} mV (Expected 0.0, blocked by refractory)", blocked_v);
+    println!("Tick 3 - Refractory Timer: {} (Expected 2)", new_timer);
+    
+    if blocked_v == 0.0 && new_timer == 2 {
+        println!("✅ FIX 3 PASS: Refractory period effectively blocked incoming signal ('Eternal High' prevented).");
+    } else {
+        println!("❌ FIX 3 FAIL: Refractory period failed to block signal.");
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing neuromorphic-engine Hybrid Engine...");
 
@@ -484,6 +562,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_emergence_test = args.contains(&String::from("--emergence-test"));
     let is_morphology_audit = args.contains(&String::from("--morphology-audit"));
     let is_spatial_test = args.contains(&String::from("--spatial-test"));
+    let is_passive_leak_test = args.contains(&String::from("--passive-leak-test"));
 
     if is_benchmark {
         let mut neurons = 10000;
@@ -524,6 +603,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if is_spatial_test {
         run_spatial_summation_test()?;
+        return Ok(());
+    }
+
+    if is_passive_leak_test {
+        run_passive_leak_test()?;
         return Ok(());
     }
 
@@ -797,7 +881,7 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 
         for n in &graph.neurons {
             total_atp += n.energy_atp;
-            avg_wear += n.metabolic_wear;
+            avg_wear += n.metabolic_wear as f32 / 65535.0;
             if !n.is_alive { dead_count += 1; }
         }
 

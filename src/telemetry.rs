@@ -93,6 +93,7 @@ impl Telemetry {
         let mut low_atp_count = 0;
         for n in neurons {
             if n.is_alive {
+                let _wear_f = n.metabolic_wear as f32 / 65535.0;
                 let a_idx = (n.energy_atp as usize / 20).min(4);
                 atp_bins[a_idx] += 1;
                 if n.energy_atp < EMERGENCY_ATP_THRESHOLD { low_atp_count += 1; }

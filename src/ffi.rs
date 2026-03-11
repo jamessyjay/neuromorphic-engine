@@ -18,17 +18,23 @@ pub enum NeuronType {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Compartment {
-    pub branch_type: u8, // 0=Empty, 1=Basal, 2=Trunk, 3=Tuft
-    pub voltage: f32,
-    pub nmda_threshold: f32,
-    pub _padding: [u8; 3],
+    pub branch_type: u8,
+    pub refractory_timer: u8,
+    pub voltage: u16,         // Fixed-point
+    pub nmda_threshold: u16,  // Fixed-point
+    pub _padding: [u8; 2],
 }
 
 #[repr(C)]
+#[repr(align(64))]
 #[derive(Debug, Clone, Copy)]
 pub struct BaseNeuron {
     pub id: u32,
-    pub type_: NeuronType,
+    pub type_: u8,            // NeuronType
+    pub death_reason: u8,
+    pub is_alive: bool,
+    pub _pad1: u8,
+    
     pub size: f32,
     pub current_voltage: f32,
     
@@ -45,15 +51,15 @@ pub struct BaseNeuron {
     pub refractory_time_left: f32,
     
     // Evolution & Adaptation
-    pub spikes_in_last_window: u32,
-    pub metabolic_wear: f32,
     pub last_spike_tick: u32,
+    pub spikes_in_last_window: u16,
+    pub metabolic_wear: u16,
 
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub death_reason: u8,
-    pub is_alive: bool,
+    pub x: u16,
+    pub y: u16,
+    pub z: u16,
+    pub _pad2: u16,
+    
     pub branches: [Compartment; 8],
 }
 
