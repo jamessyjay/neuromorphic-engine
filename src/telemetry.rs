@@ -3,6 +3,7 @@
 use std::time::Instant;
 use std::fs;
 use crate::ffi::{BaseNeuron, Synapse};
+use crate::constants::*;
 
 pub struct Telemetry {
     start_time: Instant,
@@ -94,7 +95,7 @@ impl Telemetry {
             if n.is_alive {
                 let a_idx = (n.energy_atp as usize / 20).min(4);
                 atp_bins[a_idx] += 1;
-                if n.energy_atp < 20.0 { low_atp_count += 1; }
+                if n.energy_atp < EMERGENCY_ATP_THRESHOLD { low_atp_count += 1; }
             }
         }
         

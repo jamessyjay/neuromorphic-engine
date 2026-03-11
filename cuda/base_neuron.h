@@ -28,11 +28,27 @@ extern "C" {
 #define ATP_SPIKE_COST 20.0f
 #define CALCIUM_SPIKE_GAIN 10.0f
 #define FATAL_CALCIUM_LEVEL 100.0f
+#define MAX_SYNAPSE_WEIGHT 30.0f
 
 #define DEATH_NONE 0
 #define DEATH_ATP_LOW 1
 #define DEATH_CALCIUM_HIGH 2
 #define DEATH_GLUCOSE_STARVATION 3
+
+// Dendritic Tree Physics (Phase 33/34)
+#define BRANCH_LEAK_COEFF 0.9f
+#define NMDA_SPIKE_GAIN 5.0f
+#define TRUNK_MULTIPLIER 2.0f
+#define TRUNK_ATP_COST 5.0f
+#define TUFT_MULTIPLIER 0.5f
+
+// Metabolic & Homeostatic Constants
+#define METABOLIC_FLOOR 0.15f
+#define EMERGENCY_ATP_SILENCE 20.0f
+#define STDP_LEARNING_RATE 0.1f
+#define VESICLE_SPIKE_COST 5.0f
+#define AGING_WEAR_INC 0.0005f
+#define RECEPTOR_SCALE_CONSTANT 6.0f
 
 // Base C-struct matching the BaseNeuron specification (specs/05_oop_architecture.md).
 // Extended with Biology specs (specs/02_neuron_spec.md)

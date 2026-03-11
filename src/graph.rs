@@ -1,4 +1,5 @@
 use crate::ffi::{BaseNeuron, Synapse, NeuronType, init_neuron};
+use crate::constants::*;
 use rand::RngExt;
 
 pub struct NetworkGraph {
@@ -24,11 +25,11 @@ impl NetworkGraph {
             current_voltage: 0.0,
             activation_threshold: 0.0,
             resting_voltage: 0.0,
-            energy_atp: 100.0,
-            max_atp: 100.0,
+            energy_atp: MAX_ATP,
+            max_atp: MAX_ATP,
             leak_coeff: 1.0,
             calcium_level: 0.0,
-            vesicles_pool: 100.0,
+            vesicles_pool: MAX_ATP, // Shared constant for pool size
             refractory_time_left: 0.0,
             spikes_in_last_window: 0,
             metabolic_wear: 0.0,
@@ -96,15 +97,15 @@ impl NetworkGraph {
         
         // 1. Clean synaptic overflow (Only if weight > 0)
         for synapse in &mut self.synapses {
-            if synapse.weight > 0.0 && synapse.neurotransmitter_buffer > 50.0 {
-                synapse.neurotransmitter_buffer -= 10.0;
+            if synapse.weight > 0.0 && synapse.neurotransmitter_buffer > ASTROCYTE_CLEAN_THRESHOLD {
+                synapse.neurotransmitter_buffer -= ASTROCYTE_CLEAN_AMOUNT;
             }
         }
         
         // 2. Supply ATP to hard working neurons (Only if alive and low ATP)
         for neuron in &mut self.neurons {
-            if neuron.is_alive && neuron.energy_atp < 50.0 {
-                neuron.energy_atp = f32::min(100.0, neuron.energy_atp + 10.0);
+            if neuron.is_alive && neuron.energy_atp < ASTROCYTE_CLEAN_THRESHOLD {
+                neuron.energy_atp = f32::min(MAX_ATP, neuron.energy_atp + ASTROCYTE_ATP_SUPPLY);
             }
         }
     }
@@ -124,14 +125,14 @@ impl NetworkGraph {
             let is_endpoint_dead = dead_ids.contains(&s.source_id) || dead_ids.contains(&s.target_id);
             
             // Phase 31: Hard Pruning with Persistence
-            let is_below_threshold = s.weight < 0.05;
+            let is_below_threshold = s.weight < PRUNING_WEIGHT_THRESHOLD;
             if is_below_threshold {
-                s.ticks_below_threshold += 10; // Service runs every 10 ticks
+                s.ticks_below_threshold += SERVICE_TICK_INTERVAL; // Service runs every 10 ticks (Phase 34: Use constant)
             } else {
                 s.ticks_below_threshold = 0;
             }
 
-            let is_persistent_dead = s.ticks_below_threshold >= 1000;
+            let is_persistent_dead = s.ticks_below_threshold >= PRUNING_TICK_THRESHOLD;
             
             !is_endpoint_dead && !is_persistent_dead
         });
@@ -139,7 +140,7 @@ impl NetworkGraph {
 
     // Background Service: NeuroGenesis (Growth & Structural Plasticity)
     pub fn run_neurogenesis_service(&mut self, current_tick: u32) {
-        if current_tick % 500 != 0 { return; } // Reduced frequency per Phase 31
+        if current_tick % NEUROGENESIS_INTERVAL != 0 { return; } 
         
         let mut rng = rand::rng();
         let num_neurons = self.neurons.len();
@@ -158,7 +159,7 @@ impl NetworkGraph {
             let n_target = &self.neurons[j];
 
             // 1. Metabolic Check: Can source afford to grow?
-            if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 80.0 { continue; }
+            if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 80.0 { continue; } // TODO: ATP Constant
 
             // 2. Spatial Check: Are they close? (Simulating clusters via distance)
             let dx = n_source.x - n_target.x;
@@ -166,19 +167,19 @@ impl NetworkGraph {
             let dz = n_source.z - n_target.z;
             let dist_sq = dx*dx + dy*dy + dz*dz;
 
-            if dist_sq < 400.0 { // Tighter cluster radius = 20.0
+            if dist_sq < CLUSTERING_RADIUS_SQ { 
                 // 3. Activity Correlation: Both spiked recently?
-                let s_active = current_tick - n_source.last_spike_tick < 100;
+                let s_active = current_tick - n_source.last_spike_tick < 100; // TODO: Correlation window constant
                 let t_active = current_tick - n_target.last_spike_tick < 100;
 
                 if s_active && t_active {
-                    // 4. Stochastic Growth P=0.2 per check
-                    if rng.random_bool(0.2) {
+                    // 4. Stochastic Growth
+                    if rng.random_bool(STOCHASTIC_GROWTH_PROB) {
                         // Success! Connect these neurons with target branch
                         // Find a living branch or default to 0
                         let branch_id = rng.random_range(0..8) as u8;
                         let is_inhib = rng.random_bool(0.2); 
-                        self.connect(i as u32, j as u32, 0.05, branch_id, is_inhib, false);
+                        self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
                     }
                 }
             }
@@ -201,7 +202,7 @@ impl NetworkGraph {
             let idx = indices[i];
             let b_type = rng.random_range(1..=3) as u8;
             n.branches[idx].branch_type = b_type;
-            n.branches[idx].nmda_threshold = 5.0; // 5.0 glutamate units for NMDA spike
+            n.branches[idx].nmda_threshold = NMDA_SPIKE_THRESHOLD;
             n.branches[idx].voltage = 0.0;
         }
     }

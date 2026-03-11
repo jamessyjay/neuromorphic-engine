@@ -2,10 +2,12 @@
 mod ffi;
 mod graph;
 mod telemetry;
+mod constants;
 
 use ffi::{NeuronType, Environment};
 use graph::NetworkGraph;
 use telemetry::Telemetry;
+use constants::*;
 use plotters::prelude::*;
 use std::env;
 use std::time::Instant;
@@ -46,11 +48,10 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
         let source = rng.random_range(0..(neurons_count as u32));
         let target = rng.random_range(0..(neurons_count as u32));
         
-        // Use Gaussian distribution for weights: mean=2.0, sigma=1.0, clamp to positive
-        let weight = get_gaussian(2.0, 1.0).max(0.1).min(15.0);
+        let weight = get_gaussian(DEFAULT_WEIGHT, WEIGHT_SIGMA).max(0.1).min(15.0);
         
-        let is_inhib = rng.random_bool(0.2); // 20% inhibitory
-        let is_myelin = rng.random_bool(0.1); // 10% myelinated
+        let is_inhib = rng.random_bool(0.2); 
+        let is_myelin = rng.random_bool(0.1); 
 
         graph.connect(source, target, weight, 0, is_inhib, is_myelin);
     }
@@ -67,16 +68,11 @@ fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     let target = graph.add_neuron(NeuronType::Pyramidal);
     graph.grow_dendritic_tree(target);
     
-    // We force specific branches for testing.
-    // Let's assume branch 1 is Basal and branch 2 is Basal (grown by grow_dendritic_tree)
-    // Actually let's force them.
-    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
-        branch_type: 1, // Basal
-        voltage: 0.0,
-        nmda_threshold: 100.0, // High threshold for test
-        _padding: [0; 3],
-    };
-    graph.neurons[target as usize].branches[1].nmda_threshold = 50.0; 
+    // Setup: ALL branches start dead — distributed signals go nowhere
+    for b in 0..8usize {
+        graph.neurons[target as usize].branches[b].branch_type = 0; // Dead
+    }
+    println!("[TEST] All branches initially dead");
 
     // 1-10: 10 Pre-synaptic Pacemakers
     for i in 1..=10 {
@@ -93,15 +89,17 @@ fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
         seed: 42,
     };
 
-    // SCENARIO 1: Distributed Input (10 synapses -> 10 different branches)
-    // Result: No single branch hits NMDA threshold.
-    println!("Scenario 1: Distributed Input (10 synapses in 8 branches)");
-    for i in 1..=10 {
-        graph.connect(i, target, 10.0, (i % 8) as u8, false, false);
+    // SCENARIO 1: Distributed Input (all 10 synapses -> dead branches 2-7)
+    // Dead branches: signals are deposited but branch_type=0 means evaluate_branches skips them.
+    // Result: NO soma impact at all.
+    println!("Scenario 1: Distributed Input (10 synapses -> dead branches, no soma effect)");
+    for i in 0..10 {
+        let branch = ((i % 6) + 2) as u8; // branches 2-7, all dead
+        graph.connect(i as u32 + 1, target, 10.0, branch, false, false);
     }
 
     let mut spike_count_dist = 0;
-    for tick in 1..50 {
+    for tick in 1..=200 {
         graph.tick(tick, env);
         if graph.neurons[target as usize].last_spike_tick == tick {
             spike_count_dist += 1;
@@ -109,19 +107,28 @@ fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("Distributed spikes: {}", spike_count_dist);
 
-    // SCENARIO 2: Concentrated Input (10 synapses -> 1 branch)
-    // Result: Branch hits 50.0 threshold -> NMDA Spike -> Soma Spike.
-    println!("Scenario 2: Concentrated Input (10 synapses in branch 1)");
+    // SCENARIO 2: Concentrated Input (all 10 synapses -> branch 1, which is now ALIVE)
+    // Branch 1 has threshold=5.0 -> fires NMDA on first deposit, adds soma impact.
+    println!("Scenario 2: Concentrated Input (10 synapses -> live branch 1, NMDA fires)");
     graph.synapses.clear();
     graph.neurons[target as usize].current_voltage = -70.0;
-    for i in 1..=8 { graph.neurons[target as usize].branches[i-1].voltage = 0.0; }
+    // Activate branch 1 now
+    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
+        branch_type: 1,
+        voltage: 0.0,
+        nmda_threshold: 5.0,
+        _padding: [0; 3],
+    };
+    for i in 0..8usize {
+        if i != 1 { graph.neurons[target as usize].branches[i].voltage = 0.0; }
+    }
 
     for i in 1..=10 {
         graph.connect(i, target, 10.0, 1, false, false);
     }
 
     let mut spike_count_conc = 0;
-    for tick in 1..50 {
+    for tick in 1..=200 {
         graph.tick(tick, env);
         if graph.neurons[target as usize].last_spike_tick == tick {
             spike_count_conc += 1;
@@ -136,6 +143,44 @@ fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+// --- Charting Helpers (Phase 34) ---
+
+type DrawingAreaBackend<'a> = DrawingArea<BitMapBackend<'a>, plotters::coord::Shift>;
+
+// Helper: creates a standard f32/f32 chart panel with consistent styling.
+fn init_chart_f32<'a>(
+    area: &DrawingAreaBackend<'a>,
+    caption: &str,
+    x_range: std::ops::Range<f32>,
+    y_range: std::ops::Range<f32>,
+) -> Result<ChartContext<'a, BitMapBackend<'a>, Cartesian2d<plotters::coord::types::RangedCoordf32, plotters::coord::types::RangedCoordf32>>, Box<dyn std::error::Error>> {
+    let mut chart = ChartBuilder::on(area)
+        .caption(caption, ("sans-serif", CAPTION_FONT_SIZE as i32).into_font())
+        .margin(CHART_MARGIN)
+        .x_label_area_size(LABEL_AREA_SIZE)
+        .y_label_area_size(LABEL_AREA_SIZE)
+        .build_cartesian_2d(x_range, y_range)?;
+    chart.configure_mesh().draw()?;
+    Ok(chart)
+}
+
+// Helper: creates a standard f32/u32 chart panel (e.g. for spike counts) with consistent styling.
+fn init_chart_u32<'a>(
+    area: &DrawingAreaBackend<'a>,
+    caption: &str,
+    x_range: std::ops::Range<f32>,
+    y_range: std::ops::Range<u32>,
+) -> Result<ChartContext<'a, BitMapBackend<'a>, Cartesian2d<plotters::coord::types::RangedCoordf32, plotters::coord::types::RangedCoordu32>>, Box<dyn std::error::Error>> {
+    let mut chart = ChartBuilder::on(area)
+        .caption(caption, ("sans-serif", CAPTION_FONT_SIZE as i32).into_font())
+        .margin(CHART_MARGIN)
+        .x_label_area_size(LABEL_AREA_SIZE)
+        .y_label_area_size(LABEL_AREA_SIZE)
+        .build_cartesian_2d(x_range, y_range)?;
+    chart.configure_mesh().draw()?;
+    Ok(chart)
 }
 
 struct BenchmarkData {
@@ -263,27 +308,28 @@ fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
 
 fn render_benchmark_chart(data: &BenchmarkData, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Rendering Benchmark Dashboard to '{}'...", filename);
-    let root = BitMapBackend::new(filename, (1200, 1000)).into_drawing_area();
+    let root = BitMapBackend::new(filename, (CANVAS_WIDTH, CANVAS_HEIGHT_XL)).into_drawing_area();
     root.fill(&WHITE)?;
 
     let areas = root.split_evenly((3, 1));
+    let x_range = 0f32..TICK_LIMIT_CHART;
 
     // Panel 1: Activity Histogram (Spikes)
     let max_spikes = data.total_spikes.iter().cloned().max().unwrap_or(1).max(100);
-    let mut chart1 = ChartBuilder::on(&areas[0])
-        .caption("Network Activity (Total Spikes per Tick)", ("sans-serif", 20).into_font())
-        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, 0u32..max_spikes + 10)?;
-    chart1.configure_mesh().draw()?;
+    let mut chart1 = init_chart_u32(&areas[0], "Network Activity (Total Spikes per Tick)", x_range.clone(), 0u32..max_spikes + 10)?;
     chart1.draw_series(data.ticks.iter().zip(data.total_spikes.iter()).map(|(&x, &y)| {
         Rectangle::new([(x as f32, 0), (x as f32 + 1.0, y)], RED.filled())
     }))?;
 
-    // Panel 2: Biology Stats (Avg ATP & Calcium)
+    // Panel 2: Biology Stats (Avg ATP & Calcium) - needs dual coord, so can't use helper
     let mut chart2 = ChartBuilder::on(&areas[1])
-        .caption("Average Biology State", ("sans-serif", 20).into_font())
-        .margin(10).x_label_area_size(30).y_label_area_size(40).right_y_label_area_size(40)
-        .build_cartesian_2d(0f32..1000f32, 0f32..101f32)?
-        .set_secondary_coord(0f32..1000f32, 0f32..100f32);
+        .caption("Average Biology State", ("sans-serif", CAPTION_FONT_SIZE as i32).into_font())
+        .margin(CHART_MARGIN)
+        .x_label_area_size(LABEL_AREA_SIZE)
+        .y_label_area_size(LABEL_AREA_SIZE)
+        .right_y_label_area_size(LABEL_AREA_SIZE)
+        .build_cartesian_2d(x_range.clone(), 0f32..101f32)?
+        .set_secondary_coord(x_range.clone(), 0f32..100f32);
     chart2.configure_mesh().y_desc("Avg ATP (%)").draw()?;
     chart2.configure_secondary_axes().y_desc("Avg Calcium").draw()?;
     
@@ -295,14 +341,12 @@ fn render_benchmark_chart(data: &BenchmarkData, filename: &str) -> Result<(), Bo
 
     // Panel 3: Performance (FFI vs Rust)
     let max_time = data.ffi_times.iter().cloned().fold(0./0., f32::max).max(data.rust_times.iter().cloned().fold(0./0., f32::max)).max(0.1);
-    let mut chart3 = ChartBuilder::on(&areas[2])
-        .caption("Processing Time per Tick (ms)", ("sans-serif", 20).into_font())
-        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, 0f32..max_time * 1.1)?;
-    chart3.configure_mesh().draw()?;
+    let mut chart3 = init_chart_f32(&areas[2], "Processing Time per Tick (ms)", x_range.clone(), 0f32..max_time * 1.1)?;
+    
     chart3.draw_series(LineSeries::new(data.ticks.iter().zip(data.ffi_times.iter()).map(|(&x, &y)| (x as f32, y)), &BLUE))?
-        .label("C++/CUDA Math").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
-    chart3.draw_series(LineSeries::new(data.ticks.iter().zip(data.rust_times.iter()).map(|(&x, &y)| (x as f32, y)), &MAGENTA))?
-        .label("Rust Services").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], MAGENTA));
+        .label("CUDA (Math)").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
+    chart3.draw_series(LineSeries::new(data.ticks.iter().zip(data.rust_times.iter()).map(|(&x, &y)| (x as f32, y)), &MAGENTA.mix(0.6)))?
+        .label("Rust (Services)").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], MAGENTA));
     chart3.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
 
     root.present()?;

@@ -39,7 +39,7 @@ static __device__ __host__ float get_gaussian(uint32_t* seed, float mu, float si
 static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
     n->is_alive = false;
     n->death_reason = reason;
-    n->current_voltage = 0.0f; 
+    n->current_voltage = 0.0f;
     n->energy_ATP = 0.0f;
     n->calcium_level = 0.0f;
     n->refractory_time_left = 0.0f;
@@ -143,31 +143,25 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         Compartment* b = &n->branches[i];
         if (b->branch_type == 0) continue;
 
-        // 1. Leak
-        b->voltage *= 0.9f;
-
-        // 2. NMDA Spike check (Non-linear summation)
-        if (b->voltage >= b->nmda_threshold) {
-             float gain = b->nmda_threshold; // Base gain
-             float multiplier = 1.0f;
-             
-             switch(b->branch_type) {
-                 case 1: // Basal
-                     multiplier = 1.0f;
-                     break;
-                 case 2: // Apical Trunk
-                     multiplier = 2.0f;
-                     n->energy_ATP -= 5.0f; // Metabolic cost of heavy trunk signal
-                     break;
-                 case 3: // Apical Tuft
-                     multiplier = 0.5f;
-                     break;
-             }
-             
-             float soma_impact = gain * multiplier;
-             atomicAdd(&n->current_voltage, soma_impact);
-             b->voltage = 0.0f; // Reset branch after spike
+        // Branch Signal Decay (Phase 33/34)
+        b->voltage *= BRANCH_LEAK_COEFF;
+        
+        // NMDA Spike Logic (Non-linear Summation)
+        float soma_impact = 0.0f;
+        if (b->voltage > b->nmda_threshold) {
+            soma_impact = b->voltage * NMDA_SPIKE_GAIN;
+            b->voltage = 0.0f; // Reset branch after spike
+        } else {
+            // Passive transfer based on type
+            if (b->branch_type == 1) soma_impact = b->voltage; // Basal
+            else if (b->branch_type == 2) { // Apical Trunk (Boosted)
+                soma_impact = b->voltage * TRUNK_MULTIPLIER;
+                n->energy_ATP -= TRUNK_ATP_COST;
+            } else if (b->branch_type == 3) { // Apical Tuft (Distant)
+                soma_impact = b->voltage * TUFT_MULTIPLIER;
+            }
         }
+        n->current_voltage += soma_impact;
     }
 }
 
@@ -229,7 +223,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     }
 
     // STDP Learning Logic... (Keep weight growth logic, Phase 7 & 23 & 26 & 30)
-    float learning_rate = 0.1f * env.dopamine_multiplier;
+    float learning_rate = STDP_LEARNING_RATE * env.dopamine_multiplier;
     
     // LTP: Potentiation + Thickness Growth (Phase 30)
     if (s->last_activation_tick > 0 && target->last_spike_tick == current_tick) {
@@ -248,7 +242,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             s->last_activation_tick = 0; // Reset after depression
         }
     }
-
+    
     // Homeostatic Scaling of Weights (Phase 23)
     if (target->spikes_in_last_window > 25) {
         s->weight -= 0.001f;
@@ -257,7 +251,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     }
 
     // Limits
-    if (s->weight > 30.0f) s->weight = 30.0f; 
+    if (s->weight > MAX_SYNAPSE_WEIGHT) s->weight = MAX_SYNAPSE_WEIGHT; 
     if (s->weight < 0.0f) s->weight = 0.0f; 
     
     // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08 + Phase 30)
