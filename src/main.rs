@@ -192,7 +192,13 @@ struct BenchmarkData {
 }
 
 fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
-    let mut graph = setup_benchmark(neurons_count, synapses_count);
+    let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
+        println!("Awakening network from brain_save.bin...");
+        loaded_graph
+    } else {
+        setup_benchmark(neurons_count, synapses_count)
+    };
+
     println!("Executing BENCHMARK for {} ticks...", total_ticks);
     
     let env = Environment {
@@ -226,6 +232,13 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
         let ffi_elapsed = ffi_start.elapsed();
         total_ffi_time += ffi_elapsed;
         
+        // Phase 35: The Sleep Cycle
+        if tick % 1000 == 0 && graph.is_sleep_needed() {
+            println!("Fatigue threshold reached. Entering Sleep Cycle...");
+            graph.initiate_sleep_cycle();
+            println!("Wake up! Network consolidated and saved.");
+        }
+
         // Optimized Metrics Collection: Only every 50 ticks to save CPU time at large scales
         let mut spikes = 0;
         let mut atp_sum = 0.0;
@@ -548,6 +561,59 @@ fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SLEEP CYCLE TEST (Phase 35 Validation) ---");
+    
+    let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
+        println!("Awakening network from brain_save.bin...");
+        loaded_graph
+    } else {
+        println!("Generating Infant Network: 1000 neurons...");
+        setup_benchmark(1000, 10000)
+    };
+
+    let env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 42,
+    };
+
+    println!("Injecting artificial fatigue to trigger sleep cycle...");
+    
+    for tick in 1..=50000 {
+        graph.tick(tick, env);
+        
+        // Artificially age the network for the test to bypass biological real-time waiting
+        for n in &mut graph.neurons {
+            if n.is_alive {
+                n.metabolic_wear = n.metabolic_wear.saturating_add(50);
+            }
+        }
+        
+        if tick % 1000 == 0 {
+            let mut total_wear = 0.0;
+            for n in &graph.neurons {
+                total_wear += n.metabolic_wear as f32;
+            }
+            println!("Tick {}: Avg Wear = {:.1}", tick, total_wear / 1000.0);
+            
+            if graph.is_sleep_needed() {
+                println!("Fatigue threshold reached (Avg Wear > 40000). Entering Sleep Cycle...");
+                graph.initiate_sleep_cycle();
+                println!("Wake up! Network consolidated and saved.");
+                println!("TEST COMPLETE: Please run again to verify deserialization.");
+                return Ok(());
+            }
+        }
+    }
+
+    println!("Failed to reach sleep state within 50k ticks.");
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing neuromorphic-engine Hybrid Engine...");
 
@@ -563,6 +629,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_morphology_audit = args.contains(&String::from("--morphology-audit"));
     let is_spatial_test = args.contains(&String::from("--spatial-test"));
     let is_passive_leak_test = args.contains(&String::from("--passive-leak-test"));
+    let is_sleep_test = args.contains(&String::from("--sleep-test"));
+
+    if is_sleep_test {
+        run_sleep_test()?;
+        return Ok(());
+    }
 
     if is_benchmark {
         let mut neurons = 10000;

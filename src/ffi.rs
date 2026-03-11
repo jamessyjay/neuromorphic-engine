@@ -1,10 +1,10 @@
 // src/ffi.rs
 
 use libc::c_int;
+use serde::{Serialize, Deserialize};
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NeuronType {
     Pyramidal = 0,
     Bipolar = 1,
@@ -16,7 +16,7 @@ pub enum NeuronType {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Compartment {
     pub branch_type: u8,
     pub refractory_timer: u8,
@@ -27,7 +27,7 @@ pub struct Compartment {
 
 #[repr(C)]
 #[repr(align(64))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct BaseNeuron {
     pub id: u32,
     pub type_: u8,            // NeuronType
@@ -64,7 +64,7 @@ pub struct BaseNeuron {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Synapse {
     pub source_id: u32,
     pub target_id: u32,
@@ -78,7 +78,7 @@ pub struct Synapse {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Environment {
     pub global_oxygen_level: f32,
     pub global_glucose_level: f32,

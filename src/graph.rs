@@ -1,7 +1,16 @@
 use crate::ffi::{BaseNeuron, Synapse, NeuronType, init_neuron};
 use crate::constants::*;
 use rand::RngExt;
+use serde::{Serialize, Deserialize};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 
+const MAX_ATP: f32 = 100.0;
+const CLUSTERING_RADIUS_SQ: f32 = 400.0; 
+const STOCHASTIC_GROWTH_PROB: f64 = 0.05; 
+const NMDA_SPIKE_THRESHOLD: f32 = 5.0; // Phase 33
+
+#[derive(Serialize, Deserialize)]
 pub struct NetworkGraph {
     pub neurons: Vec<BaseNeuron>,
     pub synapses: Vec<Synapse>,
@@ -12,6 +21,63 @@ impl NetworkGraph {
         NetworkGraph {
             neurons: Vec::new(),
             synapses: Vec::new(),
+        }
+    }
+
+    pub fn is_sleep_needed(&self) -> bool {
+        let mut total_wear = 0.0;
+        let mut alive_count = 0;
+        
+        for n in &self.neurons {
+            if n.is_alive {
+                total_wear += n.metabolic_wear as f32;
+                alive_count += 1;
+            }
+        }
+        
+        if alive_count == 0 { return false; }
+        
+        let avg_wear = total_wear / alive_count as f32;
+        avg_wear > 40000.0 // Threshold from Phase 35
+    }
+
+    pub fn initiate_sleep_cycle(&mut self) {
+        // Pruning (Offline): Remove weak synapses
+        let initial_synapses = self.synapses.len();
+        self.synapses.retain(|s| s.weight >= 0.05);
+        let pruned = initial_synapses - self.synapses.len();
+        println!("  -> Pruned {} weak synapses during sleep.", pruned);
+
+        // Consolidation & Recovery
+        for n in &mut self.neurons {
+            if n.is_alive {
+                n.metabolic_wear = 0;
+                n.energy_atp = n.max_atp;
+                n.calcium_level = 0.0;
+            }
+        }
+        println!("  -> Neurons fully recovered.");
+
+        // Snapshot (Serialization)
+        println!("  -> Serializing network to disk...");
+        let file = File::create("brain_save.bin").expect("Failed to create brain_save.bin");
+        let writer = BufWriter::new(file);
+        bincode::serialize_into(writer, &self).expect("Failed to serialize network");
+    }
+
+    pub fn load_from_disk() -> Option<Self> {
+        if std::path::Path::new("brain_save.bin").exists() {
+            let file = File::open("brain_save.bin").expect("Failed to open brain_save.bin");
+            let reader = BufReader::new(file);
+            match bincode::deserialize_from(reader) {
+                Ok(graph) => Some(graph),
+                Err(e) => {
+                    eprintln!("Failed to deserialize brain_save.bin: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
         }
     }
 
