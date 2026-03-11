@@ -1,7 +1,7 @@
 {
   "simulation_summary": {
-    "total_ticks": 0,
-    "sim_speed": 0.00,
+    "total_ticks": 2999,
+    "sim_speed": 985864.56,
     "final_neuron_count": 13,
     "final_synapse_count": 3
   },
@@ -12,8 +12,8 @@
     "neurons_in_emergency_atp": 1
   },
   "population_distributions": {
-    "synaptic_weights": [0, 0, 0, 0, 0, 3, 0, 0, 0, 0],
-    "synaptic_thickness": [0, 3, 0, 0, 0, 0, 0, 0, 0, 0],
+    "synaptic_weights": [0, 0, 0, 0, 1, 2, 0, 0, 0, 0],
+    "synaptic_thickness": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     "neuron_atp_bins": [1, 0, 0, 0, 0]
   }
 }

@@ -12,8 +12,8 @@
     "neurons_in_emergency_atp": 0
   },
   "population_distributions": {
-    "synaptic_weights": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-    "synaptic_thickness": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-    "neuron_atp_bins": [0, 0, 1, 1, 0]
+    "synaptic_weights": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    "synaptic_thickness": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "neuron_atp_bins": [0, 0, 1, 0, 1]
   }
 }

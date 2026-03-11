@@ -1,19 +1,19 @@
 {
   "simulation_summary": {
-    "total_ticks": 50,
-    "sim_speed": 1.55,
-    "final_neuron_count": 5000,
-    "final_synapse_count": 5665
+    "total_ticks": 100,
+    "sim_speed": 1.97,
+    "final_neuron_count": 1000,
+    "final_synapse_count": 7599
   },
   "incident_log": {
-    "atp_low_deaths": 3333,
+    "atp_low_deaths": 123,
     "calcium_high_deaths": 0,
     "glucose_starvation_deaths": 0,
-    "neurons_in_emergency_atp": 17
+    "neurons_in_emergency_atp": 16
   },
   "population_distributions": {
-    "synaptic_weights": [4663, 1002, 0, 0, 0, 0, 0, 0, 0, 0],
+    "synaptic_weights": [6181, 1418, 0, 0, 0, 0, 0, 0, 0, 0],
     "synaptic_thickness": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    "neuron_atp_bins": [17, 155, 109, 169, 1217]
+    "neuron_atp_bins": [16, 140, 223, 228, 270]
   }
 }
