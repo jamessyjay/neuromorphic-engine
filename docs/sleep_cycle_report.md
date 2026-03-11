@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implemented a biological "Sleep Cycle" where the neuromorphic engine pauses active execution, prunes weak connections, recovers metabolic parameters, and serializes the exact state of the network to disk for immediate loading upon subsequent runs. 
+Implemented a biological "Sleep Cycle" where the neuromorphic engine pauses active execution, prunes weak connections, recovers metabolic parameters, and serializes the exact state of the network to disk for immediate loading upon subsequent runs.
 
 ## Architectural Features
 
@@ -28,7 +28,7 @@ Implemented a biological "Sleep Cycle" where the neuromorphic engine pauses acti
    - Generated an infant network of 1,000 neurons and 10,000 random synapses.
    - Artificially accelerated metabolic wear to force the fatigue limit rapidly.
    - Output confirmed entering the Sleep Cycle, pruning weak synapses, and serializing.
-   
+
 2. **Subsequent Run:**
    - Execution explicitly output: `Awakening network from brain_save.bin...`
    - Bypassed the `Generating Infant Network...` phase.

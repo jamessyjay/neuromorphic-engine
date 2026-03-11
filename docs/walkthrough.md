@@ -48,7 +48,7 @@ Transformed point neurons into complex dendritic trees with 8 fixed-size compart
 - **Passive Leak:** Analog signals below the NMDA threshold now leak a small percentage of charge directly into the soma every tick, solving the "digital deafness" problem.
 - **Refractory Branches:** Prevented the "eternal high" infinite spike loop by implementing a 3-tick branch refractory block after an NMDA spike, during which incoming chemicals are consumed without voltage generation.
 
-## Phase 35: The Sleep Cycle & Graph Observability
+## Phase 35: The Sleep Cycle, Observability & Hardcode Cleanup
 
 - **Binary Serialization:** Integrated `serde` and `bincode` to dump/load the entire 1000-neuron graph in milliseconds, preserving perfect memory alignment on both Rust and C++ sides.
 - **Sleep Manager:** The network dynamically tracks `metabolic_wear`. When the fatigue threshold triggers, it enters an offline cycle to prune weak synapses (weights `< 0.05`) and fully replenish cell ATP and calcium states.
@@ -56,5 +56,9 @@ Transformed point neurons into complex dendritic trees with 8 fixed-size compart
   - Implemented `generate_fingerprint` which produces a deterministic SHA256 hash of all node IDs, stats, and synapstic weights.
   - Implemented `diff_synapses` to log an exact diagnostic report showing counts of Pruned, Strengthened (LTP), Weakened (LTD), and Unchanged synapses before and after sleep.
   - Demonstrated mathematical proof that the loaded brain snapshot from disk perfectly matches the in-memory post-sleep state hash.
+- **Hardcode Cleanup & Code Quality:**
+  - Removed all "magic numbers" across both Rust and CUDA contexts.
+  - Extracted physiological parameters (`METABOLIC_FLOOR`, `HOMEOSTATIC_SPIKE_HIGH`, `BASELINE_LEAK_RATE`) into named constants inside `cuda/base_neuron.h`.
+  - Replaced inline literal math mapping values (like `655.35` and `65535`) with precise macro structures (`COORD_SCALE`, `MAX_U16_AS_F32`) in `src/constants.rs`.
 
 **Engineering Verdict:** The engine is biologically mature, memory-perfect, cache-friendly, and capable of long-term structural consolidation. 🐯🚀🧬🧠🏗️📡⚛️🧪🔬⚛️
