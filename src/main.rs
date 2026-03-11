@@ -193,7 +193,7 @@ struct BenchmarkData {
     avg_calcium: Vec<f32>,
 }
 
-fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
+async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
     let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         println!("Awakening network from brain_save.bin...");
         loaded_graph
@@ -233,6 +233,12 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
         graph.tick(tick, env);
         let ffi_elapsed = ffi_start.elapsed();
         total_ffi_time += ffi_elapsed;
+
+        // Give Tokio a chance to run the WebSocket server
+        if tick % 50 == 0 {
+            tokio::task::yield_now().await;
+        }
+
         // Phase 36: WebSocket Streaming (every 300 ticks)
         if let Some(ref tx) = tx {
             if tick % 300 == 0 {
@@ -251,11 +257,13 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
                     };
                     snapshot.neurons.push((n.id, n.x, n.y, state));
                 }
-                for s in &graph.synapses {
+                for s in graph.synapses.iter().take(1000) {
                     snapshot.synapses.push((s.source_id, s.target_id, s.weight));
                 }
                 if let Ok(json) = serde_json::to_string(&snapshot) {
-                    let _ = tx.send(json); // Ignore error if no clients
+                    if let Err(e) = tx.send(json) {
+                        // Only print if there are actual receivers but send failed
+                    }
                 }
             }
         }
@@ -319,7 +327,7 @@ fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: 
     Ok(data)
 }
 
-fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING SCALING PERFORMANCE ANALYSIS (1K to 1M) ---");
     let sizes = [1_000, 10_000, 100_000, 1_000_000];
     let mut results = String::from("# Performance Scaling Report\n\n| Neurons | Synapses | TPS | Total Time (s) | Memory (KB) |\n|---|---|---|---|---|\n");
@@ -328,7 +336,7 @@ fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
         println!("\n>> Testing Scale: {} Neurons...", n);
         let s = n * 10;
         let start = Instant::now();
-        let _ = run_benchmark_mode(n, s, 500, None)?; // 500 ticks is enough for scaling trends
+        let _ = run_benchmark_mode(n, s, 500, None).await?; // 500 ticks is enough for scaling trends
         let elapsed = start.elapsed().as_secs_f64();
         let tps = 500.0 / elapsed;
         
@@ -422,7 +430,7 @@ fn track_metrics(data: &mut SimulationData, graph: &NetworkGraph, tick: u32) {
 }
 
 // Orchestrator: Runs the visual simulation loop
-fn run_simulation(mut graph: NetworkGraph, total_ticks: u32) -> SimulationData {
+async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> SimulationData {
     let mut data = SimulationData {
         ticks: Vec::with_capacity(total_ticks as usize),
         source_v: Vec::with_capacity(total_ticks as usize),
@@ -454,6 +462,38 @@ fn run_simulation(mut graph: NetworkGraph, total_ticks: u32) -> SimulationData {
         }
 
         graph.tick(tick, env);
+        
+        // Give Tokio a chance to run the WebSocket server
+        if tick % 50 == 0 {
+            tokio::task::yield_now().await;
+        }
+
+        // Phase 36: WebSocket Streaming (every 10 ticks for simulation mode)
+        if let Some(ref tx) = tx {
+            if tick % 10 == 0 {
+                let mut snapshot = streamer::StateSnapshot {
+                    tick,
+                    neurons: Vec::with_capacity(graph.neurons.len()),
+                    synapses: Vec::with_capacity(graph.synapses.len()),
+                };
+                for n in &graph.neurons {
+                    let state = if n.current_voltage > 0.0 || n.spikes_in_last_window > 0 {
+                        1 // Spiking
+                    } else if n.energy_atp < 20.0 {
+                        2 // Starving
+                    } else {
+                        0 // Resting
+                    };
+                    snapshot.neurons.push((n.id, n.x, n.y, state));
+                }
+                for s in graph.synapses.iter().take(1000) {
+                    snapshot.synapses.push((s.source_id, s.target_id, s.weight));
+                }
+                if let Ok(json) = serde_json::to_string(&snapshot) {
+                    let _ = tx.send(json);
+                }
+            }
+        }
         
         if tick % 10 == 0 {
             graph.run_astrocyte_service(tick);
@@ -686,6 +726,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         crate::streamer::start_server(tx_clone).await;
     });
 
+    // Give the server a moment to actually bind the port before we hammer the CPU
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
     let is_frequency_test = args.contains(&String::from("--frequency-test"));
     let is_emergence_test = args.contains(&String::from("--emergence-test"));
     let is_morphology_audit = args.contains(&String::from("--morphology-audit"));
@@ -701,7 +744,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if is_benchmark {
         let mut neurons = 10000;
         let mut synapses = 100000;
-        let mut ticks = 1000;
+        let mut ticks = 1000000;
 
         for i in 1..args.len() {
             if args[i] == "--neurons" && i + 1 < args.len() {
@@ -715,13 +758,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        let data = run_benchmark_mode(neurons, synapses, ticks, None)?;
+        let data = run_benchmark_mode(neurons, synapses, ticks, Some(tx.clone())).await?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
         return Ok(());
     }
 
     if is_scaling_test {
-        run_scaling_benchmarks()?;
+        run_scaling_benchmarks().await?;
         return Ok(());
     }
 
@@ -771,7 +814,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let graph = setup_simulation();
-    let data = run_simulation(graph, 200);
+    let data = run_simulation(graph, 5000, Some(tx.clone())).await;
     render_chart(&data, "graphs/phase8_sensors.png")?;
 
     Ok(())

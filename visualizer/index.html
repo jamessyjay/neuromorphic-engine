@@ -58,11 +58,8 @@
         let neuronsData = [];
         let synapsesData = [];
         let latestTick = 0;
-        let lastDrawTime = 0;
+        const visualState = new Map(); 
 
-        // Constants from Engine (used for scaling)
-        // Coords are u16 mapped: (0 - 65535) represents (0.0 - 100.0) usually
-        // We will just scale 0-65535 to canvas width/height
         const MAX_COORD = 65535;
 
         function resize() {
@@ -74,9 +71,9 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Connect to Rust WebSocket Streamer
         function connect() {
-            const ws = new WebSocket('ws://127.0.0.1:3030/stream');
+            const host = window.location.hostname || '127.0.0.1';
+            const ws = new WebSocket('ws://' + host + ':3030/stream');
 
             ws.onopen = () => {
                 statusEl.innerText = "Status: CONNECTED (Streaming)";
@@ -86,11 +83,27 @@
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 latestTick = data.tick;
-                neuronsData = data.neurons; // [id, x, y, visual_state]
+                const neuronsData = data.neurons; // [id, x, y, visual_state]
                 synapsesData = data.synapses; // [source, target, weight]
                 
+                for (let i = 0; i < neuronsData.length; i++) {
+                    const [id, x, y, state] = neuronsData[i];
+                    const sx = (x / MAX_COORD) * width;
+                    const sy = (y / MAX_COORD) * height;
+                    
+                    let node = visualState.get(id) || { sx, sy, spikeGlow: 0.0, isRed: false };
+                    node.sx = sx; node.sy = sy;
+                    
+                    if (state === 1) {
+                        node.spikeGlow = 1.0; // Вспышка на максимум!
+                    }
+                    node.isRed = (state === 2); // Красный, если голодает
+                    
+                    visualState.set(id, node);
+                }
+
                 tickEl.innerText = `Tick: ${latestTick}`;
-                neuronsEl.innerText = `Neurons: ${neuronsData.length}`;
+                neuronsEl.innerText = `Neurons: ${visualState.size}`;
                 synapsesEl.innerText = `Synapses: ${synapsesData.length}`;
             };
 
@@ -107,73 +120,55 @@
 
         connect();
 
-        // Drawing Loop (requestAnimationFrame) decoupled from WS receipt
-        function draw(time) {
+        function draw() {
             requestAnimationFrame(draw);
 
-            // Motion blur / trail effect instead of hard clear
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            // Trail effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.fillRect(0, 0, width, height);
 
-            if (neuronsData.length === 0) return;
-
-            // Map neurons by ID for fast lookup when drawing synapses
-            const nodeMap = new Map();
-            for (let i = 0; i < neuronsData.length; i++) {
-                const [id, x, y, state] = neuronsData[i];
-                // Scale coordinates
-                const sx = (x / MAX_COORD) * width;
-                const sy = (y / MAX_COORD) * height;
-                nodeMap.set(id, { sx, sy, state });
-            }
+            if (visualState.size === 0) return;
 
             // Draw Synapses
             ctx.lineWidth = 1;
             for (let i = 0; i < synapsesData.length; i++) {
                 const [source_id, target_id, weight] = synapsesData[i];
-                const source = nodeMap.get(source_id);
-                const target = nodeMap.get(target_id);
+                const source = visualState.get(source_id);
+                const target = visualState.get(target_id);
 
                 if (source && target) {
                     ctx.beginPath();
                     ctx.moveTo(source.sx, source.sy);
                     ctx.lineTo(target.sx, target.sy);
                     
-                    // Alpha based on weight (assuming weight is roughly 0.0 - 10.0+)
-                    const alpha = Math.min(1.0, weight / 15.0);
+                    const alpha = Math.min(1.0, weight / 30.0);
                     ctx.strokeStyle = `rgba(100, 200, 255, ${alpha})`;
                     ctx.stroke();
                 }
             }
 
             // Draw Neurons
-            for (const [id, node] of nodeMap.entries()) {
+            for (const [id, node] of visualState.entries()) {
                 ctx.beginPath();
                 
-                let radius = 2;
-                if (node.state === 1) {
-                    // Spiking
-                    ctx.fillStyle = 'rgba(255, 255, 100, 1.0)';
-                    radius = 4;
-                    // Flash effect
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = 'rgba(255, 255, 200, 0.8)';
-                } else if (node.state === 2) {
-                    // Starving
-                    ctx.fillStyle = 'rgba(255, 50, 50, 0.8)';
-                    radius = 3;
-                    ctx.shadowBlur = 5;
-                    ctx.shadowColor = 'rgba(255, 0, 0, 0.5)';
+                // Плавное затухание спайка каждый кадр
+                node.spikeGlow *= 0.90; 
+
+                let radius = 2 + (node.spikeGlow * 2); // Нейрон "пульсирует" в размере от 2 до 4
+                
+                if (node.isRed) {
+                    ctx.fillStyle = `rgba(255, 50, 50, 0.8)`; // Красный
                 } else {
-                    // Resting
-                    ctx.fillStyle = 'rgba(50, 150, 255, 0.5)';
-                    radius = 2;
-                    ctx.shadowBlur = 0;
+                    // Смешиваем Желтый (спайк) и Циан (покой)
+                    // Чем меньше spikeGlow, тем ближе цвет к #00ffff
+                    let r = Math.floor(node.spikeGlow * 255);
+                    let g = 255;
+                    let b = Math.floor((1.0 - node.spikeGlow) * 255);
+                    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`; 
                 }
 
                 ctx.arc(node.sx, node.sy, radius, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.shadowBlur = 0; // reset
             }
         }
 
