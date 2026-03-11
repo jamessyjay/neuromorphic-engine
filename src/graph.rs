@@ -38,6 +38,12 @@ impl NetworkGraph {
             z: rng.random_range(0.0..100.0),
             death_reason: 0,
             is_alive: true,
+            branches: [crate::ffi::Compartment {
+                branch_type: 0,
+                voltage: 0.0,
+                nmda_threshold: 0.0,
+                _padding: [0; 3],
+            }; 8],
         };
         
         // Let C++ engine initialize the neuron biology exactly per Spec 05 & 11
@@ -63,18 +69,21 @@ impl NetworkGraph {
         }
     }
 
-    pub fn connect(&mut self, source_id: u32, target_id: u32, weight: f32, thickness: f32, is_inhibitory: bool, is_myelinated: bool) {
+    pub fn connect(&mut self, source_id: u32, target_id: u32, weight: f32, branch_id: u8, is_inhibitory: bool, is_myelinated: bool) {
+        let mut flags = branch_id & 0x07; // Bits 0-2
+        if is_inhibitory { flags |= 0x08; } // Bit 3
+        if is_myelinated { flags |= 0x10; } // Bit 4
+
         let synapse = Synapse {
             source_id,
             target_id,
             weight,
-            thickness,
-            ticks_below_threshold: 0,
             neurotransmitter_buffer: 0.0,
             last_activation_tick: 0,
+            ticks_below_threshold: 0,
             ticks_until_delivery: 0,
-            is_inhibitory,
-            is_myelinated,
+            flags,
+            _padding: [0; 2],
         };
         
         self.synapses.push(synapse);
@@ -115,7 +124,7 @@ impl NetworkGraph {
             let is_endpoint_dead = dead_ids.contains(&s.source_id) || dead_ids.contains(&s.target_id);
             
             // Phase 31: Hard Pruning with Persistence
-            let is_below_threshold = s.weight < 0.05 && s.thickness < 0.1;
+            let is_below_threshold = s.weight < 0.05;
             if is_below_threshold {
                 s.ticks_below_threshold += 10; // Service runs every 10 ticks
             } else {
@@ -165,12 +174,35 @@ impl NetworkGraph {
                 if s_active && t_active {
                     // 4. Stochastic Growth P=0.2 per check
                     if rng.random_bool(0.2) {
-                        // Success! Connect these neurons with THIN seed synapse
+                        // Success! Connect these neurons with target branch
+                        // Find a living branch or default to 0
+                        let branch_id = rng.random_range(0..8) as u8;
                         let is_inhib = rng.random_bool(0.2); 
-                        self.connect(i as u32, j as u32, 0.05, 0.1, is_inhib, false);
+                        self.connect(i as u32, j as u32, 0.05, branch_id, is_inhib, false);
                     }
                 }
             }
+        }
+    }
+
+    pub fn grow_dendritic_tree(&mut self, neuron_id: u32) {
+        let mut rng = rand::rng();
+        let num_branches = rng.random_range(2..=4);
+        let n = &mut self.neurons[neuron_id as usize];
+        
+        // Fisher-Yates shuffle to pick unique branch indices
+        let mut indices: Vec<usize> = (0..8).collect();
+        for i in (1..8).rev() {
+            let j = rng.random_range(0..=i);
+            indices.swap(i, j);
+        }
+
+        for i in 0..num_branches {
+            let idx = indices[i];
+            let b_type = rng.random_range(1..=3) as u8;
+            n.branches[idx].branch_type = b_type;
+            n.branches[idx].nmda_threshold = 5.0; // 5.0 glutamate units for NMDA spike
+            n.branches[idx].voltage = 0.0;
         }
     }
 }

@@ -11,6 +11,7 @@ use std::env;
 use std::time::Instant;
 use rand::prelude::*;
 use rand::RngExt;
+use std::collections::HashMap;
 
 // Simple Gaussian sampler (Box-Muller)
 fn get_gaussian(mu: f32, sigma: f32) -> f32 {
@@ -28,7 +29,7 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
     println!("Generating Benchmark Network (Gaussian weights): {} neurons, {} synapses...", neurons_count, synapses_count);
 
     // Creating neurons
-    for _ in 0..neurons_count {
+    for i in 0..neurons_count {
         // Biased random types: 70% Pyramidal, others 10% each
         let n_type = match rng.random_range(0..10) {
             0..=6 => NeuronType::Pyramidal,
@@ -37,6 +38,7 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
             _ => NeuronType::Pacemaker,
         };
         graph.add_neuron(n_type);
+        graph.grow_dendritic_tree(i as u32);
     }
 
     // Creating synapses with Gaussian weights (Spec 06/11)
@@ -50,11 +52,90 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
         let is_inhib = rng.random_bool(0.2); // 20% inhibitory
         let is_myelin = rng.random_bool(0.1); // 10% myelinated
 
-        graph.connect(source, target, weight, 1.0, is_inhib, is_myelin);
+        graph.connect(source, target, weight, 0, is_inhib, is_myelin);
     }
 
     println!("Network generation complete.");
     graph
+}
+
+fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SPATIAL SUMMATION TEST (Non-linear Dendritic Logic) ---");
+    let mut graph = NetworkGraph::new();
+    
+    // 0: Target Pyramidal Neuron
+    let target = graph.add_neuron(NeuronType::Pyramidal);
+    graph.grow_dendritic_tree(target);
+    
+    // We force specific branches for testing.
+    // Let's assume branch 1 is Basal and branch 2 is Basal (grown by grow_dendritic_tree)
+    // Actually let's force them.
+    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
+        branch_type: 1, // Basal
+        voltage: 0.0,
+        nmda_threshold: 100.0, // High threshold for test
+        _padding: [0; 3],
+    };
+    graph.neurons[target as usize].branches[1].nmda_threshold = 50.0; 
+
+    // 1-10: 10 Pre-synaptic Pacemakers
+    for i in 1..=10 {
+        let id = graph.add_neuron(NeuronType::Pacemaker);
+        graph.neurons[id as usize].current_voltage = -40.0; // Pre-charge for faster test
+    }
+
+    let env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 42,
+    };
+
+    // SCENARIO 1: Distributed Input (10 synapses -> 10 different branches)
+    // Result: No single branch hits NMDA threshold.
+    println!("Scenario 1: Distributed Input (10 synapses in 8 branches)");
+    for i in 1..=10 {
+        graph.connect(i, target, 10.0, (i % 8) as u8, false, false);
+    }
+
+    let mut spike_count_dist = 0;
+    for tick in 1..50 {
+        graph.tick(tick, env);
+        if graph.neurons[target as usize].last_spike_tick == tick {
+            spike_count_dist += 1;
+        }
+    }
+    println!("Distributed spikes: {}", spike_count_dist);
+
+    // SCENARIO 2: Concentrated Input (10 synapses -> 1 branch)
+    // Result: Branch hits 50.0 threshold -> NMDA Spike -> Soma Spike.
+    println!("Scenario 2: Concentrated Input (10 synapses in branch 1)");
+    graph.synapses.clear();
+    graph.neurons[target as usize].current_voltage = -70.0;
+    for i in 1..=8 { graph.neurons[target as usize].branches[i-1].voltage = 0.0; }
+
+    for i in 1..=10 {
+        graph.connect(i, target, 10.0, 1, false, false);
+    }
+
+    let mut spike_count_conc = 0;
+    for tick in 1..50 {
+        graph.tick(tick, env);
+        if graph.neurons[target as usize].last_spike_tick == tick {
+            spike_count_conc += 1;
+        }
+    }
+    println!("Concentrated spikes: {}", spike_count_conc);
+
+    if spike_count_conc > spike_count_dist {
+        println!("VERDICT: Dendritic non-linearity confirmed! 🧠✨");
+    } else {
+        println!("VERDICT: Test failed or parameters poorly tuned.");
+    }
+
+    Ok(())
 }
 
 struct BenchmarkData {
@@ -236,7 +317,7 @@ fn setup_simulation() -> NetworkGraph {
     let pyr_target = graph.add_neuron(NeuronType::Pyramidal);       // 1 - Target Learner
 
     // Target starts with a stable connection and SchwannCell (Myelin = true)
-    graph.connect(photo_source, pyr_target, 5.0, 1.0, false, true);       
+    graph.connect(photo_source, pyr_target, 5.0, 0, false, true);       
 
     graph
 }
@@ -360,6 +441,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_frequency_test = args.contains(&String::from("--frequency-test"));
     let is_emergence_test = args.contains(&String::from("--emergence-test"));
     let is_morphology_audit = args.contains(&String::from("--morphology-audit"));
+    let is_spatial_test = args.contains(&String::from("--spatial-test"));
 
     if is_benchmark {
         let mut neurons = 10000;
@@ -395,6 +477,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if is_morphology_audit {
         run_morphology_audit()?;
+        return Ok(());
+    }
+
+    if is_spatial_test {
+        run_spatial_summation_test()?;
         return Ok(());
     }
 
@@ -439,8 +526,8 @@ fn setup_inhibition_loop() -> NetworkGraph {
     let i = graph.add_neuron(NeuronType::Interneuron);
 
     // Loop: P -> I (Exciting), I -> P (Inhibiting)
-    graph.connect(p, i, 10.0, 1.0, false, true);  // P excites I
-    graph.connect(i, p, 15.0, 1.0, true, true);   // I inhibits P (Strong GABA)
+    graph.connect(p, i, 10.0, 0, false, true);  // P excites I
+    graph.connect(i, p, 15.0, 0, true, true);   // I inhibits P (Strong GABA)
 
     graph
 }
@@ -523,8 +610,8 @@ fn setup_reflex_arc() -> NetworkGraph {
 
     // Connections: Eye -> Brain -> Muscle
     // Phase 17: Boosted weights to ensure transmission
-    graph.connect(eye, brain, 15.0, 1.0, false, true);   // Fast myelin connection
-    graph.connect(brain, muscle, 12.0, 1.0, false, false); // Normal connection
+    graph.connect(eye, brain, 15.0, 0, false, true);   // Fast myelin connection
+    graph.connect(brain, muscle, 12.0, 0, false, false); // Normal connection
 
     graph
 }
@@ -644,9 +731,9 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
     let n3 = graph.add_neuron(NeuronType::Pyramidal);
     // Connect in a reinforced loop
-    graph.connect(n1, n2, 15.0, 1.0, false, false);
-    graph.connect(n2, n3, 15.0, 1.0, false, false);
-    graph.connect(n3, n1, 15.0, 1.0, false, false);
+    graph.connect(n1, n2, 15.0, 0, false, false);
+    graph.connect(n2, n3, 15.0, 0, false, false);
+    graph.connect(n3, n1, 15.0, 0, false, false);
     
     // Kickstart the loop with a high voltage on n1
     graph.neurons[n1 as usize].current_voltage = 20.0;
@@ -711,7 +798,7 @@ fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     // Setup: 2 Neurons with a weak connection
     let n1 = graph.add_neuron(NeuronType::Pacemaker); // Source fires constantly
     let n2 = graph.add_neuron(NeuronType::Pyramidal); // Target
-    graph.connect(n1, n2, 1.0, 1.0, false, true);
+    graph.connect(n1, n2, 1.0, 0, false, true);
 
     let mut weight_history = vec![];
     
@@ -808,8 +895,8 @@ fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let f2_det = graph.add_neuron(NeuronType::Pyramidal);
     
     // Initial random connections
-    graph.connect(eye, f1_det, 5.0, 1.0, false, true);
-    graph.connect(eye, f2_det, 5.0, 1.0, false, true);
+    graph.connect(eye, f1_det, 5.0, 0, false, true);
+    graph.connect(eye, f2_det, 5.0, 0, false, true);
     
     let total_ticks = 2000;
     let mut history = vec![];
@@ -983,7 +1070,7 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     let target = graph.add_neuron(NeuronType::Pyramidal);
     
     // Scenario: A very strong "seed" synapse to ensure survival
-    graph.connect(source, target, 5.0, 2.0, false, false);
+    graph.connect(source, target, 5.0, 0, false, false);
     
     let total_ticks = 3000;
     let mut history = vec![];
@@ -996,7 +1083,9 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
         seed: 777 
     };
 
-    println!("Initial: Weight={}, Thickness={}", graph.synapses[0].weight, graph.synapses[0].thickness);
+    if !graph.synapses.is_empty() {
+        println!("Initial: Weight={}", graph.synapses[0].weight);
+    }
 
     for tick in 1..=total_ticks {
         // Stimulate source to spike and drive LTP
@@ -1018,15 +1107,13 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
             println!("Tick {}: Synapses={}, SourceATP={:.1}, TargetATP={:.1}, Alive={}", 
                 tick, graph.synapses.len(), s_atp, t_atp, n_alive);
         }
-
         let sw = if !graph.synapses.is_empty() { graph.synapses[0].weight } else { 0.0 };
-        let st = if !graph.synapses.is_empty() { graph.synapses[0].thickness } else { 0.0 };
+        // Removing thickness tracking to match packed 24B struct
         let sb = if !graph.synapses.is_empty() { graph.synapses[0].neurotransmitter_buffer } else { 0.0 };
 
         history.push((
             tick,
             sw,
-            st,
             graph.neurons[target as usize].current_voltage,
             sb,
         ));
@@ -1035,7 +1122,9 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     render_morphology_chart(&history, "graphs/morphology_audit.png")?;
     
     if !graph.synapses.is_empty() {
-        println!("Final: Weight={:.2}, Thickness={:.2}", graph.synapses[0].weight, graph.synapses[0].thickness);
+    if !graph.synapses.is_empty() {
+        println!("Final: Weight={:.2}", graph.synapses[0].weight);
+    }
     } else {
         println!("Final: Synapse was pruned.");
     }
@@ -1048,7 +1137,7 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn render_morphology_chart(data: &[(u32, f32, f32, f32, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn render_morphology_chart(data: &[(u32, f32, f32, f32)], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Rendering Morphology Audit to '{}'...", filename);
     let root = BitMapBackend::new(filename, (1200, 800)).into_drawing_area();
     root.fill(&WHITE)?;
@@ -1061,11 +1150,8 @@ fn render_morphology_chart(data: &[(u32, f32, f32, f32, f32)], filename: &str) -
         .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..3000f32, 0f32..10f32)?;
     chart1.configure_mesh().y_desc("Value").draw()?;
     
-    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, w, _, _, _)| (t as f32, w)), &RED))?
+    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, w, _, _)| (t as f32, w)), &RED))?
         .label("Syaptic Weight").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
-    
-    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, _, th, _, _)| (t as f32, th)), &BLUE))?
-        .label("Synaptic Thickness").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
     
     chart1.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
 
@@ -1075,10 +1161,10 @@ fn render_morphology_chart(data: &[(u32, f32, f32, f32, f32)], filename: &str) -
         .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..3000f32, -90f32..100f32)?;
     chart2.configure_mesh().draw()?;
     
-    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, v, _)| (t as f32, v)), &MAGENTA))?
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, v, _)| (t as f32, v)), &MAGENTA))?
         .label("Target Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], MAGENTA));
 
-    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, _, buff)| (t as f32, buff)), &GREEN))?
+    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, _, buff)| (t as f32, buff)), &GREEN))?
         .label("NT Buffer Volume").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], GREEN));
 
     chart2.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;

@@ -49,6 +49,13 @@ typedef enum {
 } NeuronType;
 
 typedef struct {
+    uint8_t branch_type; // 0=Empty, 1=Basal, 2=Trunk, 3=Tuft
+    float voltage;
+    float nmda_threshold;
+    uint8_t _padding[3]; // Align to 8 bytes
+} Compartment;
+
+typedef struct {
     uint32_t id;
     NeuronType type;
     float size;
@@ -75,6 +82,9 @@ typedef struct {
     float x, y, z;
     uint8_t death_reason;
     bool is_alive;
+    
+    // Dendritic Tree (Phase 33)
+    Compartment branches[8]; 
 } BaseNeuron;
 
 // Environment Singleton Representation
@@ -94,11 +104,10 @@ typedef struct {
     float weight;
     float neurotransmitter_buffer;
     uint32_t last_activation_tick;
-    uint8_t ticks_until_delivery;
-    float thickness;
     uint32_t ticks_below_threshold;
-    bool is_inhibitory;
-    bool is_myelinated;
+    uint8_t ticks_until_delivery;
+    uint8_t flags; // Bits 0-2: branch_id, Bit 3: is_inhibitory, Bit 4: is_myelinated
+    uint8_t _padding[2];
 } Synapse;
 
 // Orchestrator Function declarations

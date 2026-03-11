@@ -86,8 +86,7 @@ impl Telemetry {
             let w_idx = (s.weight as usize / 3).min(9);
             weight_bins[w_idx] += 1;
             
-            let t_idx = (s.thickness as usize).min(9);
-            thickness_bins[t_idx] += 1;
+            // Removed thickness tracking
         }
         
         let mut low_atp_count = 0;

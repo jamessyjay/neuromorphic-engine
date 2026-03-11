@@ -138,6 +138,39 @@ static inline __device__ void update_calcium(BaseNeuron* n) {
     if (n->calcium_level >= FATAL_CALCIUM_LEVEL) die_gracefully(n, DEATH_CALCIUM_HIGH);
 }
 
+static inline __device__ void evaluate_branches(BaseNeuron* n) {
+    for (int i = 0; i < 8; i++) {
+        Compartment* b = &n->branches[i];
+        if (b->branch_type == 0) continue;
+
+        // 1. Leak
+        b->voltage *= 0.9f;
+
+        // 2. NMDA Spike check (Non-linear summation)
+        if (b->voltage >= b->nmda_threshold) {
+             float gain = b->nmda_threshold; // Base gain
+             float multiplier = 1.0f;
+             
+             switch(b->branch_type) {
+                 case 1: // Basal
+                     multiplier = 1.0f;
+                     break;
+                 case 2: // Apical Trunk
+                     multiplier = 2.0f;
+                     n->energy_ATP -= 5.0f; // Metabolic cost of heavy trunk signal
+                     break;
+                 case 3: // Apical Tuft
+                     multiplier = 0.5f;
+                     break;
+             }
+             
+             float soma_impact = gain * multiplier;
+             atomicAdd(&n->current_voltage, soma_impact);
+             b->voltage = 0.0f; // Reset branch after spike
+        }
+    }
+}
+
 static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick) {
     if (n->refractory_time_left > 0.0f) {
         n->refractory_time_left -= 1.0f; 
@@ -182,25 +215,27 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         if (source->type == TYPE_PHOTORECEPTOR) {
             if (source->current_voltage >= -41.0f) {
                 s->neurotransmitter_buffer += 2.0f; // Photoreceptors leak constantly
-                s->ticks_until_delivery = s->is_myelinated ? 0 : 2;
+                uint8_t is_myelinated = (s->flags & 0x10) != 0;
+                s->ticks_until_delivery = is_myelinated ? 0 : 2;
             }
         } else {
             if (source->last_spike_tick == current_tick && source->current_voltage == SPIKE_VOLTAGE) {
                 // Bulk release on spike
                 s->neurotransmitter_buffer += 25.0f; 
-                s->ticks_until_delivery = s->is_myelinated ? 0 : 2; // Myelin Bypass (Phase 26)
+                uint8_t is_myelinated = (s->flags & 0x10) != 0;
+                s->ticks_until_delivery = is_myelinated ? 0 : 2; // Myelin Bypass (Phase 26)
             }
         }
     }
 
-    // STDP Learning Logic (Phase 7 & 23 & 26 & 30)
+    // STDP Learning Logic... (Keep weight growth logic, Phase 7 & 23 & 26 & 30)
     float learning_rate = 0.1f * env.dopamine_multiplier;
     
     // LTP: Potentiation + Thickness Growth (Phase 30)
     if (s->last_activation_tick > 0 && target->last_spike_tick == current_tick) {
         if (current_tick - s->last_activation_tick <= 20) {
             s->weight += learning_rate;
-            s->thickness += learning_rate * 0.1f; // Physical growth
+            // Physical growth removed since thickness field is gone
             s->last_activation_tick = 0; // Consumption
         }
     }
@@ -209,7 +244,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     if (s->last_activation_tick > 0 && current_tick - s->last_activation_tick >= 10) {
         if (target->last_spike_tick < s->last_activation_tick) {
             s->weight -= learning_rate * 0.5f;
-            s->thickness -= learning_rate * 0.05f; // Structural decay
+            // Structural decay removed
             s->last_activation_tick = 0; // Reset after depression
         }
     }
@@ -223,11 +258,8 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
 
     // Limits
     if (s->weight > 30.0f) s->weight = 30.0f; 
-    if (s->weight < 0.0f) s->weight = 0.0f; // Pruning threshold is 0.05 in Rust
+    if (s->weight < 0.0f) s->weight = 0.0f; 
     
-    if (s->thickness > 5.0f) s->thickness = 5.0f;
-    if (s->thickness < 0.0f) s->thickness = 0.0f;
-
     // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08 + Phase 30)
     if (s->ticks_until_delivery >= 0) {
         if (s->ticks_until_delivery > 0) {
@@ -236,18 +268,18 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
             // 1. Reliability Check (Phase 30/31): Thin synapses are unreliable
-            if (s->thickness < 0.3f) {
-                // Stochastic signal failure
-                // Using a simple deterministic-random based on tick and IDs for mock CPU compatibility
+            // 1. Reliability Check: (Simplified since thickness is gone from struct)
+            // We use weight as a proxy for maturity
+            if (s->weight < 0.5f) {
                 float failure_roll = (float)((current_tick + s->source_id + s->target_id) % 100) / 100.0f;
-                if (failure_roll > s->thickness) {
-                    s->neurotransmitter_buffer *= 0.8f; // Waste chemistry on failure
+                if (failure_roll > 0.5f) {
+                    s->neurotransmitter_buffer *= 0.8f; 
                     return; 
                 }
             }
 
-            // 2. Buffer Capacity (Phase 30): Thickness limits chemical volume
-            float max_buffer = s->thickness * 100.0f;
+            // 2. Buffer Capacity
+            float max_buffer = 100.0f; 
             if (s->neurotransmitter_buffer > max_buffer) s->neurotransmitter_buffer = max_buffer;
 
             // RECEPTOR SATURATION (Spec 08)
@@ -259,12 +291,15 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             s->last_activation_tick = current_tick;
             s->neurotransmitter_buffer -= (effective_signal / env.dopamine_multiplier); 
             
-            float voltage_impact = effective_signal * 6.0f; // Scale constant
+            float voltage_impact = effective_signal * 6.0f; 
             
-            if (s->is_inhibitory) {
-                atomicAdd(&target->current_voltage, -voltage_impact);
+            int branch_id = s->flags & 0x07;
+            bool is_inhib = (s->flags & 0x08) != 0;
+            
+            if (is_inhib) {
+                atomicAdd(&target->branches[branch_id].voltage, -voltage_impact);
             } else {
-                atomicAdd(&target->current_voltage, voltage_impact);
+                atomicAdd(&target->branches[branch_id].voltage, voltage_impact);
             }
         }
     }
@@ -279,6 +314,7 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     
     update_metabolism(&neurons[idx], env, current_tick);
     update_calcium(&neurons[idx]);
+    evaluate_branches(&neurons[idx]);
     process_spike(&neurons[idx], current_tick);
 }
 
@@ -309,6 +345,7 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
         if (neurons[i].is_alive) {
             update_metabolism(&neurons[i], env, current_tick);
             update_calcium(&neurons[i]);
+            evaluate_branches(&neurons[i]);
             process_spike(&neurons[i], current_tick);
         }
     }
@@ -370,6 +407,12 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->metabolic_wear = 0.0f;
     neuron->is_alive = true;
     neuron->death_reason = DEATH_NONE;
+
+    for (int i = 0; i < 8; i++) {
+        neuron->branches[i].branch_type = 0;
+        neuron->branches[i].voltage = 0.0f;
+        neuron->branches[i].nmda_threshold = 0.0f;
+    }
 }
 
 } // extern "C"

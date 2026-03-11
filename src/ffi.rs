@@ -17,6 +17,15 @@ pub enum NeuronType {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct Compartment {
+    pub branch_type: u8, // 0=Empty, 1=Basal, 2=Trunk, 3=Tuft
+    pub voltage: f32,
+    pub nmda_threshold: f32,
+    pub _padding: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct BaseNeuron {
     pub id: u32,
     pub type_: NeuronType,
@@ -45,6 +54,7 @@ pub struct BaseNeuron {
     pub z: f32,
     pub death_reason: u8,
     pub is_alive: bool,
+    pub branches: [Compartment; 8],
 }
 
 #[repr(C)]
@@ -55,11 +65,10 @@ pub struct Synapse {
     pub weight: f32,
     pub neurotransmitter_buffer: f32,
     pub last_activation_tick: u32,
-    pub ticks_until_delivery: u8,
-    pub thickness: f32,
     pub ticks_below_threshold: u32,
-    pub is_inhibitory: bool,
-    pub is_myelinated: bool,
+    pub ticks_until_delivery: u8,
+    pub flags: u8, // Bits 0-2: branch_id, Bit 3: is_inhibitory, Bit 4: is_myelinated
+    pub _padding: [u8; 2],
 }
 
 #[repr(C)]
