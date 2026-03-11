@@ -1,3 +1,7 @@
 target
 .agents/*
 .DS_Store
+brain_save.bin
+logs/
+reports/
+graphs/
