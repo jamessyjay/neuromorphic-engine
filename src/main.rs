@@ -602,9 +602,32 @@ fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
             
             if graph.is_sleep_needed() {
                 println!("Fatigue threshold reached (Avg Wear > 40000). Entering Sleep Cycle...");
+                
+                let pre_sleep_snapshot = graph.snapshot_synapses();
+                let pre_sleep_fingerprint = graph.generate_fingerprint();
+
                 graph.initiate_sleep_cycle();
                 println!("Wake up! Network consolidated and saved.");
-                println!("TEST COMPLETE: Please run again to verify deserialization.");
+                
+                let post_sleep_snapshot = graph.snapshot_synapses();
+                let post_sleep_fingerprint = graph.generate_fingerprint();
+                
+                println!("\n[OBSERVABILITY] Fingerprint BEFORE Sleep: {}", pre_sleep_fingerprint);
+                println!("[OBSERVABILITY] Fingerprint AFTER Sleep:  {}", post_sleep_fingerprint);
+                
+                NetworkGraph::diff_synapses(&pre_sleep_snapshot, &post_sleep_snapshot);
+
+                // Load from disk to prove exact match
+                let disk_graph = NetworkGraph::load_from_disk().expect("Failed to load right after save");
+                let disk_fingerprint = disk_graph.generate_fingerprint();
+                
+                if disk_fingerprint == post_sleep_fingerprint {
+                    println!("✅ FINGERPRINT MATCH: The serialized disk network is structurally IDENTICAL to the memory network.");
+                } else {
+                    println!("❌ FINGERPRINT MISMATCH: Serialization corrupted the data!");
+                }
+
+                println!("TEST COMPLETE.");
                 return Ok(());
             }
         }

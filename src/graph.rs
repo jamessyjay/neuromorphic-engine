@@ -4,6 +4,8 @@ use rand::RngExt;
 use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
+use std::collections::HashMap;
+use sha2::{Sha256, Digest};
 
 const MAX_ATP: f32 = 100.0;
 const CLUSTERING_RADIUS_SQ: f32 = 400.0; 
@@ -79,6 +81,75 @@ impl NetworkGraph {
         } else {
             None
         }
+    }
+
+    pub fn generate_fingerprint(&self) -> String {
+        let mut hasher = Sha256::new();
+        
+        hasher.update((self.neurons.len() as u32).to_le_bytes());
+        for n in &self.neurons {
+            hasher.update(n.id.to_le_bytes());
+            hasher.update((n.is_alive as u8).to_le_bytes());
+            hasher.update(n.energy_atp.to_bits().to_le_bytes());
+            hasher.update(n.metabolic_wear.to_le_bytes());
+        }
+        
+        hasher.update((self.synapses.len() as u32).to_le_bytes());
+        for s in &self.synapses {
+            hasher.update(s.source_id.to_le_bytes());
+            hasher.update(s.target_id.to_le_bytes());
+            hasher.update(s.weight.to_bits().to_le_bytes());
+            hasher.update(s.flags.to_le_bytes());
+        }
+        
+        format!("{:x}", hasher.finalize())
+    }
+
+    pub fn snapshot_synapses(&self) -> HashMap<(u32, u32, u8), f32> {
+        let mut map = HashMap::new();
+        for s in &self.synapses {
+            let branch_id = s.flags & 0x07;
+            map.insert((s.source_id, s.target_id, branch_id), s.weight);
+        }
+        map
+    }
+
+    pub fn diff_synapses(before: &HashMap<(u32, u32, u8), f32>, after: &HashMap<(u32, u32, u8), f32>) {
+        let mut pruned = 0;
+        let mut strengthened = 0;
+        let mut weakened = 0;
+        let mut unchanged = 0;
+
+        for (key, old_weight) in before {
+            if let Some(new_weight) = after.get(key) {
+                if new_weight > old_weight {
+                    strengthened += 1;
+                } else if new_weight < old_weight {
+                    weakened += 1;
+                } else {
+                    unchanged += 1;
+                }
+            } else {
+                pruned += 1;
+            }
+        }
+        
+        let mut new_synapses = 0;
+        for key in after.keys() {
+            if !before.contains_key(key) {
+                new_synapses += 1;
+            }
+        }
+
+        println!("--- SYNAPTIC DIFF REPORT ---");
+        println!("Total Pre-Sleep: {}", before.len());
+        println!("Total Post-Sleep: {}", after.len());
+        println!("Pruned (Removed): {}", pruned);
+        println!("New Synapses: {}", new_synapses);
+        println!("Strengthened (LTP): {}", strengthened);
+        println!("Weakened (LTD): {}", weakened);
+        println!("Unchanged: {}", unchanged);
+        println!("----------------------------");
     }
 
     pub fn add_neuron(&mut self, type_: NeuronType) -> u32 {
