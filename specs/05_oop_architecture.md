@@ -32,3 +32,8 @@
 * **`Astrocyte`:** Garbage Collector (GC) & Resource Manager. Monitors synapses. If it sees excess Glutamate — calls clean_synapse(). Also boosts ATP (energy_ATP += 10) for active neurons.
 * **`SchwannCell / Oligodendrocyte`:** Network Optimizer. Wraps outputs_array (axon) in myelin (insulation). Changes transmission physics: instead of slow channel-by-channel calculation, enables teleport_signal(), speeding up data packets 100x.
 * **`Microglia`:** Antivirus / Firewall. Swims through the network. Finds dead objects (is_alive == false), calls delete(), and clears memory of trash.
+## 4. Memory Geometry & Serialization (Phase 34 & 35)
+* **`BaseNeuron` Alignment:** Strictly packed and padded to exactly `128 bytes` (2 cache lines) with `alignas(64)` in C++ and `#[repr(align(64))]` in Rust to eliminate cache latency bottlenecks.
+* **Fixed-Point Arithmetic:** `Compartment` values (like `voltage` and `nmda_threshold`) are packed into 16-bit integers (`uint16_t`) mapped to a 0.0-100.0 float range. This compresses tree size from 96 bytes down to 64 bytes.
+* **Serialization (`serde`/`bincode`)**: The entire state of the brain is serialized and deserialized to disk (`brain_save.bin`). The strict C ABI representation ensures pointerless recreation of the exact CUDA memory map instantly upon engine restart.
+* **Cryptographic Observability:** A SHA256 deterministic fingerprint is generated from neural states and synaptic topologies to mathematically prove structural integrity across the memory-disk serialization boundary.

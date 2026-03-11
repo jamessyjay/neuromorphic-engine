@@ -27,3 +27,6 @@
 * **Norepinephrine/Epinephrine:** Alarm clock / Turbo button. Sharply narrows focus, cuts out excess noise.
 * **Histamine:** System tone. Prevents the network from "falling asleep".
 * **Endorphins (Peptides):** Built-in morphine. Cull overloads (pain), work slowly but massively.
+## 4. Passive Leak & Refractory Physics (Phase 34)
+* **Passive Leak:** Analog sub-threshold signals (below NMDA activation limits) are no longer discarded. A fraction of dendritic charge constantly "leaks" into the soma every tick. This solves the "digital deafness" problem, allowing weak but consistent signals to eventually build up a somatic potential.
+* **Branch Refractory Period:** Once an NMDA spike triggers on a specific dendrite branch, that branch enters a localized refractory state (e.g. 3 ticks). Incoming neurotransmitters are consumed without generating further voltage, preventing "eternal high" infinite-spiking loops within a single tick window.

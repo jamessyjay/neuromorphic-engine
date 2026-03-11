@@ -41,7 +41,13 @@ Removing "impotent" connections allows the network to stay efficient and free up
     - For large N, it uses **Random Sampling** (checking random pairs) instead of $O(N^2)$ exhaustive search to maintain performance.
     - Rate: Runs every 1000-5000 ticks depending on complexity.
 
-## 6. Success Metrics
-- **Clustering Coefficient**: Spontaneous formation of functional clusters.
-- **Memory Efficiency**: Pruning reduces memory load by 15-30% in stabilized networks.
-- **Pathfinding**: Ability of the network to find a signal path from input to output neurons without initial manual connections.
+## 7. The Sleep Cycle & Metabolic Wear (Phase 35)
+As the network operates, continuous spiking and calcium flux generate "metabolic wear" that degrades network efficiency. To prevent collapse, the network must sleep.
+
+### Mechanisms:
+1. **Metabolic Wear Tracking**: Every spike increases a 16-bit packed `metabolic_wear` counter. At a critical threshold, the network triggers a sleep cycle.
+2. **Offline Replenishment**: During sleep, normal stimulation stops. All ATP is restored to max, calcium is flushed to 0, and refractory periods are cleared.
+3. **Consolidation**: The sleep cycle triggers an immediate pass of the **Microglia Service** to aggressively prune weak synapses (e.g. `Weight < 0.05`), simulating synaptic downscaling during slow-wave sleep.
+
+### Observability & Integrity:
+Before and after sleep, the network calculates a cryptographic **Fingerprint (SHA256)** of its topology to guarantee structural consistency across the serialization boundary (`serde`/`bincode`). This ensures memory alignment and biological pointers remain 100% intact after the cycle.
