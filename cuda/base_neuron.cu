@@ -187,20 +187,21 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
 }
 
 static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, uint32_t current_tick) {
-    if (source->is_alive) {
-        if (source->type == TYPE_PHOTORECEPTOR) {
-            if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
-                s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK; // Photoreceptors leak constantly
-                uint8_t is_myelinated = (s->flags & 0x10) != 0;
-                s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
-            }
-        } else {
-            if (source->last_spike_tick == current_tick && source->current_voltage == ACTION_POTENTIAL_PEAK) {
-                // Bulk release on spike
-                s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
-                uint8_t is_myelinated = (s->flags & 0x10) != 0;
-                s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS; // Myelin Bypass (Phase 26)
-            }
+    // Phase 40 Performance: Early exit for dead neural pathways
+    if (!source->is_alive || !target->is_alive) return;
+
+    if (source->type == TYPE_PHOTORECEPTOR) {
+        if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
+            s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK; // Photoreceptors leak constantly
+            uint8_t is_myelinated = (s->flags & 0x10) != 0;
+            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
+        }
+    } else {
+        if (source->last_spike_tick == current_tick && source->current_voltage == ACTION_POTENTIAL_PEAK) {
+            // Bulk release on spike
+            s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
+            uint8_t is_myelinated = (s->flags & 0x10) != 0;
+            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS; // Myelin Bypass (Phase 26)
         }
     }
 
