@@ -2,6 +2,9 @@ target
 .agents/*
 .DS_Store
 brain_save.bin
-logs/
-reports/
-graphs/
+logs/*.log
+reports/*.json
+graphs/*.png
+.windsurf
+.agents
+output.log
