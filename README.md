@@ -87,6 +87,24 @@ Executes a load test on 10k neurons and generates `graphs/benchmark_load.png`.
 cargo run --release -- --benchmark
 ```
 
+### 4. Running the Automated Test Suite
+
+We have implemented a massive 7-block test suite covering everything from biological accuracy to hardware performance bottlenecks.
+
+To run the full suite (30+ tests):
+
+```bash
+cargo test
+```
+
+To run a specific test file (e.g. `biology_tests`):
+
+```bash
+cargo test --test biology_tests
+```
+
+*For a full breakdown of what each test validates, read [TESTS.md](TESTS.md).*
+
 ---
 
 ## Directory Structure
