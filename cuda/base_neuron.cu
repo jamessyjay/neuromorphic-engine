@@ -77,11 +77,12 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) 
         n->energy_ATP += 0.2f;
     }
 
-    // Death by starvation
+    // Death by starvation (Only if hypoxic, otherwise just coma/silence)
     if (n->energy_ATP <= 0.0f) {
-        n->is_alive = false;
         n->energy_ATP = 0.0f;
-        n->death_reason = DEATH_ATP_LOW;
+        if (env.global_oxygen_level < 0.5f) {
+            die_gracefully(n, DEATH_ATP_LOW);
+        }
     }
 }
 
@@ -126,8 +127,12 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
             // Passive transfer based on type
             if (b->branch_type == 1) soma_impact = v * BASAL_SOMA_GAIN; // Basal
             else if (b->branch_type == 2) { // Apical Trunk (Boosted)
-                soma_impact = v * TRUNK_MULTIPLIER;
-                n->energy_ATP -= TRUNK_ATP_COST * TRUNK_PASSIVE_COST_MULTIPLIER;
+                if (n->energy_ATP >= TRUNK_ATP_COST * TRUNK_PASSIVE_COST_MULTIPLIER) {
+                    soma_impact = v * TRUNK_MULTIPLIER;
+                    n->energy_ATP -= TRUNK_ATP_COST * TRUNK_PASSIVE_COST_MULTIPLIER;
+                } else {
+                    soma_impact = v * BASAL_SOMA_GAIN; // Downgrade to passive if starved
+                }
             } else if (b->branch_type == 3) { // Apical Tuft (Distant)
                 soma_impact = v * TUFT_MULTIPLIER;
             }
@@ -146,7 +151,11 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
 
     // EMERGENCY GUARD 2.0: Explicit ATP check
     if (n->energy_ATP < EMERGENCY_ATP_THRESHOLD) {
-        die_gracefully(n, DEATH_ATP_LOW);
+        if (env.global_oxygen_level < 0.5f) {
+            die_gracefully(n, DEATH_ATP_LOW);
+        } else {
+            n->current_voltage = n->resting_voltage; // Sleep mode
+        }
         return;
     }
 
