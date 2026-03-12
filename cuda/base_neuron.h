@@ -35,7 +35,7 @@ extern "C" {
 // Refractory and Recovery
 #define ABSOLUTE_REFRACTORY_PERIOD 2.0f
 #define VOLTAGE_DECAY_RATE 0.1f // Membrane leak
-#define CALCIUM_SPIKE_GAIN 2.0f
+#define CALCIUM_SPIKE_GAIN 5.0f
 #define FATAL_CALCIUM_LEVEL 1000.0f
 #define MAX_SYNAPSE_WEIGHT 50.0f
 
@@ -70,8 +70,8 @@ extern "C" {
 #define ATP_STRESS_THRESHOLD 30.0f
 #define EMERGENCY_ATP_THRESHOLD 0.01f
 #define EMERGENCY_SILENCE_THRESHOLD 0.0f // Achievable mV, but high (sleep)
+#define CALCIUM_RECOVERY_RATE 0.5f
 #define VOLTAGE_DRIFT_RATE 0.4f
-#define CALCIUM_RECOVERY_RATE 2.0f
 
 // Photoreceptor specific
 #define PHOTO_HYPERPOLARIZED -65.0f
