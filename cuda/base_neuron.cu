@@ -62,14 +62,24 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
 static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) {
     if (!n->is_alive) return;
 
-    // Phase 40: Recovery
-    n->energy_ATP += ATP_RECOVERY_RATE;
+    // Phase 40: Recovery (Asymptotic to max_atp)
+    float atp_gap = n->max_atp - n->energy_ATP;
+    if (atp_gap > 0.0f) {
+        // Recovery slows down as it reaches max_atp
+        n->energy_ATP += ATP_RECOVERY_RATE * (atp_gap / (n->max_atp * 0.5f));
+    }
+    
     if (n->energy_ATP > n->max_atp) {
         n->energy_ATP = n->max_atp;
     }
 
-    // Passive drain
-    float passive_drain = 0.01f * (1.0f - env.global_oxygen_level);
+    // Base passive drain + severe hypoxic penalty
+    float hypoxia_penalty = 0.0f;
+    if (env.global_oxygen_level < 0.5f) {
+        // As oxygen drops below 0.5, penalty scales up dramatically (up to 0.5 ATP per tick)
+        hypoxia_penalty = (0.5f - env.global_oxygen_level) * 1.0f; 
+    }
+    float passive_drain = BASELINE_LEAK_RATE + hypoxia_penalty;
     n->energy_ATP -= passive_drain;
 
     // Glucose processing
@@ -159,26 +169,30 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         return;
     }
 
-    if (n->current_voltage > n->activation_threshold && n->energy_ATP >= ATP_SPIKE_COST) {
-        // Check refractory
-        if (current_tick - n->last_spike_tick < (uint32_t)n->refractory_time_left) {
-            return;
-        }
+    if (n->current_voltage > n->activation_threshold) {
+        if (n->energy_ATP >= ATP_SPIKE_COST) {
+            // Check refractory
+            if (current_tick - n->last_spike_tick < (uint32_t)n->refractory_time_left) {
+                return;
+            }
 
-        // Fire spike
-        n->current_voltage = ACTION_POTENTIAL_PEAK;
-        n->last_spike_tick = current_tick;
-        n->refractory_time_left = ABSOLUTE_REFRACTORY_PERIOD;
-        
-        // Metabolic Cost
-        n->energy_ATP -= ATP_SPIKE_COST;
-        n->calcium_level += CALCIUM_SPIKE_GAIN;
-        
-        // Track spike count for Window
-        n->spikes_in_last_window++;
-    } else if (n->current_voltage > n->activation_threshold) {
-        // Tried to spike but no ATP -> exhaustion collapse
-        n->current_voltage = n->resting_voltage;
+            // Fire spike
+            n->current_voltage = ACTION_POTENTIAL_PEAK;
+            n->last_spike_tick = current_tick;
+            n->refractory_time_left = ABSOLUTE_REFRACTORY_PERIOD;
+            
+            // Metabolic Cost
+            n->energy_ATP -= ATP_SPIKE_COST;
+            n->calcium_level += CALCIUM_SPIKE_GAIN;
+            
+            // Track spike count for Window
+            n->spikes_in_last_window++;
+        } else {
+            // Tried to spike but no ATP -> exhaustion collapse and penalty
+            n->current_voltage = n->resting_voltage;
+            // Still subtract the cost to drive ATP into negative (which triggers coma or death)
+            n->energy_ATP -= ATP_SPIKE_COST;
+        }
     } else {  
         // SPIKE-DRIVEN WEAR (The "Aging" effect)
         float wear_f = (float)n->metabolic_wear / MAX_U16_FLOAT;
