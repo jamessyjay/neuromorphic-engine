@@ -28,15 +28,16 @@ cargo run --release -- --benchmark --neurons 100000 --synapses 1000000 --ticks 1
 
 If you want to see how the network looks and operates in real-time in your browser:
 
-1. First, start the engine with the `--ui` flag (this will spin up a WebSocket server on port 3030):
+### 1. First, start the engine with the `--ui` flag (this will spin up a WebSocket server on port 3030)
+
+[!] (For the UI, it's highly recommended to use no more than 5,000-10,000 neurons, otherwise the browser's WebGL will lag heavily)
 
 ```bash
 cargo run --release -- --benchmark --neurons 1000 --synapses 5000 --ticks 1000000 --fresh --ui
 ```
 
-*(For the UI, it's highly recommended to use no more than 5,000-10,000 neurons, otherwise the browser's WebGL will lag heavily)*
+### 2. Open the visualizer file in your browser (Chrome / Safari)
 
-2. Open the visualizer file in your browser (Chrome / Safari):
 Simply double-click the `visualizer/index.html` file or open it via Live Server.
 It will automatically connect to `ws://127.0.0.1:3030` and start rendering the network.
 
