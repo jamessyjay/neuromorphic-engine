@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, RwLock};
 use warp::Filter;
 use futures_util::{StreamExt, SinkExt};
 
@@ -28,16 +28,35 @@ pub struct TickUpdatePayload {
 
 pub async fn start_server(tx: broadcast::Sender<String>) {
     let tx = Arc::new(tx);
-    let tx_filter = warp::any().map(move || Arc::clone(&tx));
+    let tx_for_filter = tx.clone();
+    let tx_for_bg = tx.clone();
+    let tx_filter = warp::any().map(move || Arc::clone(&tx_for_filter));
+    
+    let initial_state_cache: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
+    let cache_clone = initial_state_cache.clone();
+    
+    // Background task to cache InitialState for late joiners
+    let mut rx = tx_for_bg.subscribe();
+    tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if msg.contains("\"type\":\"InitialState\"") {
+                let mut cache = cache_clone.write().await;
+                *cache = Some(msg);
+                println!("Cached InitialState for late UI joiners.");
+            }
+        }
+    });
+
+    let cache_filter = warp::any().map(move || Arc::clone(&initial_state_cache));
 
     let stream_route = warp::path("stream")
         .and(warp::ws())
         .and(tx_filter)
-        .map(|ws: warp::ws::Ws, tx: Arc<broadcast::Sender<String>>| {
-            ws.on_upgrade(move |socket| handle_client(socket, tx))
+        .and(cache_filter)
+        .map(|ws: warp::ws::Ws, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>| {
+            ws.on_upgrade(move |socket| handle_client(socket, tx, cache))
         });
 
-    // Also serve the visualizer directory for convenience
     let static_files = warp::fs::dir("visualizer");
     let routes = stream_route.or(static_files).with(warp::cors().allow_any_origin());
 
@@ -47,11 +66,20 @@ pub async fn start_server(tx: broadcast::Sender<String>) {
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
 
-async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String>>) {
+async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>) {
     let mut rx = tx.subscribe();
     let (mut client_ws_sender, _) = ws.split();
 
     println!("New WebSocket client connected!");
+
+    // Send cached initial state immediately to new clients
+    if let Some(init_msg) = cache.read().await.as_ref() {
+        if let Err(e) = client_ws_sender.send(warp::ws::Message::text(init_msg.clone())).await {
+            println!("Error sending initial state: {}", e);
+            return;
+        }
+        println!("Sent cached InitialState to new client.");
+    }
 
     loop {
         match rx.recv().await {
@@ -63,7 +91,6 @@ async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String
             }
             Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
                 println!("WebSocket client lagged, skipped {} messages. Recovering...", skipped);
-                // The loop will just continue and try to recv the next fresh message
             }
             Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                 println!("Broadcast channel closed.");
