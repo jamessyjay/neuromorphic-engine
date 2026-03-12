@@ -67,11 +67,13 @@ After these tests complete, beautiful PNG graphs showing action potentials will 
 The engine includes a massive 7-block test suite (35+ tests) verifying everything from cellular metabolism (ATP, Hypoxia) and dendritic summation, to global network scaling limits ($O(n^2)$ bottlenecks) and memory boundaries.
 
 To run the full suite:
+
 ```bash
 cargo test
 ```
 
 To run a specific test block and see detailed console logs (e.g. for low-level benching):
+
 ```bash
 cargo test --test low_level_tests -- --nocapture
 ```

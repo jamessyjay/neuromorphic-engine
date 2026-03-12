@@ -79,11 +79,16 @@ fn test_neurogenesis_rate() {
         graph.neurons[id as usize].x = 1000;
         graph.neurons[id as usize].y = 1000;
         graph.neurons[id as usize].z = 1000;
-        graph.neurons[id as usize].last_spike_tick = 400;
+        graph.neurons[id as usize].last_spike_tick = 400; // active in window
     }
     
     let initial_synapses = graph.synapses.len();
-    graph.run_neurogenesis_service(500);
+    
+    // Neurogenesis is highly stochastic (1% per check, checks = 2*N = 20 per call)
+    // Run it enough times to guarantee a hit
+    for _ in 0..500 {
+        graph.run_neurogenesis_service(500); // Pass 500 so `tick % NEUROGENESIS_INTERVAL == 0` is true
+    }
     
     let final_synapses = graph.synapses.len();
     assert!(final_synapses > initial_synapses, "Neurogenesis should create new synapses over time between active, close neurons");
@@ -150,7 +155,6 @@ fn test_pavlovian_success_rate() {
         _padding: [0; 2],
     });
     
-    // Set up branch 1 to be Basal (branch_type = 1)
     graph.neurons[relay as usize].branches[1] = Compartment {
         branch_type: 1,
         refractory_timer: 0,
@@ -204,20 +208,17 @@ fn test_pavlovian_success_rate() {
     graph.neurons[relay as usize].current_voltage = -70.0;
     graph.neurons[motor as usize].current_voltage = -70.0;
     
-    // Reset refractory to allow firing
+    // Reset refractory
     graph.neurons[sensor as usize].refractory_time_left = 0.0;
     graph.neurons[relay as usize].refractory_time_left = 0.0;
     graph.neurons[motor as usize].refractory_time_left = 0.0;
     
     for tick in 501..=510 { graph.tick(tick, env.clone()); }
     
-    // Provide ATP
     graph.neurons[sensor as usize].energy_atp = 100.0;
     graph.neurons[relay as usize].energy_atp = 100.0;
     graph.neurons[motor as usize].energy_atp = 100.0;
     
-    // Spike sensor manually and simulate processing to ensure it sets last_spike_tick appropriately
-    // so synapse picks it up.
     graph.neurons[sensor as usize].current_voltage = 45.0; // Above threshold
     
     for tick in 511..=550 {
