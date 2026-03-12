@@ -73,7 +73,7 @@ pub fn render_benchmark_chart(data: &BenchmarkData, filename: &str) -> Result<()
     chart2.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
 
     // Panel 3: Performance (FFI vs Rust)
-    let max_time = data.ffi_times.iter().cloned().fold(0./0., f32::max).max(data.rust_times.iter().cloned().fold(0./0., f32::max)).max(0.1);
+    let max_time = data.ffi_times.iter().cloned().fold(f32::NAN, f32::max).max(data.rust_times.iter().cloned().fold(f32::NAN, f32::max)).max(0.1);
     let mut chart3 = init_chart_f32(&areas[2], "Processing Time per Tick (ms)", x_range.clone(), 0f32..max_time * 1.1)?;
     
     chart3.draw_series(LineSeries::new(data.ticks.iter().zip(data.ffi_times.iter()).map(|(&x, &y)| (x as f32, y)), &BLUE))?
