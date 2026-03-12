@@ -32,6 +32,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_spatial_test = args.contains(&String::from("--spatial-test"));
     let is_passive_leak_test = args.contains(&String::from("--passive-leak-test"));
     let is_sleep_test = args.contains(&String::from("--sleep-test"));
+    let is_bench_scaling = args.contains(&String::from("--bench-scaling"));
+    let is_bench_io = args.contains(&String::from("--bench-io"));
 
     let (tx, _rx) = broadcast::channel(100);
     
@@ -50,7 +52,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tx_option = if is_ui_enabled { Some(tx.clone()) } else { None };
 
-    if is_sleep_test {
+    if is_bench_scaling {
+        modes::run_bench_scaling().await?;
+    } else if is_bench_io {
+        modes::run_bench_io().await?;
+    } else if is_sleep_test {
         run_sleep_test()?;
         return Ok(());
     }

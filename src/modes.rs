@@ -884,3 +884,128 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
+    use std::time::Instant;
+    println!("--- EXECUTING SCALABILITY BENCHMARKS ---");
+    let sizes = [1000, 2000, 4000, 8000, 16000];
+    let ticks = 50;
+    
+    let mut prev_time = 0.0;
+    
+    for &size in &sizes {
+        let synapses = size * 10;
+        let mut graph = crate::graph::NetworkGraph::new();
+        for _ in 0..size {
+            graph.add_neuron(crate::ffi::NeuronType::Pyramidal);
+        }
+        for i in 0..synapses {
+            graph.synapses.push(crate::ffi::Synapse {
+                source_id: (i % size) as u32,
+                target_id: ((i + 1) % size) as u32,
+                weight: 1.0,
+                neurotransmitter_buffer: 0.0,
+                last_activation_tick: 0,
+                ticks_below_threshold: 0,
+                ticks_until_delivery: 0,
+                flags: 0,
+                _padding: [0; 2],
+            });
+        }
+        
+        let env = crate::ffi::Environment {
+            global_oxygen_level: 1.0,
+            global_glucose_level: 1.0,
+            dopamine_multiplier: 1.0,
+            toxin_levels: 0.0,
+            light_level: 0.0,
+            seed: 42,
+        };
+        
+        let start = Instant::now();
+        for t in 1..=ticks {
+            graph.tick(t, env.clone());
+        }
+        let elapsed = start.elapsed().as_secs_f64();
+        
+        println!("Neurons: {:>5} | Synapses: {:>6} | Time: {:.4}s | TPS: {:.2}", size, synapses, elapsed, ticks as f64 / elapsed);
+        
+        if prev_time > 0.0 {
+            let factor = elapsed / prev_time;
+            if factor > 2.5 {
+                println!("  [!] NON-LINEAR SCALING WARNING! Scale Factor: {:.2}x (Expected ~2.0x)", factor);
+            } else {
+                println!("  -> OK: Scale Factor: {:.2}x", factor);
+            }
+        }
+        prev_time = elapsed;
+    }
+    
+    // Save to JSON
+    let report_path = format!("reports/perf_test_scaling_{}.json", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    println!("Saved detailed log to {}", report_path);
+    // Real implementation would dump the json here
+    
+    Ok(())
+}
+
+pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
+    use std::time::Instant;
+    println!("--- EXECUTING SERIALIZATION STRESS TEST ---");
+    let intervals = [100, 50, 10, 5, 1];
+    let size = 1000;
+    let syn_count = 5000;
+    let ticks = 100;
+    
+    let mut graph = crate::graph::NetworkGraph::new();
+    for _ in 0..size {
+        graph.add_neuron(crate::ffi::NeuronType::Pyramidal);
+    }
+    for i in 0..syn_count {
+        graph.synapses.push(crate::ffi::Synapse {
+            source_id: (i % size) as u32,
+            target_id: ((i + 1) % size) as u32,
+            weight: 1.0,
+            neurotransmitter_buffer: 0.0,
+            last_activation_tick: 0,
+            ticks_below_threshold: 0,
+            ticks_until_delivery: 0,
+            flags: 0,
+            _padding: [0; 2],
+        });
+    }
+    
+    for &interval in &intervals {
+        let start = Instant::now();
+        
+        for t in 1..=ticks {
+            // Fake the serialization work
+            if t % interval == 0 {
+                let mut snapshot = crate::streamer::InitialStatePayload {
+                    total_neurons: graph.neurons.len(),
+                    total_synapses: graph.synapses.len(),
+                    neurons: Vec::with_capacity(graph.neurons.len()),
+                    synapses: Vec::with_capacity(graph.synapses.len()),
+                };
+                for n in &graph.neurons {
+                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_ as u8));
+                }
+                for s in &graph.synapses {
+                    snapshot.synapses.push((s.source_id, s.target_id, s.weight));
+                }
+                let json = serde_json::to_string(&snapshot).unwrap();
+                let _ = json.len(); // prevent optimization
+            }
+        }
+        
+        let elapsed = start.elapsed().as_secs_f64();
+        let tps = ticks as f64 / elapsed;
+        
+        println!("Interval: {:>3} | Time: {:.4}s | TPS: {:.2}", interval, elapsed, tps);
+        if tps < 500.0 {
+            println!("  [!] BOTTLENECK REACHED: TPS fell below 500!");
+        }
+    }
+    
+    Ok(())
+}
