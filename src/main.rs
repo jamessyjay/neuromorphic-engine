@@ -19,6 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing neuromorphic-engine Hybrid Engine...");
 
     let args: Vec<String> = env::args().collect();
+    let is_ui_enabled = args.contains(&String::from("--ui"));
     let is_benchmark = args.contains(&String::from("--benchmark"));
     let is_stress_test = args.contains(&String::from("--stress-test"));
     let is_dopamine_rush = args.contains(&String::from("--dopamine-rush"));
@@ -34,14 +35,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (tx, _rx) = broadcast::channel(100);
     
-    // Spawn WebSocket server
-    let tx_clone = tx.clone();
-    tokio::spawn(async move {
-        crate::streamer::start_server(tx_clone).await;
-    });
+    // Spawn WebSocket server only if --ui flag is present
+    if is_ui_enabled {
+        println!("UI Mode enabled. Starting WebSocket server...");
+        let tx_clone = tx.clone();
+        tokio::spawn(async move {
+            crate::streamer::start_server(tx_clone).await;
+        });
+        // Give the server a moment to actually bind the port before we hammer the CPU
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    } else {
+        println!("UI Mode disabled. Running in headless high-performance mode (use --ui to enable visualizer).");
+    }
 
-    // Give the server a moment to actually bind the port before we hammer the CPU
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    let tx_option = if is_ui_enabled { Some(tx.clone()) } else { None };
 
     if is_sleep_test {
         run_sleep_test()?;
@@ -73,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        let data = run_benchmark_mode(neurons, synapses, ticks, Some(tx.clone())).await?;
+        let data = run_benchmark_mode(neurons, synapses, ticks, tx_option).await?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
         return Ok(());
     }
@@ -134,7 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         setup_simulation()
     };
-    let data = run_simulation(graph, DEFAULT_SIMULATION_TICKS, Some(tx.clone())).await;
+    let data = run_simulation(graph, DEFAULT_SIMULATION_TICKS, tx_option).await;
     render_chart(&data, "graphs/phase8_sensors.png")?;
 
     Ok(())
