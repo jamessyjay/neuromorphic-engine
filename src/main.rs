@@ -34,6 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_sleep_test = args.contains(&String::from("--sleep-test"));
     let is_bench_scaling = args.contains(&String::from("--bench-scaling"));
     let is_bench_io = args.contains(&String::from("--bench-io"));
+    let is_ui_test = args.contains(&String::from("--ui-test"));
 
     let (tx, _rx) = broadcast::channel(100);
     
@@ -56,6 +57,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         modes::run_bench_scaling().await?;
     } else if is_bench_io {
         modes::run_bench_io().await?;
+    } else if is_ui_test {
+        modes::run_ui_test(tx_option.clone()).await?;
     } else if is_sleep_test {
         run_sleep_test()?;
         return Ok(());

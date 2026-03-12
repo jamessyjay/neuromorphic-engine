@@ -42,6 +42,10 @@
         <div id="neurons">Neurons: 0</div>
         <div id="synapses">Synapses: 0</div>
         <div style="margin-top: 5px; color: #aaa;">[LMB] ROTATE | [RMB] PAN | [WHEEL] ZOOM</div>
+        <div id="log-container" style="margin-top: 10px; max-height: 150px; overflow-y: auto; border-top: 1px solid #0f0; padding-top: 5px; font-size: 10px;">
+            <div style="color: #aaa; margin-bottom: 2px;">-- DEBUG LOGS --</div>
+            <div id="logs"></div>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -55,8 +59,22 @@
                 status.innerText = "JS ERROR: " + msg;
                 status.style.color = "#f0f";
             }
+            logMsg("ERROR: " + msg);
             return false;
         };
+
+        function logMsg(msg) {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logs.appendChild(div);
+            // Keep only last 20 logs
+            while (logs.children.length > 20) {
+                logs.removeChild(logs.firstChild);
+            }
+            document.getElementById('log-container').scrollTop = document.getElementById('log-container').scrollHeight;
+        }
 
         // --- Configuration & Constants ---
         const MAX_COORD = 65535;
@@ -196,11 +214,24 @@
             const wsUrl = `${protocol}//${host}:${port}/stream`;
             
             console.log("Connecting to WebSocket:", wsUrl);
+            logMsg(`Connecting to ${wsUrl}...`);
             const ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 document.getElementById('status').innerText = "Status: ONLINE (3D)";
                 document.getElementById('status').style.color = "#0f0";
+                logMsg("WebSocket ONLINE.");
+            };
+
+            ws.onclose = () => {
+                document.getElementById('status').innerText = "Status: DISCONNECTED";
+                document.getElementById('status').style.color = "#f00";
+                logMsg("WebSocket DISCONNECTED. Reconnecting in 2s...");
+                setTimeout(connect, 2000);
+            };
+
+            ws.onerror = (err) => {
+                logMsg("WebSocket ERROR occurred.");
             };
 
             ws.onmessage = (event) => {
@@ -209,7 +240,8 @@
                 if (msg.type === "InitialState") {
                     const data = msg.payload;
                     totalNeurons = data.total_neurons;
-                    
+                    logMsg(`Received InitialState: ${data.total_neurons} neurons, ${data.total_synapses} synapses.`);
+
                     // Clear existing meshes
                     neuronMeshes.forEach(mesh => scene.remove(mesh));
                     neuronMeshes.clear();

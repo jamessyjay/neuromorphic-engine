@@ -1009,3 +1009,107 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
     
     Ok(())
 }
+
+pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::graph::NetworkGraph;
+    use crate::ffi::{NeuronType, Environment, Synapse};
+    
+    println!("--- EXECUTING UI TEST MODE ---");
+    println!("Spawning a tiny predictable network to test visualizer functionality.");
+    
+    let mut graph = NetworkGraph::new();
+    // 5 neurons in a star shape
+    graph.add_neuron(NeuronType::Pyramidal); // Center (0)
+    graph.add_neuron(NeuronType::Bipolar);    // Top (1)
+    graph.add_neuron(NeuronType::Bipolar);    // Right (2)
+    graph.add_neuron(NeuronType::Purkinje);     // Bottom (3)
+    graph.add_neuron(NeuronType::Interneuron); // Left (4)
+    
+    // Set explicit coordinates for visual debugging
+    graph.neurons[0].x = 32768; graph.neurons[0].y = 32768; graph.neurons[0].z = 32768;
+    graph.neurons[1].x = 32768; graph.neurons[1].y = 60000; graph.neurons[1].z = 32768;
+    graph.neurons[2].x = 60000; graph.neurons[2].y = 32768; graph.neurons[2].z = 32768;
+    graph.neurons[3].x = 32768; graph.neurons[3].y = 5000;  graph.neurons[3].z = 32768;
+    graph.neurons[4].x = 5000;  graph.neurons[4].y = 32768; graph.neurons[4].z = 32768;
+    
+    // Add synapses flowing from sensors to center to motor
+    let edges = [(1, 0), (2, 0), (0, 3), (4, 0)];
+    for &(src, tgt) in &edges {
+        graph.synapses.push(Synapse {
+            source_id: src as u32,
+            target_id: tgt as u32,
+            weight: 50.0,
+            neurotransmitter_buffer: 0.0,
+            last_activation_tick: 0,
+            ticks_below_threshold: 0,
+            ticks_until_delivery: 0,
+            flags: 0,
+            _padding: [0; 2],
+        });
+    }
+
+    let mut env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 42,
+    };
+
+    println!("Network Ready. Initiating slow tick loop for visualizer debugging...");
+    
+    let mut tick = 1;
+    loop {
+        // Send a stimulus wave every 50 ticks
+        if tick % 50 == 0 {
+            println!("Tick {}: Flashing sensors...", tick);
+            graph.neurons[1].current_voltage = 40.0;
+            graph.neurons[1].energy_atp = 100.0;
+            graph.neurons[2].current_voltage = 40.0;
+            graph.neurons[2].energy_atp = 100.0;
+        }
+
+        graph.tick(tick, env.clone());
+        
+        // Broadcast state
+        if let Some(ref sender) = tx {
+            // First tick: send InitialState
+            if tick == 1 {
+                let mut initial = crate::streamer::InitialStatePayload {
+                    total_neurons: graph.neurons.len(),
+                    total_synapses: graph.synapses.len(),
+                    neurons: Vec::new(),
+                    synapses: Vec::new(),
+                };
+                for n in &graph.neurons {
+                    initial.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_ as u8));
+                }
+                for s in &graph.synapses {
+                    initial.synapses.push((s.source_id, s.target_id, s.weight));
+                }
+                
+                let msg = crate::streamer::StreamMessage::InitialState(initial);
+                let _ = sender.send(serde_json::to_string(&msg).unwrap());
+            } else {
+                let mut update = crate::streamer::TickUpdatePayload {
+                    tick,
+                    total_spikes: 0,
+                    neurons: Vec::new(),
+                };
+                for n in &graph.neurons {
+                    let state = if n.current_voltage >= 30.0 { 2 } else if n.current_voltage > -50.0 { 1 } else { 0 };
+                    let atp_percent = (n.energy_atp / n.max_atp * 100.0) as u8;
+                    update.neurons.push((n.id, state as f32, atp_percent as f32));
+                }
+                
+                let msg = crate::streamer::StreamMessage::TickUpdate(update);
+                let _ = sender.send(serde_json::to_string(&msg).unwrap());
+            }
+        }
+        
+        tick += 1;
+        // Super slow loop so user can watch UI
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+}
