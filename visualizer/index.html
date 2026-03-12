@@ -204,98 +204,153 @@
             };
 
             ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
+                const msg = JSON.parse(event.data);
                 
-                if (neuronMeshes.size === 0 || data.total_neurons !== totalNeurons) {
-                    initNetwork(data);
-                }
-
-                // Reset indices for this frame
-                neuronMeshes.forEach(m => m.index = 0);
-
-                // Update Neurons
-                for (let i = 0; i < data.neurons.length; i++) {
-                    const [id, x, y, z, state, threshold, atp_pct, type] = data.neurons[i];
-                    const meshData = neuronMeshes.get(type);
-                    if (!meshData) continue;
-
-                    const nx = (x / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
-                    const ny = (y / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
-                    const nz = (z / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
-
-                    _tempPos.set(nx, ny, nz);
-                    _tempMatrix.setPosition(_tempPos);
+                if (msg.type === "InitialState") {
+                    const data = msg.payload;
+                    totalNeurons = data.total_neurons;
                     
-                    const idx = meshData.index;
-                    meshData.mesh.setMatrixAt(idx, _tempMatrix);
-                    neuronMap.set(id, { x: nx, y: ny, z: nz });
+                    // Clear existing meshes
+                    neuronMeshes.forEach(mesh => scene.remove(mesh));
+                    neuronMeshes.clear();
 
-                    // Dynamic Color Logic (Spec 13)
-                    const baseColor = getBaseColorForType(type);
-                    if (state === 1.0) {
-                        _tempColor.setRGB(1.0, 1.0, 0.8); // Brilliant Yellow / White flash
-                    } else if (state === 2.0) {
-                        // Low Energy: Red outline/tint
-                        _tempColor.setRGB(1.0, 0.0, 0.0);
-                    } else {
-                        // Resting: Dim Blue / Cyan
-                        _tempColor.copy(baseColor).multiplyScalar(0.5);
-                    }
-                    meshData.mesh.setColorAt(idx, _tempColor);
-                    meshData.index++;
-                }
+                    // Count neurons per type
+                    const counts = {};
+                    data.neurons.forEach(n => {
+                        const type = n[4]; // n is [id, x, y, z, type]
+                        counts[type] = (counts[type] || 0) + 1;
+                    });
 
-                neuronMeshes.forEach(m => {
-                    m.mesh.instanceMatrix.needsUpdate = true;
-                    if (m.mesh.instanceColor) m.mesh.instanceColor.needsUpdate = true;
-                });
-
-                // Update Synapses
-                const synCount = data.synapses.length;
-                updateSynapseGeometry(synCount);
-
-                for (let i = 0; i < synCount; i++) {
-                    const [srcId, dstId, weight, buffer] = data.synapses[i];
-                    const src = neuronMap.get(srcId);
-                    const dst = neuronMap.get(dstId);
-
-                    if (src && dst) {
-                        const idx = i * 6;
-                        synapsePositions[idx] = src.x;
-                        synapsePositions[idx+1] = src.y;
-                        synapsePositions[idx+2] = src.z;
-                        synapsePositions[idx+3] = dst.x;
-                        synapsePositions[idx+4] = dst.y;
-                        synapsePositions[idx+5] = dst.z;
-
-                        // Activity-based blinking: use buffer for pulse effect
-                        const activity = Math.min(1.0, buffer / 10.0);
-                        const baseBrightness = Math.min(1.0, weight / 10.0 + 0.1);
+                    // Create InstancedMeshes
+                    for (const type in counts) {
+                        const geometry = getGeometryForType(parseInt(type));
+                        const betterMaterial = new THREE.MeshPhongMaterial({
+                            color: 0xffffff,
+                            emissive: 0x000000,
+                            flatShading: true
+                        });
                         
-                        // Active synapses glow white/cyan, idle are dim blue
-                        if (activity > 0.1) {
-                            _tempColor.setRGB(0.5 + activity * 0.5, 0.8 + activity * 0.2, 1.0); 
-                        } else {
+                        const mesh = new THREE.InstancedMesh(geometry, betterMaterial, counts[type]);
+                        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                        
+                        const colors = new Float32Array(counts[type] * 3);
+                        for(let i=0; i<colors.length; i++) colors[i] = 1;
+                        mesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
+                        
+                        scene.add(mesh);
+                        neuronMeshes.set(parseInt(type), {
+                            mesh: mesh,
+                            count: counts[type],
+                            index: 0
+                        });
+                    }
+
+                    // Synapses geometry init
+                    const synCount = data.synapses.length;
+                    if (synapseLines) scene.remove(synapseLines);
+                    const synGeometry = new THREE.BufferGeometry();
+                    synapseLines = new THREE.LineSegments(
+                        synGeometry,
+                        new THREE.LineBasicMaterial({ 
+                            vertexColors: true, 
+                            transparent: true, 
+                            opacity: 0.6,
+                            blending: THREE.AdditiveBlending
+                        })
+                    );
+                    scene.add(synapseLines);
+                    synapsePositions = new Float32Array(synCount * 6);
+                    synapseColors = new Float32Array(synCount * 6);
+                    synGeometry.setAttribute('position', new THREE.BufferAttribute(synapsePositions, 3));
+                    synGeometry.setAttribute('color', new THREE.BufferAttribute(synapseColors, 3));
+
+                    // Set static positions for neurons
+                    neuronMeshes.forEach(m => m.index = 0);
+                    for (let i = 0; i < data.neurons.length; i++) {
+                        const [id, x, y, z, type] = data.neurons[i];
+                        const meshData = neuronMeshes.get(type);
+                        if (!meshData) continue;
+
+                        const nx = (x / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
+                        const ny = (y / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
+                        const nz = (z / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
+
+                        _tempPos.set(nx, ny, nz);
+                        _tempMatrix.setPosition(_tempPos);
+                        
+                        const idx = meshData.index;
+                        meshData.mesh.setMatrixAt(idx, _tempMatrix);
+                        neuronMap.set(id, { x: nx, y: ny, z: nz, type: type, meshIdx: idx });
+                        meshData.index++;
+                    }
+                    neuronMeshes.forEach(m => {
+                        m.mesh.instanceMatrix.needsUpdate = true;
+                    });
+
+                    // Set static synapse lines
+                    for (let i = 0; i < synCount; i++) {
+                        const [srcId, dstId, weight] = data.synapses[i];
+                        const src = neuronMap.get(srcId);
+                        const dst = neuronMap.get(dstId);
+
+                        if (src && dst) {
+                            const idx = i * 6;
+                            synapsePositions[idx] = src.x;
+                            synapsePositions[idx+1] = src.y;
+                            synapsePositions[idx+2] = src.z;
+                            synapsePositions[idx+3] = dst.x;
+                            synapsePositions[idx+4] = dst.y;
+                            synapsePositions[idx+5] = dst.z;
+                            
+                            const baseBrightness = Math.min(1.0, weight / 10.0 + 0.1);
                             _tempColor.setRGB(0.05 * baseBrightness, 0.2 * baseBrightness, 0.5 * baseBrightness);
+                            synapseColors[idx] = _tempColor.r;
+                            synapseColors[idx+1] = _tempColor.g;
+                            synapseColors[idx+2] = _tempColor.b;
+                            synapseColors[idx+3] = _tempColor.r;
+                            synapseColors[idx+4] = _tempColor.g;
+                            synapseColors[idx+5] = _tempColor.b;
                         }
-                        
-                        synapseColors[idx] = _tempColor.r;
-                        synapseColors[idx+1] = _tempColor.g;
-                        synapseColors[idx+2] = _tempColor.b;
-                        synapseColors[idx+3] = _tempColor.r;
-                        synapseColors[idx+4] = _tempColor.g;
-                        synapseColors[idx+5] = _tempColor.b;
                     }
+                    if (synapseLines && synapseLines.geometry && synapseLines.geometry.attributes) {
+                        if (synapseLines.geometry.attributes.position) synapseLines.geometry.attributes.position.needsUpdate = true;
+                        if (synapseLines.geometry.attributes.color) synapseLines.geometry.attributes.color.needsUpdate = true;
+                        synapseLines.geometry.setDrawRange(0, synCount * 2);
+                    }
+                    
+                    document.getElementById('neurons').innerText = `Neurons: ${data.total_neurons}`;
+                    document.getElementById('synapses').innerText = `Synapses: ${data.total_synapses}`;
                 }
-                if (synapseLines && synapseLines.geometry && synapseLines.geometry.attributes) {
-                    if (synapseLines.geometry.attributes.position) synapseLines.geometry.attributes.position.needsUpdate = true;
-                    if (synapseLines.geometry.attributes.color) synapseLines.geometry.attributes.color.needsUpdate = true;
-                    synapseLines.geometry.setDrawRange(0, synCount * 2);
-                }
+                
+                else if (msg.type === "TickUpdate") {
+                    const data = msg.payload;
+                    
+                    for (let i = 0; i < data.neurons.length; i++) {
+                        const [id, state, atp_pct] = data.neurons[i];
+                        const nData = neuronMap.get(id);
+                        if (!nData) continue;
+                        
+                        const meshData = neuronMeshes.get(nData.type);
+                        if (!meshData) continue;
+                        
+                        const baseColor = getBaseColorForType(nData.type);
+                        if (state === 1.0) {
+                            _tempColor.setRGB(1.0, 1.0, 0.8);
+                        } else if (state === 2.0) {
+                            _tempColor.setRGB(1.0, 0.0, 0.0);
+                        } else {
+                            _tempColor.copy(baseColor).multiplyScalar(0.5);
+                        }
+                        meshData.mesh.setColorAt(nData.meshIdx, _tempColor);
+                    }
 
-                document.getElementById('tick').innerText = `Tick: ${data.tick}`;
-                document.getElementById('neurons').innerText = `Neurons: ${data.total_neurons}`;
-                document.getElementById('synapses').innerText = `Synapses: ${data.total_synapses}`;
+                    neuronMeshes.forEach(m => {
+                        if (m.mesh.instanceColor) m.mesh.instanceColor.needsUpdate = true;
+                    });
+
+                    document.getElementById('tick').innerText = `Tick: ${data.tick}`;
+                    // Optional: Show spikes in UI if needed: `Spikes: ${data.total_spikes}`
+                }
             };
 
             ws.onclose = () => {

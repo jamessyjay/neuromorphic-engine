@@ -39,12 +39,16 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
 
     println!("Generating Benchmark Network (Gaussian weights): {} neurons, {} synapses...", neurons_count, synapses_count);
 
+    let num_sensors = (neurons_count as f32 * 0.02) as usize;
+    let num_motors = (neurons_count as f32 * 0.02) as usize;
+    let motor_start_idx = neurons_count.saturating_sub(num_motors);
+
     for i in 0..neurons_count {
-        let n_type = if i < 20 {
+        let n_type = if i < num_sensors {
             NeuronType::Photoreceptor
-        } else if i >= 980 && i < 1000 {
+        } else if i >= motor_start_idx {
             NeuronType::Purkinje
-        } else if i >= 20 && i < 40 {
+        } else if i >= num_sensors && i < num_sensors + 20 {
             NeuronType::Pacemaker
         } else {
             if rand::RngExt::random_bool(&mut rng, PYRAMIDAL_PROB) { NeuronType::Pyramidal } else { NeuronType::Interneuron }
@@ -53,10 +57,10 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
         graph.add_neuron(n_type);
         
         let n = &mut graph.neurons[i];
-        if i < 20 {
-            n.x = rand::RngExt::random_range(&mut rng, 0..5000);
-        } else if i >= 980 && i < 1000 {
-            n.x = rand::RngExt::random_range(&mut rng, 60000..65535);
+        if i < num_sensors {
+            n.x = 0; // Force sensors to left edge
+        } else if i >= motor_start_idx {
+            n.x = 65535; // Force motors to right edge
         }
         
         graph.grow_dendritic_tree(i as u32);
@@ -156,45 +160,48 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         }
 
         if let Some(ref tx) = tx {
-            if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_BENCHMARK == 0 {
-                let mut snapshot = streamer::StateSnapshot {
-                    tick,
+            if tx.receiver_count() > 0 && tick == 1 {
+                let mut initial_state = streamer::InitialStatePayload {
                     total_neurons: graph.neurons.len(),
                     total_synapses: graph.synapses.len(),
                     neurons: Vec::with_capacity(graph.neurons.len()),
-                    synapses: Vec::new(), // We will only send ACTIVE synapses to save bandwidth
+                    synapses: Vec::with_capacity(graph.synapses.len()),
+                };
+                for n in &graph.neurons {
+                    initial_state.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_));
+                }
+                for s in &graph.synapses {
+                    initial_state.synapses.push((s.source_id, s.target_id, s.weight));
+                }
+                let msg = streamer::StreamMessage::InitialState(initial_state);
+                let tx_clone = tx.clone();
+                tokio::spawn(async move {
+                    if let Ok(json) = serde_json::to_string(&msg) {
+                        let _ = tx_clone.send(json);
+                    }
+                });
+            }
+
+            if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_BENCHMARK == 0 {
+                let mut update = streamer::TickUpdatePayload {
+                    tick,
+                    total_spikes: accumulated_spikes as u32,
+                    neurons: Vec::with_capacity(graph.neurons.len()),
                 };
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
                     let is_spiking_now = n.current_voltage > n.activation_threshold;
                     let spiked_recently = tick.saturating_sub(n.last_spike_tick) < VISUAL_SPIKE_PERSISTENCE_TICKS;
                     
-                    // State logic based on Spec 13
                     let visual_state = if is_spiking_now || spiked_recently { 1.0 } else if atp_pct < 25.0 { 2.0 } else { 0.0 };
 
-                    snapshot.neurons.push((
-                        n.id,
-                        n.x as f32,
-                        n.y as f32,
-                        n.z as f32,
-                        visual_state, // Overriding voltage with simple state for UI logic
-                        n.activation_threshold,
-                        atp_pct,
-                        n.type_,
-                    ));
+                    update.neurons.push((n.id, visual_state, atp_pct));
                 }
                 
-                // Only send synapses that have active neurotransmitter or high weight to drastically cut JSON size
-                for s in &graph.synapses {
-                    if s.neurotransmitter_buffer > 0.1 || s.weight > 5.0 {
-                        snapshot.synapses.push((s.source_id, s.target_id, s.weight, s.neurotransmitter_buffer));
-                    }
-                }
-                
-                // Async serialization and send
+                let msg = streamer::StreamMessage::TickUpdate(update);
                 let tx_clone = tx.clone();
                 tokio::spawn(async move {
-                    if let Ok(json) = serde_json::to_string(&snapshot) {
+                    if let Ok(json) = serde_json::to_string(&msg) {
                         let _ = tx_clone.send(json);
                     }
                 });
@@ -323,42 +330,53 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
         }
 
         if let Some(ref tx) = tx {
-            if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_SIMULATION == 0 {
-                let mut snapshot = streamer::StateSnapshot {
-                    tick,
+            if tx.receiver_count() > 0 && tick == 1 {
+                let mut initial_state = streamer::InitialStatePayload {
                     total_neurons: graph.neurons.len(),
                     total_synapses: graph.synapses.len(),
                     neurons: Vec::with_capacity(graph.neurons.len()),
-                    synapses: Vec::new(),
+                    synapses: Vec::with_capacity(graph.synapses.len()),
                 };
                 for n in &graph.neurons {
+                    initial_state.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_));
+                }
+                for s in &graph.synapses {
+                    initial_state.synapses.push((s.source_id, s.target_id, s.weight));
+                }
+                let msg = streamer::StreamMessage::InitialState(initial_state);
+                let tx_clone = tx.clone();
+                tokio::spawn(async move {
+                    if let Ok(json) = serde_json::to_string(&msg) {
+                        let _ = tx_clone.send(json);
+                    }
+                });
+            }
+
+            if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_SIMULATION == 0 {
+                let mut accumulated_spikes = 0;
+                let mut update = streamer::TickUpdatePayload {
+                    tick,
+                    total_spikes: 0,
+                    neurons: Vec::with_capacity(graph.neurons.len()),
+                };
+                for n in &graph.neurons {
+                    if n.last_spike_tick == tick {
+                        accumulated_spikes += 1;
+                    }
                     let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
                     let is_spiking_now = n.current_voltage > n.activation_threshold;
                     let spiked_recently = tick.saturating_sub(n.last_spike_tick) < VISUAL_SPIKE_PERSISTENCE_TICKS;
                     
-                    let visual_voltage = if is_spiking_now || spiked_recently { METRIC_MAX_F32 } else { n.current_voltage };
+                    let visual_state = if is_spiking_now || spiked_recently { 1.0 } else if atp_pct < 25.0 { 2.0 } else { 0.0 };
 
-                    snapshot.neurons.push((
-                        n.id,
-                        n.x as f32,
-                        n.y as f32,
-                        n.z as f32,
-                        visual_voltage,
-                        n.activation_threshold,
-                        atp_pct,
-                        n.type_,
-                    ));
+                    update.neurons.push((n.id, visual_state, atp_pct));
                 }
+                update.total_spikes = accumulated_spikes as u32;
                 
-                for s in &graph.synapses {
-                    if s.neurotransmitter_buffer > 0.1 || s.weight > 5.0 {
-                        snapshot.synapses.push((s.source_id, s.target_id, s.weight, s.neurotransmitter_buffer));
-                    }
-                }
-                
+                let msg = streamer::StreamMessage::TickUpdate(update);
                 let tx_clone = tx.clone();
                 tokio::spawn(async move {
-                    if let Ok(json) = serde_json::to_string(&snapshot) {
+                    if let Ok(json) = serde_json::to_string(&msg) {
                         let _ = tx_clone.send(json);
                     }
                 });

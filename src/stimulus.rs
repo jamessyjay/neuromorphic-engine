@@ -20,10 +20,16 @@ impl StimulusService {
     }
 
     pub fn process_tick(&mut self, graph: &mut NetworkGraph, env: &mut Environment, current_tick: u32) {
+        let num_neurons = graph.neurons.len();
+        if num_neurons == 0 { return; }
+        let num_sensors = (num_neurons as f32 * 0.02) as usize;
+        let num_motors = (num_neurons as f32 * 0.02) as usize;
+        let motor_start_idx = num_neurons.saturating_sub(num_motors);
+
         // Phase A: The Flash (Stimulus)
         if current_tick % self.stimulus_interval == 0 {
-            // IDs 0..20 are Photoreceptors (Sensors)
-            for i in 0..20 {
+            // Apply stimulus to the first 2% (Sensors)
+            for i in 0..num_sensors {
                 if i < graph.neurons.len() {
                     let n = &mut graph.neurons[i];
                     if n.is_alive {
@@ -41,20 +47,17 @@ impl StimulusService {
 
         // Phase B: The Observation (Response Window)
         if self.waiting_for_response {
-            let mut motor_fired = false;
-            // IDs 980..1000 are Purkinje (Motors)
-            for i in 980..1000 {
-                if i < graph.neurons.len() {
-                    let n = &graph.neurons[i];
-                    // Detection: did it fire AFTER the stimulus?
-                    if n.is_alive && n.last_spike_tick == current_tick && current_tick > self.last_stimulus_tick {
-                        motor_fired = true;
-                        break;
-                    }
+            let mut response_detected = false;
+            
+            // Check if any motor neuron spiked
+            for i in motor_start_idx..num_neurons {
+                if graph.neurons[i].last_spike_tick == current_tick {
+                    response_detected = true;
+                    break;
                 }
             }
 
-            if motor_fired {
+            if response_detected {
                 // Success!
                 env.dopamine_multiplier = 8.0; // EVEN BIGGER RUSH for visibility
                 self.waiting_for_response = false;

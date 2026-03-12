@@ -5,12 +5,25 @@ use warp::Filter;
 use futures_util::{StreamExt, SinkExt};
 
 #[derive(Serialize, Clone)]
-pub struct StateSnapshot {
-    pub tick: u32,
+#[serde(tag = "type", content = "payload")]
+pub enum StreamMessage {
+    InitialState(InitialStatePayload),
+    TickUpdate(TickUpdatePayload),
+}
+
+#[derive(Serialize, Clone)]
+pub struct InitialStatePayload {
     pub total_neurons: usize,
     pub total_synapses: usize,
-    pub neurons: Vec<(u32, f32, f32, f32, f32, f32, f32, u8)>, // id, x, y, z, voltage, threshold, atp_pct, type
-    pub synapses: Vec<(u32, u32, f32, f32)>,                // source_id, target_id, weight, buffer
+    pub neurons: Vec<(u32, f32, f32, f32, u8)>, // id, x, y, z, type
+    pub synapses: Vec<(u32, u32, f32)>,         // source_id, target_id, weight
+}
+
+#[derive(Serialize, Clone)]
+pub struct TickUpdatePayload {
+    pub tick: u32,
+    pub total_spikes: u32,
+    pub neurons: Vec<(u32, f32, f32)>, // id, visual_state, atp_pct
 }
 
 pub async fn start_server(tx: broadcast::Sender<String>) {

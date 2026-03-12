@@ -24,14 +24,17 @@ extern "C" {
 #define VOLTAGE_SCALE 100.0f
 #define MAX_VESICLES 100.0f
 
-#define RESTING_VOLTAGE -70.0f
-#define THRESHOLD_VOLTAGE -55.0f
-#define SPIKE_VOLTAGE 40.0f
-#define REFRACTORY_PERIOD_ABSOLUTE_MS 1.0f
-#define REFRACTORY_PERIOD_RELATIVE_MS 3.0f
+#define NEURON_RESTING_VOLTAGE -70.0f
+#define NEURON_THRESHOLD -55.0f
+#define ACTION_POTENTIAL_PEAK 40.0f
 
-#define MAX_ATP 100.0f
-#define ATP_SPIKE_COST 2.0f
+// Metabolic parameters (Phase 40)
+#define ATP_RECOVERY_RATE 0.05f
+#define ATP_SPIKE_COST 25.0f
+
+// Refractory and Recovery
+#define ABSOLUTE_REFRACTORY_PERIOD 2.0f
+#define VOLTAGE_DECAY_RATE 0.1f // Membrane leak
 #define CALCIUM_SPIKE_GAIN 2.0f
 #define FATAL_CALCIUM_LEVEL 1000.0f
 #define MAX_SYNAPSE_WEIGHT 50.0f
@@ -105,8 +108,10 @@ extern "C" {
 #define SYNAPSE_RELIABILITY_PENALTY 0.8f
 
 // Structural Defaults
-#define DEFAULT_RESTING_VAR 4.0f
-#define DEFAULT_THRESHOLD_VAR 2.5f
+#define DEFAULT_VOLTAGE_VAR 2.0f
+#define PURKINJE_RESTING -65.0f
+#define PURKINJE_THRESHOLD -50.0f
+#define NOCICEPTOR_RESTING -70.0f
 #define DEFAULT_ATP_VAR 10.0f
 #define DEFAULT_LEAK_VAR 0.2f
 #define DEFAULT_SIZE_VAR 0.2f

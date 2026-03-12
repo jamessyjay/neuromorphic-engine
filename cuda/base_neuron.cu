@@ -60,87 +60,28 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
 
 // Atomic function: metabolism
 static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, uint32_t current_tick) {
-    if (n->energy_ATP <= 1.0f) {
-        die_gracefully(n, DEATH_ATP_LOW);
-        return;
+    if (!n->is_alive) return;
+
+    // Phase 40: Recovery
+    n->energy_ATP += ATP_RECOVERY_RATE;
+    if (n->energy_ATP > n->max_atp) {
+        n->energy_ATP = n->max_atp;
     }
 
-    // 1. ATP Generation (mitochondria) - Asymptotic Recovery (Phase 28)
-    float wear_f = (float)n->metabolic_wear / MAX_U16_FLOAT;
-    float baseline_generation = 1.0f * (1.0f - wear_f);
-    float glucose_factor = env.global_glucose_level;
-    float oxygen_factor = env.global_oxygen_level;
-    
-    // Recovery slows down as capacity is reached (Asymptotic)
-    float atp_gap = n->max_atp - n->energy_ATP;
-    // Phase 28/30: Ensure recovery is effective even at high ATP
-    float recovery_rate = (atp_gap / (n->max_atp * 0.5f)) * baseline_generation; 
-    
-    // Metabolic Floor: Ensure recovery can overcome baseline leak at rest (Phase 30)
-    if (recovery_rate < 0.15f * baseline_generation) recovery_rate = 0.15f * baseline_generation;
-    if (recovery_rate > baseline_generation) recovery_rate = baseline_generation;
-    
-    n->energy_ATP += recovery_rate * oxygen_factor * glucose_factor;
-    if (n->energy_ATP > n->max_atp) n->energy_ATP = n->max_atp;
+    // Passive drain
+    float passive_drain = 0.01f * (1.0f - env.global_oxygen_level);
+    n->energy_ATP -= passive_drain;
 
-    // 2. Vesicle Recycling (Phase 26/28) - Spec 02
-    // Recovery slows down as pool fills
-    float v_gap = MAX_VESICLES - n->vesicles_pool;
-    n->vesicles_pool += (v_gap / MAX_VESICLES) * 0.5f * (n->energy_ATP / MAX_ATP);
-    if (n->vesicles_pool > MAX_VESICLES) n->vesicles_pool = MAX_VESICLES;
-
-    // 3. Homeostatic Plasticity & Threshold Recovery (Phase 13 & 26)
-    if (current_tick % 100 == 0) {
-        if (n->spikes_in_last_window > HOMEOSTATIC_SPIKE_HIGH) {
-            n->activation_threshold += HOMEOSTATIC_PENALTY; // Raise threshold (Negative Feedback)
-        } else if (n->spikes_in_last_window < HOMEOSTATIC_SPIKE_LOW) {
-            // Recovery: Move back to resting threshold (Spec 11)
-            float base_threshold = THRESHOLD_VOLTAGE; // Standard Pyramidal
-            if (n->type == TYPE_PHOTORECEPTOR) base_threshold = 0.0f; 
-            
-            if (n->activation_threshold > base_threshold) {
-                 n->activation_threshold -= HOMEOSTATIC_RECOVERY;
-            } else if (n->activation_threshold < base_threshold) {
-                 n->activation_threshold += HOMEOSTATIC_RECOVERY;
-            }
-        }
-        n->spikes_in_last_window = 0; 
+    // Glucose processing
+    if (env.global_glucose_level > 0.1f && n->energy_ATP < n->max_atp * 0.5f) {
+        n->energy_ATP += 0.2f;
     }
-    // BASELINE LEAKAGE (Spec 11)
-    float gradient_maintenance = BASELINE_LEAK_RATE * n->leak_coeff;
-    if (n->energy_ATP < ATP_STRESS_THRESHOLD) gradient_maintenance *= LOW_ATP_LEAK_MULTIPLIER; 
-    n->energy_ATP -= gradient_maintenance;
 
-    // Step 2.5: EMERGENCY METABOLIC GUARD (Phase 23)
-    if (n->energy_ATP < EMERGENCY_ATP_SILENCE) {
-        n->activation_threshold = EMERGENCY_SILENCE_THRESHOLD; // Force silence
-    }
-    
-    // Step 3: Voltage drift & CHAOS (Spec 11)
-    uint32_t chaos_seed = env.seed + n->id + current_tick;
-    float noise = get_gaussian(&chaos_seed, 0.0f, VOLTAGE_DRIFT_RATE);
-    n->current_voltage += noise;
-    
-    if (n->type == TYPE_PACEMAKER) {
-        n->current_voltage += PACEMAKER_DEPOLARIZATION; 
-        n->energy_ATP -= BASELINE_LEAK_RATE * 2.0f * n->leak_coeff; // Approximation
-    } else if (n->type == TYPE_PHOTORECEPTOR) {
-        // Photoreceptor logic: 
-        // In light -> hyperpolarize (-65mV)
-        // In dark -> depolarize (-40mV, dark current)
-        float target_v = PHOTO_DARK_CURRENT + env.light_level * (PHOTO_HYPERPOLARIZED - PHOTO_DARK_CURRENT);
-        float sens_speed = PHOTO_ACTIVATION_SPEED;
-        if (n->current_voltage < target_v) n->current_voltage += sens_speed;
-        else if (n->current_voltage > target_v) n->current_voltage -= sens_speed;
-    } else {
-        // Drift towards resting potential
-        float drift = VOLTAGE_DRIFT_RATE * n->leak_coeff;
-        if (n->current_voltage > n->resting_voltage) {
-            n->current_voltage -= drift; 
-            if (n->current_voltage < n->resting_voltage) n->current_voltage = n->resting_voltage;
-        } else if (n->current_voltage < n->resting_voltage) {
-            n->current_voltage += drift;
-        }
+    // Death by starvation
+    if (n->energy_ATP <= 0.0f) {
+        n->is_alive = false;
+        n->energy_ATP = 0.0f;
+        n->death_reason = DEATH_ATP_LOW;
     }
 }
 
@@ -209,19 +150,27 @@ static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick
         return;
     }
 
-    if (n->current_voltage >= n->activation_threshold) {
-        if (n->type == TYPE_PHOTORECEPTOR) return; // Sensors don't spike
-        
-        // BOOM: SPIKE!
-        n->current_voltage = SPIKE_VOLTAGE;
-        n->refractory_time_left = (REFRACTORY_PERIOD_ABSOLUTE_MS + REFRACTORY_PERIOD_RELATIVE_MS) * RELATIVE_REFRACTORY_MULTIPLIER;
+    if (n->current_voltage > n->activation_threshold && n->energy_ATP >= ATP_SPIKE_COST) {
+        // Check refractory
+        if (current_tick - n->last_spike_tick < (uint32_t)n->refractory_time_left) {
+            return;
+        }
+
+        // Fire spike
+        n->current_voltage = ACTION_POTENTIAL_PEAK;
         n->last_spike_tick = current_tick;
+        n->refractory_time_left = ABSOLUTE_REFRACTORY_PERIOD;
         
-        // Metabolic Cost (Spec 11)
+        // Metabolic Cost
         n->energy_ATP -= ATP_SPIKE_COST;
         n->calcium_level += CALCIUM_SPIKE_GAIN;
-        n->spikes_in_last_window++;
         
+        // Track spike count for Window
+        n->spikes_in_last_window++;
+    } else if (n->current_voltage > n->activation_threshold) {
+        // Tried to spike but no ATP -> exhaustion collapse
+        n->current_voltage = n->resting_voltage;
+    } else {  
         // SPIKE-DRIVEN WEAR (The "Aging" effect)
         float wear_f = (float)n->metabolic_wear / MAX_U16_FLOAT;
         wear_f += AGING_WEAR_INC; 
@@ -246,7 +195,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
                 s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
             }
         } else {
-            if (source->last_spike_tick == current_tick && source->current_voltage == SPIKE_VOLTAGE) {
+            if (source->last_spike_tick == current_tick && source->current_voltage == ACTION_POTENTIAL_PEAK) {
                 // Bulk release on spike
                 s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
                 uint8_t is_myelinated = (s->flags & 0x10) != 0;
@@ -397,8 +346,8 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     uint32_t local_seed = seed + id;
 
     // Heterogeneity: Gaussian distributions (Spec 11)
-    float base_resting = RESTING_VOLTAGE;
-    float base_threshold = THRESHOLD_VOLTAGE;
+    float base_resting = NEURON_RESTING_VOLTAGE;
+    float base_threshold = NEURON_THRESHOLD;
     
     switch(type) {
         case TYPE_PYRAMIDAL:
@@ -416,16 +365,23 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
             base_resting = PHOTO_HYPERPOLARIZED;
             base_threshold = PHOTO_THRESHOLD; // Doesn't spike
             break;
+        case TYPE_PURKINJE:
+            base_resting = PURKINJE_RESTING;
+            base_threshold = PURKINJE_THRESHOLD;
+            break;
         case TYPE_NOCICEPTOR:
-            base_threshold = NOCICEPTOR_THRESHOLD; // High pain threshold
+            base_resting = NOCICEPTOR_RESTING;
+            base_threshold = NOCICEPTOR_THRESHOLD;
             break;
-        default:
-            break;
+        default: break;
     }
 
-    neuron->resting_voltage = get_gaussian(&local_seed, base_resting, DEFAULT_RESTING_VAR); // Wider variance
-    neuron->activation_threshold = get_gaussian(&local_seed, base_threshold, DEFAULT_THRESHOLD_VAR);
-    neuron->max_atp = get_gaussian(&local_seed, MAX_ATP, DEFAULT_ATP_VAR);
+    neuron->resting_voltage = get_gaussian(&local_seed, base_resting, DEFAULT_VOLTAGE_VAR);
+    neuron->activation_threshold = get_gaussian(&local_seed, base_threshold, DEFAULT_VOLTAGE_VAR);
+    neuron->current_voltage = neuron->resting_voltage;
+
+    // Spec 11: Metabolic Capacity Variation
+    neuron->max_atp = get_gaussian(&local_seed, 100.0f, DEFAULT_ATP_VAR);
     neuron->leak_coeff = get_gaussian(&local_seed, INIT_LEAK_COEFF_MEAN, DEFAULT_LEAK_VAR);
     
     // Randomized structural properties
