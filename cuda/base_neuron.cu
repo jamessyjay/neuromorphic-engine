@@ -315,6 +315,12 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
 extern "C" {
 
 void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, Environment env, uint32_t current_tick) {
+    (void)neurons;
+    (void)count;
+    (void)synapses;
+    (void)syn_count;
+    (void)env;
+    (void)current_tick;
 #ifdef USE_CUDA
     int t_per_b = THREADS_PER_BLOCK;
     int n_blocks = (count + t_per_b - 1) / t_per_b;
@@ -325,19 +331,27 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
     tick_synapses_kernel<<<s_blocks, t_per_b>>>(synapses, syn_count, neurons, env, current_tick);
     cudaDeviceSynchronize();
 #else
-    for(int i = 0; i < count; ++i) {
-        if (neurons[i].is_alive) {
-            update_metabolism(&neurons[i], env);
-            update_calcium(&neurons[i]);
-            evaluate_branches(&neurons[i]);
-            process_spike(&neurons[i], current_tick);
-        }
-    }
-    for(int i = 0; i < syn_count; ++i) {
-        process_synapse(&synapses[i], &neurons[synapses[i].source_id], &neurons[synapses[i].target_id], env, current_tick);
-    }
+    // Removed CPU fallback loop from here. Rust will handle multithreading using Rayon.
+    // Use tick_neuron_cpu and tick_synapse_cpu individually instead.
 #endif
 }
+
+#ifndef USE_CUDA
+extern "C" {
+    void tick_neuron_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
+        if (neuron->is_alive) {
+            update_metabolism(neuron, env);
+            update_calcium(neuron);
+            evaluate_branches(neuron);
+            process_spike(neuron, current_tick);
+        }
+    }
+
+    void tick_synapse_cpu(Synapse* synapse, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
+        process_synapse(synapse, &neurons[synapse->source_id], &neurons[synapse->target_id], env, current_tick);
+    }
+}
+#endif
 
 void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed) {
     neuron->id = id;

@@ -98,5 +98,9 @@ extern "C" {
         current_tick: u32
     );
     
+    // CPU Fallback multi-threading bindings
+    pub fn tick_neuron_cpu(neuron: *mut BaseNeuron, env: Environment, current_tick: u32);
+    pub fn tick_synapse_cpu(synapse: *mut Synapse, neurons: *mut BaseNeuron, env: Environment, current_tick: u32);
+
     pub fn init_neuron(neuron: *mut BaseNeuron, id: u32, type_: NeuronType, seed: u32);
 }

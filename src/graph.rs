@@ -201,15 +201,35 @@ impl NetworkGraph {
     }
 
     pub fn tick(&mut self, current_tick: u32, env: crate::ffi::Environment) {
-        unsafe {
-            crate::ffi::launch_tick_neurons(
-                self.neurons.as_mut_ptr(),
-                self.neurons.len() as i32,
-                self.synapses.as_mut_ptr(),
-                self.synapses.len() as i32,
-                env,
-                current_tick
-            );
+        #[cfg(target_os = "macos")]
+        {
+            // MacOS CPU Fallback using Rayon Multi-Threading
+            self.neurons.par_iter_mut().for_each(|n| {
+                unsafe { crate::ffi::tick_neuron_cpu(n, env, current_tick); }
+            });
+
+            // Convert pointer to usize to make it trivially Send+Sync
+            let neurons_ptr_usize = self.neurons.as_mut_ptr() as usize;
+            
+            self.synapses.par_iter_mut().for_each(|s| {
+                let ptr = neurons_ptr_usize as *mut crate::ffi::BaseNeuron;
+                unsafe { crate::ffi::tick_synapse_cpu(s, ptr, env, current_tick); }
+            });
+        }
+        
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Jetson/CUDA mode
+            unsafe {
+                crate::ffi::launch_tick_neurons(
+                    self.neurons.as_mut_ptr(),
+                    self.neurons.len() as i32,
+                    self.synapses.as_mut_ptr(),
+                    self.synapses.len() as i32,
+                    env,
+                    current_tick
+                );
+            }
         }
     }
 
