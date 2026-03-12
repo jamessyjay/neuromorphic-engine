@@ -142,7 +142,7 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
     }
 }
 
-static inline __device__ void process_spike(BaseNeuron* n, uint32_t current_tick) {
+static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint32_t current_tick) {
     if (n->refractory_time_left > 0.0f) {
         n->refractory_time_left -= 1.0f; 
         n->current_voltage = n->resting_voltage - HYPERPOLARIZATION_OFFSET; // Hyperpolarization
@@ -308,7 +308,7 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     update_metabolism(&neurons[idx], env);
     update_calcium(&neurons[idx]);
     evaluate_branches(&neurons[idx]);
-    process_spike(&neurons[idx], current_tick);
+    process_spike(&neurons[idx], env, current_tick);
 }
 
 // Optimized Kernel 2: Parallel Synapse Processing (Axon delivery & binding)
@@ -352,7 +352,7 @@ extern "C" {
             update_metabolism(neuron, env);
             update_calcium(neuron);
             evaluate_branches(neuron);
-            process_spike(neuron, current_tick);
+            process_spike(neuron, env, current_tick);
         }
     }
 
