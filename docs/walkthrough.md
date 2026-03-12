@@ -110,4 +110,17 @@ Transformed point neurons into complex dendritic trees with 8 fixed-size compart
 - **Global Integration:**
   - Integrated the feedback loop into all simulation modes, including benchmarks and stress tests, ensuring consistent biological evolution across the entire engine.
 
-**Engineering Verdict:** The engine is no longer just a simulation; it is a trainable biological entity capable of forming conditioned reflexes through associative learning and dopamine modulation. 🐯🚀🧬🧠🏗️📡⚛️🧪🔬⚛️
+## Phase 40: Performance Overhaul & Biological Realism
+
+- **Streamer Protocol Optimization:**
+  - Decoupled payload: Send `InitialState` (coordinates, synapse topology) once upon connection.
+  - Frame payload `TickUpdate`: Only broadcasts visual states (0, 1, 2) and ATP levels for neurons, dramatically cutting payload size from ~10MB to <100KB per frame. TPS returned to >1100 on 10k/100k scale.
+- **CUDA Biological Metabolism Fixes:**
+  - Increased `ATP_SPIKE_COST` from 2.0 to 25.0 to represent actual biological effort.
+  - Added baseline `ATP_RECOVERY_RATE` of 0.05 per tick.
+  - Spike suppression on ATP starvation: neurons attempt to spike but collapse without sufficient energy, followed by apoptotic death.
+- **Dynamic Topology Casting:**
+  - `setup_benchmark` dynamically identifies top 2% neurons as **Sensors** (forced to `x = 0`) and bottom 2% as **Motors** (forced to `x = 65535`).
+  - Allows tests and stimuli to dynamically adapt to arbitrary user-supplied `--neurons` sizes without breaking hardcoded indices.
+- **Double-Buffer Spike Flags:**
+  - Ensure persistent flag read for `tick_synapses` during multi-kernel execution (prevent race conditions).
