@@ -25,8 +25,7 @@ pub struct Compartment {
     pub _padding: [u8; 2],
 }
 
-#[repr(C)]
-#[repr(align(64))]
+#[repr(C, align(64))]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct BaseNeuron {
     pub id: u32,

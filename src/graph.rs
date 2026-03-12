@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::collections::HashMap;
 use sha2::{Sha256, Digest};
+use rayon::prelude::*; // For massive parallelism over CPU
 
 #[derive(Serialize, Deserialize)]
 pub struct NetworkGraph {
@@ -238,34 +239,34 @@ impl NetworkGraph {
         // For now, let's just make the loops as tight as possible
         
         // 1. Clean synaptic overflow (Only if weight > 0)
-        for synapse in &mut self.synapses {
+        self.synapses.par_iter_mut().for_each(|synapse| {
             if synapse.weight > 0.0 && synapse.neurotransmitter_buffer > ASTROCYTE_CLEAN_THRESHOLD {
                 synapse.neurotransmitter_buffer -= ASTROCYTE_CLEAN_AMOUNT;
             }
-        }
+        });
         
         // 2. Supply ATP to hard working neurons (Only if alive and low ATP)
-        for neuron in &mut self.neurons {
+        self.neurons.par_iter_mut().for_each(|neuron| {
             if neuron.is_alive && neuron.energy_atp < ASTROCYTE_CLEAN_THRESHOLD {
-                neuron.energy_atp = f32::min(MAX_ATP, neuron.energy_atp + ASTROCYTE_ATP_SUPPLY);
+                neuron.energy_atp = f32::min(neuron.max_atp, neuron.energy_atp + ASTROCYTE_ATP_SUPPLY);
             }
-        }
+        });
     }
 
     // Background Service: Microglia (Immune System / Firewall / Pruning)
     pub fn run_microglia_service(&mut self, _current_tick: u32) {
-        let dead_ids: std::collections::HashSet<u32> = self.neurons.iter()
-            .filter(|n| !n.is_alive)
-            .map(|n| n.id)
-            .collect();
-
-        // Phase 29: Structural Plasticity - PRUNING
-        // Remove synapses that are:
-        // 1. Connected to dead neurons
-        // 2. DISABLE weight pruning: synapses should stay even if they are thin (User request)
+        let neurons_ptr = self.neurons.as_ptr();
+        
+        // Retain only synapses where both endpoints are alive.
+        // We use standard retain since we need mutable access to the vector, but we optimize the lookup.
         self.synapses.retain(|s| {
-            let is_endpoint_dead = dead_ids.contains(&s.source_id) || dead_ids.contains(&s.target_id);
-            !is_endpoint_dead
+            // Unsafe block is fine here because we only READ from the neurons array
+            // and we know the indices are within bounds (guaranteed by our graph construction)
+            unsafe {
+                let src_alive = (*neurons_ptr.add(s.source_id as usize)).is_alive;
+                let dst_alive = (*neurons_ptr.add(s.target_id as usize)).is_alive;
+                src_alive && dst_alive
+            }
         });
     }
 
@@ -282,6 +283,14 @@ impl NetworkGraph {
         // Limit total synapses to prevent "spaghetti"
         if self.synapses.len() >= MAX_SYNAPSES_TOTAL { return; }
 
+        // O(1) Pre-compute outgoing synapse counts to avoid O(N_synapses) per neurogenesis attempt
+        let mut outgoing_counts = vec![0; num_neurons];
+        for s in &self.synapses {
+            if (s.source_id as usize) < num_neurons {
+                outgoing_counts[s.source_id as usize] += 1;
+            }
+        }
+
         let check_count = num_neurons * 2; 
         
         for _ in 0..check_count {
@@ -295,9 +304,8 @@ impl NetworkGraph {
             // 1. Metabolic Check: Can source afford to grow? (ATP > 40)
             if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 40.0 { continue; } 
 
-            // Hard Limit: Max outgoing synapses per neuron (Phase 37)
-            let outgoing_count = self.synapses.iter().filter(|s| s.source_id == n_source.id).count();
-            if outgoing_count >= MAX_SYNAPSES_PER_NEURON { continue; }
+            // Hard Limit: Max outgoing synapses per neuron (Phase 37) using O(1) lookup
+            if outgoing_counts[i] >= MAX_SYNAPSES_PER_NEURON { continue; }
 
             // 2. Spatial Check: Are they close? (CLUSTERING_RADIUS_SQ * 1.5)
             let x1 = n_source.x as f32 / COORD_SCALE;
