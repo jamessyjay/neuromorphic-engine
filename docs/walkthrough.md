@@ -124,3 +124,22 @@ Transformed point neurons into complex dendritic trees with 8 fixed-size compart
   - Allows tests and stimuli to dynamically adapt to arbitrary user-supplied `--neurons` sizes without breaking hardcoded indices.
 - **Double-Buffer Spike Flags:**
   - Ensure persistent flag read for `tick_synapses` during multi-kernel execution (prevent race conditions).
+
+## Phase 41: Comprehensive Test Driven Development (TDD) Suite
+
+To secure the biological integrity and hardware stability of the engine, a complete 7-block test suite consisting of 40 automated tests was engineered.
+
+- **Block 1: Metabolic Terror (ATP & Death)**
+  - Validated conditions for Hypoxia, ATP starvation, Excitotoxicity (Calcium Overdose), and Asymptotic ATP recovery in `biology_tests.rs`.
+- **Block 2: Dendritic Architecture**
+  - Confirmed non-linear spatial summation across 8 compartments, NMDA threshold triggers, and branch isolation in `dendrite_tests.rs`.
+- **Block 3: Synaptic Dynamics (STDP & Dopamine)**
+  - Verified Classic LTP/LTD, Dopamine Amplification curves, Homeostatic Synaptic Scaling, and Receptor Saturation via `synapse_tests.rs`.
+- **Block 4: Profiling & Hardware (The Mac Squeeze)**
+  - Introduced automated TPS tracking for Connectivity Explosions (up to 1M synapses), Memory Footprint leaks, and FFI Boundary Overheads (`hardware_tests.rs`).
+- **Block 5: Specialized Cells**
+  - Verified individual cell "character": Pacemaker rhythm, Photoreceptor light/dark currents, and Nociceptor sensitization (`cell_types_tests.rs`).
+- **Block 6: Global Cycles (Evolution)**
+  - Tested macro-system behavior including Fatigue Sleep triggers, Microglia Synapse Pruning, Neurogenesis O(N) scaling, and Pavlovian conditioning success rates (`global_cycles_tests.rs`).
+- **Block 7: Low-Level Benchmarking**
+  - Added CLI flags `--bench-scaling` and `--bench-io` to automatically hunt down $O(n^2)$ bottlenecks and JSON Serialization backpressure limits.
