@@ -135,7 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
+    let graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         println!("Awakening network from brain_save.bin for simulation...");
         loaded_graph
     } else {

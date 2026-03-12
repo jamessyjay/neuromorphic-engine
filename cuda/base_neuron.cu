@@ -59,7 +59,7 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
 }
 
 // Atomic function: metabolism
-static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, uint32_t current_tick) {
+static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) {
     if (!n->is_alive) return;
 
     // Phase 40: Recovery
@@ -296,7 +296,7 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     if (idx >= count) return;
     if (!neurons[idx].is_alive) return;
     
-    update_metabolism(&neurons[idx], env, current_tick);
+    update_metabolism(&neurons[idx], env);
     update_calcium(&neurons[idx]);
     evaluate_branches(&neurons[idx]);
     process_spike(&neurons[idx], current_tick);
@@ -327,7 +327,7 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 #else
     for(int i = 0; i < count; ++i) {
         if (neurons[i].is_alive) {
-            update_metabolism(&neurons[i], env, current_tick);
+            update_metabolism(&neurons[i], env);
             update_calcium(&neurons[i]);
             evaluate_branches(&neurons[i]);
             process_spike(&neurons[i], current_tick);
