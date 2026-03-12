@@ -169,6 +169,16 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         return;
     }
 
+    // Specialized cell behaviors in idle state
+    if (n->type == TYPE_PACEMAKER) {
+        // Automatically depolarize over time until spike
+        n->current_voltage += PACEMAKER_DEPOLARIZATION;
+    } else if (n->type == TYPE_PHOTORECEPTOR) {
+        // Dark current: depolarize to -40mV in dark, hyperpolarize to -65mV in light
+        float target_v = PHOTO_HYPERPOLARIZED + (1.0f - env.light_level) * (PHOTO_DARK_CURRENT - PHOTO_HYPERPOLARIZED);
+        n->current_voltage += (target_v - n->current_voltage) * PHOTO_ACTIVATION_SPEED;
+    }
+
     if (n->current_voltage > n->activation_threshold) {
         if (n->energy_ATP >= ATP_SPIKE_COST) {
             // Check refractory
