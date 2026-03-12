@@ -1,0 +1,863 @@
+// src/modes.rs
+use std::time::Instant;
+use tokio::sync::broadcast;
+use crate::ffi::{Environment, NeuronType};
+use crate::graph::NetworkGraph;
+use crate::telemetry::Telemetry;
+use crate::stimulus;
+use crate::streamer;
+use crate::constants::*;
+use crate::visualization;
+
+pub struct BenchmarkData {
+    pub ticks: Vec<u32>,
+    pub ffi_times: Vec<f32>,
+    pub rust_times: Vec<f32>,
+    pub total_spikes: Vec<u32>,
+    pub avg_atp: Vec<f32>,
+    pub avg_calcium: Vec<f32>,
+}
+
+pub struct SimulationData {
+    pub ticks: Vec<u32>,
+    pub source_v: Vec<f32>,
+    pub target_v: Vec<f32>,
+    pub synapse_w: Vec<f32>,
+}
+
+pub fn get_gaussian(mu: f32, sigma: f32) -> f32 {
+    let mut rng = rand::rng();
+    let u1: f32 = rand::RngExt::random(&mut rng);
+    let u2: f32 = rand::RngExt::random(&mut rng);
+    let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+    mu + sigma * z
+}
+
+pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph {
+    let mut graph = NetworkGraph::new();
+    let mut rng = rand::rng();
+
+    println!("Generating Benchmark Network (Gaussian weights): {} neurons, {} synapses...", neurons_count, synapses_count);
+
+    for i in 0..neurons_count {
+        let n_type = if i < 20 {
+            NeuronType::Photoreceptor
+        } else if i >= 980 && i < 1000 {
+            NeuronType::Purkinje
+        } else if i >= 20 && i < 40 {
+            NeuronType::Pacemaker
+        } else {
+            if rand::RngExt::random_bool(&mut rng, PYRAMIDAL_PROB) { NeuronType::Pyramidal } else { NeuronType::Interneuron }
+        };
+
+        graph.add_neuron(n_type);
+        
+        let n = &mut graph.neurons[i];
+        if i < 20 {
+            n.x = rand::RngExt::random_range(&mut rng, 0..5000);
+        } else if i >= 980 && i < 1000 {
+            n.x = rand::RngExt::random_range(&mut rng, 60000..65535);
+        }
+        
+        graph.grow_dendritic_tree(i as u32);
+    }
+
+    let local_radius_sq = (COORD_SCALE * 0.15).powi(2);
+    let mut actual_synapses = 0;
+    // Do not force minimum to 30000. Let it be what the user requested.
+    let target_synapses = synapses_count; 
+    while actual_synapses < target_synapses {
+        let source_idx = rand::RngExt::random_range(&mut rng, 0..neurons_count);
+        let target_idx = rand::RngExt::random_range(&mut rng, 0..neurons_count);
+        if source_idx == target_idx { continue; }
+        
+        let n_source = &graph.neurons[source_idx];
+        let n_target = &graph.neurons[target_idx];
+
+        let dx = (n_source.x as f32 - n_target.x as f32).abs();
+        let dy = (n_source.y as f32 - n_target.y as f32).abs();
+        let dz = (n_source.z as f32 - n_target.z as f32).abs();
+        let dist_sq = dx*dx + dy*dy + dz*dz;
+
+        if dist_sq < local_radius_sq || rand::RngExt::random_bool(&mut rng, LONG_RANGE_PROB) {
+            let weight = get_gaussian(DEFAULT_WEIGHT * 2.0, WEIGHT_SIGMA).max(0.5).min(10.0);
+            let is_inhib = rand::RngExt::random_bool(&mut rng, INHIBITORY_PROB); 
+            let is_myelin = rand::RngExt::random_bool(&mut rng, MYELIN_PROB); 
+            let branch_id = rand::RngExt::random_range(&mut rng, 0..8) as u8;
+            graph.connect(source_idx as u32, target_idx as u32, weight, branch_id, is_inhib, is_myelin);
+            actual_synapses += 1;
+        }
+    }
+
+    for i in 0..neurons_count {
+        if rand::RngExt::random_bool(&mut rng, 0.1) {
+            graph.neurons[i].current_voltage = -30.0;
+        }
+    }
+
+    println!("Network generation complete.");
+    graph
+}
+
+pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
+    let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
+        println!("Awakening network from brain_save.bin...");
+        loaded_graph
+    } else {
+        setup_benchmark(neurons_count, synapses_count)
+    };
+
+    println!("Executing BENCHMARK for {} ticks...", total_ticks);
+    
+    let mut current_env = Environment {
+        global_oxygen_level: DEFAULT_OXYGEN,  
+        global_glucose_level: DEFAULT_GLUCOSE,
+        dopamine_multiplier: DEFAULT_DOPAMINE, 
+        toxin_levels: DEFAULT_TOXINS,
+        light_level: DEFAULT_LIGHT,
+        seed: SEED_BENCHMARK as u32,
+    };
+    
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+
+    let mut data = BenchmarkData {
+        ticks: Vec::with_capacity(total_ticks as usize),
+        ffi_times: Vec::with_capacity(total_ticks as usize),
+        rust_times: Vec::with_capacity(total_ticks as usize),
+        total_spikes: Vec::with_capacity(total_ticks as usize),
+        avg_atp: Vec::with_capacity(total_ticks as usize),
+        avg_calcium: Vec::with_capacity(total_ticks as usize),
+    };
+
+    let mut total_ffi_time = std::time::Duration::new(0, 0);
+    let mut total_rust_time = std::time::Duration::new(0, 0);
+    let mut telemetry = Telemetry::new();
+    let mut accumulated_spikes = 0;
+
+    for tick in 1..=total_ticks {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+
+        // Accumulate spikes from all neurons that spiked in THIS tick
+        for n in &graph.neurons {
+            if n.last_spike_tick == tick {
+                accumulated_spikes += 1;
+            }
+        }
+
+        let num_neurons = graph.neurons.len() as i32;
+
+        let ffi_start = Instant::now();
+        graph.tick(tick, current_env);
+        let ffi_elapsed = ffi_start.elapsed();
+        total_ffi_time += ffi_elapsed;
+
+        if tick % 50 == 0 {
+            tokio::task::yield_now().await;
+        }
+
+        if let Some(ref tx) = tx {
+            if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_BENCHMARK == 0 {
+                let mut snapshot = streamer::StateSnapshot {
+                    tick,
+                    total_neurons: graph.neurons.len(),
+                    total_synapses: graph.synapses.len(),
+                    neurons: Vec::with_capacity(graph.neurons.len()),
+                    synapses: Vec::new(), // We will only send ACTIVE synapses to save bandwidth
+                };
+                for n in &graph.neurons {
+                    let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
+                    let is_spiking_now = n.current_voltage > n.activation_threshold;
+                    let spiked_recently = tick.saturating_sub(n.last_spike_tick) < VISUAL_SPIKE_PERSISTENCE_TICKS;
+                    
+                    // State logic based on Spec 13
+                    let visual_state = if is_spiking_now || spiked_recently { 1.0 } else if atp_pct < 25.0 { 2.0 } else { 0.0 };
+
+                    snapshot.neurons.push((
+                        n.id,
+                        n.x as f32,
+                        n.y as f32,
+                        n.z as f32,
+                        visual_state, // Overriding voltage with simple state for UI logic
+                        n.activation_threshold,
+                        atp_pct,
+                        n.type_,
+                    ));
+                }
+                
+                // Only send synapses that have active neurotransmitter or high weight to drastically cut JSON size
+                for s in &graph.synapses {
+                    if s.neurotransmitter_buffer > 0.1 || s.weight > 5.0 {
+                        snapshot.synapses.push((s.source_id, s.target_id, s.weight, s.neurotransmitter_buffer));
+                    }
+                }
+                
+                // Async serialization and send
+                let tx_clone = tx.clone();
+                tokio::spawn(async move {
+                    if let Ok(json) = serde_json::to_string(&snapshot) {
+                        let _ = tx_clone.send(json);
+                    }
+                });
+            }
+        }
+
+        if tick % 1000 == 0 && graph.is_sleep_needed() {
+            println!("Fatigue threshold reached. Entering Sleep Cycle...");
+            graph.initiate_sleep_cycle();
+            println!("Wake up! Network consolidated and saved.");
+        }
+
+        if tick % 5000 == 0 {
+            graph.save_to_disk();
+        }
+
+        let mut spikes = 0;
+        let mut atp_sum = 0.0;
+        let mut calcium_sum = 0.0;
+        
+        if tick % METRICS_COLLECTION_INTERVAL == 0 || tick == total_ticks {
+            for n in &graph.neurons {
+                atp_sum += n.energy_atp;
+                calcium_sum += n.calcium_level;
+            }
+            spikes = accumulated_spikes;
+            accumulated_spikes = 0; // Reset for next interval
+        }
+
+        let mut tick_rust_time = std::time::Duration::new(0, 0);
+        if tick % SERVICE_TICK_INTERVAL == 0 {
+            let rust_start = Instant::now();
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+            graph.run_neurogenesis_service(tick);
+            tick_rust_time = rust_start.elapsed();
+            total_rust_time += tick_rust_time;
+        }
+
+        telemetry.update(tick);
+        if tick % TELEMETRY_PRINT_INTERVAL == 0 {
+            let dead_count = graph.neurons.iter().filter(|n| !n.is_alive).count();
+            telemetry.print_report(graph.neurons.len(), graph.synapses.len(), dead_count);
+        }
+
+        data.ticks.push(tick);
+        data.ffi_times.push(ffi_elapsed.as_secs_f32() * 1000.0);
+        data.rust_times.push(tick_rust_time.as_secs_f32() * 1000.0);
+        data.total_spikes.push(spikes);
+        data.avg_atp.push(atp_sum / num_neurons as f32);
+        data.avg_calcium.push(calcium_sum / num_neurons as f32);
+    }
+
+    println!("--- BENCHMARK RESULTS (macOS Mock CPU) ---");
+    println!("FFI / CUDA Math Time: {:?}", total_ffi_time);
+    println!("Rust Services Time: {:?}", total_rust_time);
+    
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/simulation_report.json");
+    graph.save_to_disk();
+
+    Ok(data)
+}
+
+pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SCALING PERFORMANCE ANALYSIS (1K to 1M) ---");
+    let sizes = [1_000, 10_000, 100_000, 1_000_000];
+    let mut results = String::from("# Performance Scaling Report\n\n| Neurons | Synapses | TPS | Total Time (s) | Memory (KB) |\n|---|---|---|---|---|\n");
+
+    for &n in &sizes {
+        println!("\n>> Testing Scale: {} Neurons...", n);
+        let s = n * 10;
+        let start = Instant::now();
+        let _ = run_benchmark_mode(n, s, 500, None).await?;
+        let elapsed = start.elapsed().as_secs_f64();
+        let tps = 500.0 / elapsed;
+        
+        let neuron_mem = std::mem::size_of::<crate::ffi::BaseNeuron>();
+        let synapse_mem = std::mem::size_of::<crate::ffi::Synapse>();
+        let total_mem_kb = (n * neuron_mem + s * synapse_mem) as f32 / 1024.0;
+
+        results.push_str(&format!("| {} | {} | {:.2} | {:.2} | {:.2} |\n", n, s, tps, elapsed, total_mem_kb));
+    }
+
+    std::fs::create_dir_all("docs")?;
+    std::fs::write("docs/performance_report.md", results)?;
+    println!("Scaling Benchmarks Complete!");
+
+    Ok(())
+}
+
+pub fn setup_simulation() -> NetworkGraph {
+    let mut graph = NetworkGraph::new();
+    let photo_source = graph.add_neuron(NeuronType::Photoreceptor);
+    let pyr_target = graph.add_neuron(NeuronType::Pyramidal);
+    graph.connect(photo_source, pyr_target, DEFAULT_WEIGHT + 3.0, 0, false, true);       
+    graph
+}
+
+pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> SimulationData {
+    let mut data = SimulationData {
+        ticks: Vec::with_capacity(total_ticks as usize),
+        source_v: Vec::with_capacity(total_ticks as usize),
+        target_v: Vec::with_capacity(total_ticks as usize),
+        synapse_w: Vec::with_capacity(total_ticks as usize),
+    };
+
+    println!("Executing {} ticks...", total_ticks);
+    
+    let mut current_env = Environment {
+        global_oxygen_level: 1.0,  
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0, 
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: SEED_SIMULATION as u32,
+    };
+    
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+
+    for tick in 1..=total_ticks {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+        graph.tick(tick, current_env);
+        
+        if tick % 50 == 0 {
+            tokio::task::yield_now().await;
+        }
+
+        if let Some(ref tx) = tx {
+            if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_SIMULATION == 0 {
+                let mut snapshot = streamer::StateSnapshot {
+                    tick,
+                    total_neurons: graph.neurons.len(),
+                    total_synapses: graph.synapses.len(),
+                    neurons: Vec::with_capacity(graph.neurons.len()),
+                    synapses: Vec::new(),
+                };
+                for n in &graph.neurons {
+                    let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
+                    let is_spiking_now = n.current_voltage > n.activation_threshold;
+                    let spiked_recently = tick.saturating_sub(n.last_spike_tick) < VISUAL_SPIKE_PERSISTENCE_TICKS;
+                    
+                    let visual_voltage = if is_spiking_now || spiked_recently { METRIC_MAX_F32 } else { n.current_voltage };
+
+                    snapshot.neurons.push((
+                        n.id,
+                        n.x as f32,
+                        n.y as f32,
+                        n.z as f32,
+                        visual_voltage,
+                        n.activation_threshold,
+                        atp_pct,
+                        n.type_,
+                    ));
+                }
+                
+                for s in &graph.synapses {
+                    if s.neurotransmitter_buffer > 0.1 || s.weight > 5.0 {
+                        snapshot.synapses.push((s.source_id, s.target_id, s.weight, s.neurotransmitter_buffer));
+                    }
+                }
+                
+                let tx_clone = tx.clone();
+                tokio::spawn(async move {
+                    if let Ok(json) = serde_json::to_string(&snapshot) {
+                        let _ = tx_clone.send(json);
+                    }
+                });
+            }
+        }
+        
+        if tick % SERVICE_TICK_INTERVAL == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+        
+        if tick % 5000 == 0 {
+            graph.save_to_disk();
+        }
+        
+        data.ticks.push(tick);
+        data.source_v.push(graph.neurons[0].current_voltage);
+        data.target_v.push(graph.neurons[1].current_voltage);
+        data.synapse_w.push(graph.synapses[0].neurotransmitter_buffer);
+    }
+
+    let mut telemetry = Telemetry::new();
+    telemetry.update(total_ticks);
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/simulation_report.json");
+    graph.save_to_disk();
+
+    data
+}
+
+pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SPATIAL SUMMATION TEST (Non-linear Dendritic Logic) ---");
+    let mut graph = NetworkGraph::new();
+    let target = graph.add_neuron(NeuronType::Pyramidal);
+    graph.grow_dendritic_tree(target);
+    
+    for b in 0..8usize {
+        graph.neurons[target as usize].branches[b].branch_type = 0;
+    }
+
+    for _ in 1..=10 {
+        let id = graph.add_neuron(NeuronType::Pacemaker);
+        graph.neurons[id as usize].current_voltage = SUBTHRESHOLD_VOLTAGE;
+    }
+
+    let env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: SEED_BENCHMARK as u32,
+    };
+
+    for i in 0..10 {
+        let branch = ((i % 6) + 2) as u8;
+        graph.connect(i as u32 + 1, target, DEFAULT_WEIGHT * 5.0, branch, false, false);
+    }
+
+    let mut spike_count_dist = 0;
+    for tick in 1..=200 {
+        graph.tick(tick, env);
+        if graph.neurons[target as usize].last_spike_tick == tick {
+            spike_count_dist += 1;
+        }
+    }
+    println!("Distributed spikes: {}", spike_count_dist);
+
+    graph.synapses.clear();
+    graph.neurons[target as usize].current_voltage = -70.0;
+    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
+        branch_type: 1,
+        refractory_timer: 0,
+        voltage: ZERO_VOLTAGE_PACKED,
+        nmda_threshold: NMDA_THRESHOLD_PACKED,
+        _padding: [0; 2],
+    };
+    for i in 0..8usize {
+        if i != 1 { graph.neurons[target as usize].branches[i].voltage = ZERO_VOLTAGE_PACKED; }
+    }
+
+    for i in 1..=10 {
+        graph.connect(i, target, DEFAULT_WEIGHT * 5.0, 1, false, false);
+    }
+
+    let mut spike_count_conc = 0;
+    for tick in 1..=200 {
+        graph.tick(tick, env);
+        if graph.neurons[target as usize].last_spike_tick == tick {
+            spike_count_conc += 1;
+        }
+    }
+    println!("Concentrated spikes: {}", spike_count_conc);
+
+    if spike_count_conc > spike_count_dist {
+        println!("VERDICT: Dendritic non-linearity confirmed! 🧠✨");
+    }
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING PASSIVE LEAK & REFRACTORY TEST (Fix 2 & 3 Validation) ---");
+    let mut graph = NetworkGraph::new();
+    let target = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[target as usize].current_voltage = -70.0;
+    
+    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
+        branch_type: 1,
+        refractory_timer: 0,
+        voltage: ZERO_VOLTAGE_PACKED,
+        nmda_threshold: VOLTAGE_50_PACKED,
+        _padding: [0; 2],
+    };
+
+    let env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: SEED_BENCHMARK as u32,
+    };
+
+    graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED;
+    graph.tick(1, env);
+    
+    let soma_v = graph.neurons[target as usize].current_voltage;
+    if soma_v > -70.0 {
+        println!("✅ FIX 2 PASS: Passive leak successfully transferred sub-threshold charge to soma.");
+    }
+
+    graph.neurons[target as usize].branches[1].voltage = VOLTAGE_60_PACKED;
+    graph.tick(2, env);
+    if graph.neurons[target as usize].branches[1].refractory_timer == 3 {
+        println!("✅ FIX 3 PASS: Branch entered refractory period after NMDA spike.");
+    }
+
+    graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED;
+    graph.tick(3, env);
+    if graph.neurons[target as usize].branches[1].voltage == ZERO_VOLTAGE_PACKED {
+        println!("✅ FIX 3 PASS: Refractory period effectively blocked incoming signal.");
+    }
+
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SLEEP CYCLE TEST (Phase 35 Validation) ---");
+    let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
+        loaded_graph
+    } else {
+        setup_benchmark(1000, 10000)
+    };
+
+    let mut current_env = Environment {
+        global_oxygen_level: DEFAULT_OXYGEN,
+        global_glucose_level: DEFAULT_GLUCOSE,
+        dopamine_multiplier: DEFAULT_DOPAMINE,
+        toxin_levels: DEFAULT_TOXINS,
+        light_level: DEFAULT_LIGHT,
+        seed: SEED_BENCHMARK as u32,
+    };
+
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+
+    for tick in 1..=50000 {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+        graph.tick(tick, current_env);
+        
+        for n in &mut graph.neurons {
+            if n.is_alive {
+                n.metabolic_wear = n.metabolic_wear.saturating_add(50);
+            }
+        }
+        
+        if tick % 1000 == 0 && graph.is_sleep_needed() {
+            let pre_sleep_snapshot = graph.snapshot_synapses();
+            graph.initiate_sleep_cycle();
+            let post_sleep_snapshot = graph.snapshot_synapses();
+            NetworkGraph::diff_synapses(&pre_sleep_snapshot, &post_sleep_snapshot);
+            graph.save_to_disk();
+            return Ok(());
+        }
+    }
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING INHIBITION LOOP SCENARIO (Phase 19) ---");
+    let mut graph = NetworkGraph::new();
+    let p = graph.add_neuron(NeuronType::Pyramidal);
+    let i = graph.add_neuron(NeuronType::Interneuron);
+    graph.connect(p, i, 10.0, 0, false, true);
+    graph.connect(i, p, 15.0, 0, true, true);
+
+    let mut env = Environment { 
+        global_oxygen_level: DEFAULT_OXYGEN, 
+        global_glucose_level: DEFAULT_GLUCOSE,
+        dopamine_multiplier: DEFAULT_DOPAMINE, 
+        toxin_levels: DEFAULT_TOXINS,
+        light_level: DEFAULT_LIGHT,
+        seed: SEED_INHIBITION as u32 
+    };
+
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut history = vec![];
+
+    for tick in 1..=1000 {
+        stimulus_service.process_tick(&mut graph, &mut env, tick);
+        graph.neurons[0].current_voltage += VOLTAGE_STEP;
+        graph.tick(tick, env);
+        
+        if tick % SERVICE_TICK_INTERVAL == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        history.push((
+            tick,
+            graph.neurons[0].current_voltage,
+            graph.neurons[1].current_voltage,
+            graph.synapses[0].weight,
+        ));
+    }
+
+    visualization::render_inhibition_chart(&history, "graphs/inhibition_loop.png")?;
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING REFLEX ARC (Phase 11) ---");
+    let mut graph = NetworkGraph::new();
+    let eye = graph.add_neuron(NeuronType::Photoreceptor);
+    let brain = graph.add_neuron(NeuronType::Interneuron);
+    let muscle = graph.add_neuron(NeuronType::Pyramidal);
+    graph.connect(eye, brain, 15.0, 0, false, true);
+    graph.connect(brain, muscle, 12.0, 0, false, false);
+
+    let mut env = Environment { 
+        global_oxygen_level: 1.0, 
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0, 
+        toxin_levels: 0.0, 
+        light_level: 0.0, 
+        seed: SEED_REFLEX as u32 
+    };
+
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut history = vec![];
+
+    for tick in 1..=1200 {
+        env.light_level = if (tick / 50) % 2 == 0 { LIGHT_HIGH } else { LIGHT_LOW };
+        if tick >= 300 && tick <= 800 {
+            env.dopamine_multiplier = BOOSTED_DOPAMINE;
+        } else {
+            env.dopamine_multiplier = DEFAULT_DOPAMINE;
+        }
+
+        stimulus_service.process_tick(&mut graph, &mut env, tick);
+        graph.tick(tick, env);
+        
+        if tick % SERVICE_TICK_INTERVAL == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        history.push((
+            tick,
+            graph.neurons[0].current_voltage,
+            graph.neurons[1].current_voltage,
+            graph.neurons[2].current_voltage,
+            graph.neurons[2].energy_atp,
+            graph.synapses[1].weight,
+        ));
+    }
+
+    visualization::render_reflex_arc_chart(&history, "graphs/reflex_arc_boosted.png")?;
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING STRESS-TEST (Phase 13) ---");
+    let mut graph = NetworkGraph::new();
+    let mut env = Environment { 
+        global_oxygen_level: DEFAULT_OXYGEN, 
+        global_glucose_level: DEFAULT_GLUCOSE, 
+        dopamine_multiplier: DEFAULT_DOPAMINE, 
+        toxin_levels: DEFAULT_TOXINS, 
+        light_level: DEFAULT_LIGHT, 
+        seed: SEED_STRESS as u32 
+    };
+
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+
+    for _ in 0..10 { graph.add_neuron(NeuronType::Pyramidal); }
+    let n1 = graph.add_neuron(NeuronType::Pyramidal);
+    let n2 = graph.add_neuron(NeuronType::Pyramidal);
+    let n3 = graph.add_neuron(NeuronType::Pyramidal);
+    graph.connect(n1, n2, 15.0, 0, false, false);
+    graph.connect(n2, n3, 15.0, 0, false, false);
+    graph.connect(n3, n1, 15.0, 0, false, false);
+    graph.neurons[n1 as usize].current_voltage = 20.0;
+
+    let mut results = vec![];
+    for tick in 0..3000 {
+        if tick == 300 { env.global_oxygen_level = HYPOXIC_OXYGEN; }
+        stimulus_service.process_tick(&mut graph, &mut env, tick as u32);
+        graph.tick(tick as u32, env);
+        
+        let mut total_atp = 0.0;
+        let mut dead_count = 0;
+        let mut avg_wear = 0.0;
+
+        for n in &graph.neurons {
+            total_atp += n.energy_atp;
+            avg_wear += n.metabolic_wear as f32 / 65535.0;
+            if !n.is_alive { dead_count += 1; }
+        }
+
+        results.push((tick as u32, total_atp / graph.neurons.len() as f32, dead_count, avg_wear / graph.neurons.len() as f32));
+        if dead_count == graph.neurons.len() { break; }
+    }
+    
+    let mut telemetry = Telemetry::new();
+    telemetry.update(results.last().map(|r| r.0).unwrap_or(0));
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/stress_report.json");
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING DOPAMINE RUSH (Phase 14) ---");
+    let mut graph = NetworkGraph::new();
+    let mut current_env = Environment { 
+        global_oxygen_level: DEFAULT_OXYGEN, 
+        global_glucose_level: DEFAULT_GLUCOSE,
+        dopamine_multiplier: DEFAULT_DOPAMINE, 
+        toxin_levels: DEFAULT_TOXINS, 
+        light_level: DEFAULT_LIGHT, 
+        seed: SEED_DOPAMINE as u32 
+    };
+
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let n1 = graph.add_neuron(NeuronType::Pacemaker);
+    let n2 = graph.add_neuron(NeuronType::Pyramidal);
+    graph.connect(n1, n2, 1.0, 0, false, true);
+
+    let mut weight_history = vec![];
+    
+    current_env.dopamine_multiplier = LOW_DOPAMINE;
+    for tick in 0..200 {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
+        graph.tick(tick as u32, current_env);
+        weight_history.push((tick as u32, graph.synapses[0].weight, current_env.dopamine_multiplier));
+    }
+
+    current_env.dopamine_multiplier = HIGH_DOPAMINE;
+    for tick in 200..600 {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
+        graph.tick(tick as u32, current_env);
+        weight_history.push((tick as u32, graph.synapses[0].weight, current_env.dopamine_multiplier));
+    }
+
+    current_env.dopamine_multiplier = DEFAULT_DOPAMINE;
+    for tick in 600..1000 {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
+        graph.tick(tick as u32, current_env);
+        weight_history.push((tick as u32, graph.synapses[0].weight, current_env.dopamine_multiplier));
+    }
+
+    visualization::render_plasticity_chart(&weight_history, "graphs/dopamine_rush_results.png")?;
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING FREQUENCY DISCRIMINATION TEST (Phase 23) ---");
+    let mut graph = NetworkGraph::new();
+    let eye = graph.add_neuron(NeuronType::Photoreceptor);
+    let f1_det = graph.add_neuron(NeuronType::Pyramidal);
+    let f2_det = graph.add_neuron(NeuronType::Pyramidal);
+    graph.connect(eye, f1_det, 5.0, 0, false, true);
+    graph.connect(eye, f2_det, 5.0, 0, false, true);
+    
+    let mut current_env = Environment {
+        global_oxygen_level: 1.0,  
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0, 
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: SEED_SIMULATION as u32,
+    };
+    
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut history = vec![];
+
+    for tick in 1..=2000 {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+        graph.tick(tick, current_env);
+        
+        if tick % SERVICE_TICK_INTERVAL == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        let s1_w = if !graph.synapses.is_empty() { graph.synapses[0].weight } else { 0.0 };
+        let s2_w = if graph.synapses.len() > 1 { graph.synapses[1].weight } else { 0.0 };
+
+        history.push((tick, graph.neurons[f1_det as usize].current_voltage, graph.neurons[f2_det as usize].current_voltage, s1_w, s2_w));
+    }
+
+    visualization::render_frequency_chart(&history, "graphs/frequency_learning.png")?;
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING EMERGENCE FROM CHAOS (Phase 29) ---");
+    let mut graph = NetworkGraph::new();
+    for _ in 0..500 { graph.add_neuron(NeuronType::Pyramidal); }
+    
+    let mut current_env = Environment { 
+        global_oxygen_level: DEFAULT_OXYGEN, 
+        global_glucose_level: DEFAULT_GLUCOSE, 
+        dopamine_multiplier: EMERGENCE_DOPAMINE, 
+        toxin_levels: DEFAULT_TOXINS, 
+        light_level: DEFAULT_LIGHT, 
+        seed: SEED_EMERGENCE as u32 
+    };
+
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut history = vec![];
+
+    for tick in 1..=3000 {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+        for i in 0..200 { graph.neurons[i].current_voltage += 15.0; }
+        graph.tick(tick, current_env);
+        
+        if tick % SERVICE_TICK_INTERVAL == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+            graph.run_neurogenesis_service(tick);
+        }
+
+        history.push((tick, graph.synapses.len() as u32, graph.neurons[250].current_voltage));
+    }
+
+    visualization::render_emergence_chart(&history, "graphs/emergence_growth.png")?;
+    let mut telemetry = Telemetry::new();
+    telemetry.update(3000);
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/emergence_report.json");
+    graph.save_to_disk();
+    Ok(())
+}
+
+pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING SYNAPTIC MORPHOLOGY AUDIT (Phase 30) ---");
+    let mut graph = NetworkGraph::new();
+    let source = graph.add_neuron(NeuronType::Pyramidal);
+    let target = graph.add_neuron(NeuronType::Pyramidal);
+    graph.connect(source, target, 5.0, 0, false, false);
+    
+    let mut current_env = Environment { 
+        global_oxygen_level: DEFAULT_OXYGEN, 
+        global_glucose_level: DEFAULT_GLUCOSE, 
+        dopamine_multiplier: MORPHOLOGY_DOPAMINE, 
+        toxin_levels: DEFAULT_TOXINS, 
+        light_level: DEFAULT_LIGHT, 
+        seed: SEED_DOPAMINE as u32 
+    };
+
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut history = vec![];
+
+    for tick in 1..=3000 {
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+        if tick % 25 == 0 { graph.neurons[source as usize].current_voltage += DEFAULT_WEIGHT * 17.5; }
+        graph.tick(tick, current_env);
+        
+        if tick % SERVICE_TICK_INTERVAL == 0 {
+            graph.run_astrocyte_service(tick);
+            graph.run_microglia_service(tick);
+        }
+
+        let sw = if !graph.synapses.is_empty() { graph.synapses[0].weight } else { 0.0 };
+        let sb = if !graph.synapses.is_empty() { graph.synapses[0].neurotransmitter_buffer } else { 0.0 };
+
+        history.push((tick, sw, graph.neurons[target as usize].current_voltage, sb));
+    }
+
+    visualization::render_morphology_chart(&history, "graphs/morphology_audit.png")?;
+    let mut telemetry = Telemetry::new();
+    telemetry.update(3000);
+    telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/morphology_report.json");
+    graph.save_to_disk();
+
+    Ok(())
+}

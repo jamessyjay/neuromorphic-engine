@@ -10,7 +10,7 @@ pub struct StateSnapshot {
     pub total_neurons: usize,
     pub total_synapses: usize,
     pub neurons: Vec<(u32, f32, f32, f32, f32, f32, f32, u8)>, // id, x, y, z, voltage, threshold, atp_pct, type
-    pub synapses: Vec<(u32, u32, f32)>,                    // source_id, target_id, weight
+    pub synapses: Vec<(u32, u32, f32, f32)>,                // source_id, target_id, weight, buffer
 }
 
 pub async fn start_server(tx: broadcast::Sender<String>) {
@@ -40,10 +40,22 @@ async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String
 
     println!("New WebSocket client connected!");
 
-    while let Ok(msg) = rx.recv().await {
-        if let Err(e) = client_ws_sender.send(warp::ws::Message::text(msg)).await {
-            println!("WebSocket send error: {}. Closing connection.", e);
-            break;
+    loop {
+        match rx.recv().await {
+            Ok(msg) => {
+                if let Err(e) = client_ws_sender.send(warp::ws::Message::text(msg)).await {
+                    println!("WebSocket send error: {}. Closing connection.", e);
+                    break;
+                }
+            }
+            Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                println!("WebSocket client lagged, skipped {} messages. Recovering...", skipped);
+                // The loop will just continue and try to recv the next fresh message
+            }
+            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                println!("Broadcast channel closed.");
+                break;
+            }
         }
     }
 }

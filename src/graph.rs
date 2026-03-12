@@ -7,10 +7,6 @@ use std::io::{BufReader, BufWriter};
 use std::collections::HashMap;
 use sha2::{Sha256, Digest};
 
-const MAX_ATP: f32 = 100.0;
-const CLUSTERING_RADIUS_SQ: f32 = 400.0; 
-const STOCHASTIC_GROWTH_PROB: f64 = 0.05; 
-
 #[derive(Serialize, Deserialize)]
 pub struct NetworkGraph {
     pub neurons: Vec<BaseNeuron>,
@@ -43,9 +39,9 @@ impl NetworkGraph {
     }
 
     pub fn initiate_sleep_cycle(&mut self) {
-        // Pruning (Offline): Remove weak synapses
+        // Pruning (Offline): Remove ONLY extremely weak synapses (Phase 29/37)
         let initial_synapses = self.synapses.len();
-        self.synapses.retain(|s| s.weight >= 0.05);
+        self.synapses.retain(|s| s.weight >= 0.01); // Lower threshold
         let pruned = initial_synapses - self.synapses.len();
         println!("  -> Pruned {} weak synapses during sleep.", pruned);
 
@@ -61,6 +57,13 @@ impl NetworkGraph {
 
         // Snapshot (Serialization)
         println!("  -> Serializing network to disk...");
+        let file = File::create("brain_save.bin").expect("Failed to create brain_save.bin");
+        let writer = BufWriter::new(file);
+        bincode::serialize_into(writer, &self).expect("Failed to serialize network");
+    }
+
+    pub fn save_to_disk(&self) {
+        println!("  -> Saving network to disk (brain_save.bin)...");
         let file = File::create("brain_save.bin").expect("Failed to create brain_save.bin");
         let writer = BufWriter::new(file);
         bincode::serialize_into(writer, &self).expect("Failed to serialize network");
@@ -276,8 +279,8 @@ impl NetworkGraph {
 
         // Large Scale Mapping: Stochastic sampling instead of O(N^2)
         // We check num_neurons * 2 pairs per service call to maintain biological speed
-        // Limit total synapses to 50x neurons to prevent "spaghetti"
-        if self.synapses.len() > num_neurons * 50 { return; }
+        // Limit total synapses to prevent "spaghetti"
+        if self.synapses.len() >= MAX_SYNAPSES_TOTAL { return; }
 
         let check_count = num_neurons * 2; 
         
@@ -292,9 +295,9 @@ impl NetworkGraph {
             // 1. Metabolic Check: Can source afford to grow? (ATP > 40)
             if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 40.0 { continue; } 
 
-            // Hard Limit: Max 50 outgoing synapses per neuron (Phase 37)
+            // Hard Limit: Max outgoing synapses per neuron (Phase 37)
             let outgoing_count = self.synapses.iter().filter(|s| s.source_id == n_source.id).count();
-            if outgoing_count >= 50 { continue; }
+            if outgoing_count >= MAX_SYNAPSES_PER_NEURON { continue; }
 
             // 2. Spatial Check: Are they close? (CLUSTERING_RADIUS_SQ * 1.5)
             let x1 = n_source.x as f32 / COORD_SCALE;

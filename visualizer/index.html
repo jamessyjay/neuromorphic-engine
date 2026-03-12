@@ -45,9 +45,19 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/OrbitControls.js"></script>
 
     <script>
+        // Global error handler for debugging
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            const status = document.getElementById('status');
+            if (status) {
+                status.innerText = "JS ERROR: " + msg;
+                status.style.color = "#f0f";
+            }
+            return false;
+        };
+
         // --- Configuration & Constants ---
         const MAX_COORD = 65535;
         const NEURON_RADIUS = 20; 
@@ -105,10 +115,25 @@
             // Create InstancedMeshes for each type present
             for (const type in counts) {
                 const geometry = getGeometryForType(parseInt(type));
-                const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                const mesh = new THREE.InstancedMesh(geometry, material, counts[type]);
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff
+                });
+                // In Three.js r128, to use instance colors with MeshBasicMaterial without getting black,
+                // we sometimes need vertexColors to be true on the material AND provide colors.
+                // However, an easier approach in r128 is using MeshPhongMaterial which handles instanceColor well natively.
+                const betterMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xffffff,
+                    emissive: 0x000000,
+                    flatShading: true
+                });
+                
+                const mesh = new THREE.InstancedMesh(geometry, betterMaterial, counts[type]);
                 mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(counts[type] * 3), 3);
+                
+                const colors = new Float32Array(counts[type] * 3);
+                for(let i=0; i<colors.length; i++) colors[i] = 1;
+                mesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
+                
                 scene.add(mesh);
                 neuronMeshes.set(parseInt(type), {
                     mesh: mesh,
@@ -116,6 +141,13 @@
                     index: 0
                 });
             }
+
+            // Bring back some light for PhongMaterial
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
 
             // Synapses: BufferGeometry with LineSegments
             if (synapseLines) scene.remove(synapseLines);
@@ -143,9 +175,28 @@
         }
 
         // --- WebSocket ---
+        function getBaseColorForType(type) {
+            switch(type) {
+                // Spec 13 overrides
+                case 0: return new THREE.Color(0x0088ff); // Pyramidal - Dim Blue (Resting)
+                case 1: return new THREE.Color(0x0088ff); // Bipolar - Dim Blue
+                case 2: return new THREE.Color(0x0088ff); // Interneuron - Dim Blue
+                case 3: return new THREE.Color(0x0088ff); // Pacemaker - Dim Blue
+                case 4: return new THREE.Color(0x0088ff); // Purkinje - Dim Blue
+                case 5: return new THREE.Color(0x00ffff); // Photoreceptor - Cyan
+                case 6: return new THREE.Color(0x00ffff); // Nociceptor - Cyan
+                default: return new THREE.Color(0x0088ff);
+            }
+        }
+
         function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.hostname || '127.0.0.1';
-            const ws = new WebSocket('ws://' + host + ':3030/stream');
+            const port = window.location.port || '3030';
+            const wsUrl = `${protocol}//${host}:${port}/stream`;
+            
+            console.log("Connecting to WebSocket:", wsUrl);
+            const ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 document.getElementById('status').innerText = "Status: ONLINE (3D)";
@@ -164,7 +215,7 @@
 
                 // Update Neurons
                 for (let i = 0; i < data.neurons.length; i++) {
-                    const [id, x, y, z, voltage, threshold, atp_pct, type] = data.neurons[i];
+                    const [id, x, y, z, state, threshold, atp_pct, type] = data.neurons[i];
                     const meshData = neuronMeshes.get(type);
                     if (!meshData) continue;
 
@@ -179,16 +230,16 @@
                     meshData.mesh.setMatrixAt(idx, _tempMatrix);
                     neuronMap.set(id, { x: nx, y: ny, z: nz });
 
-                    // Color logic (Highly Saturated & Normalized)
-                    if (voltage > threshold) {
-                        _tempColor.setRGB(1.0, 1.0, 1.0); // PURE WHITE SPIKE
-                    } else if (atp_pct > 80) {
-                        _tempColor.setRGB(0.0, 1.0, 0.0); // BRIGHT GREEN (Healthy)
-                    } else if (atp_pct > 30) {
-                        const factor = (atp_pct - 30) / 50;
-                        _tempColor.setRGB(1.0, 1.0, 0.0).lerp(new THREE.Color(0, 1, 0), factor); 
+                    // Dynamic Color Logic (Spec 13)
+                    const baseColor = getBaseColorForType(type);
+                    if (state === 1.0) {
+                        _tempColor.setRGB(1.0, 1.0, 0.8); // Brilliant Yellow / White flash
+                    } else if (state === 2.0) {
+                        // Low Energy: Red outline/tint
+                        _tempColor.setRGB(1.0, 0.0, 0.0);
                     } else {
-                        _tempColor.setRGB(1.0, 0.0, 0.0); // PURE RED (Exhausted)
+                        // Resting: Dim Blue / Cyan
+                        _tempColor.copy(baseColor).multiplyScalar(0.5);
                     }
                     meshData.mesh.setColorAt(idx, _tempColor);
                     meshData.index++;
@@ -204,7 +255,7 @@
                 updateSynapseGeometry(synCount);
 
                 for (let i = 0; i < synCount; i++) {
-                    const [srcId, dstId, weight] = data.synapses[i];
+                    const [srcId, dstId, weight, buffer] = data.synapses[i];
                     const src = neuronMap.get(srcId);
                     const dst = neuronMap.get(dstId);
 
@@ -217,9 +268,16 @@
                         synapsePositions[idx+4] = dst.y;
                         synapsePositions[idx+5] = dst.z;
 
-                        // Synapse Color based on weight/activity (Normalized)
-                        const brightness = Math.min(1.0, weight / 5.0 + 0.3);
-                        _tempColor.setRGB(0.1 * brightness, 0.5 * brightness, 1.0 * brightness); 
+                        // Activity-based blinking: use buffer for pulse effect
+                        const activity = Math.min(1.0, buffer / 10.0);
+                        const baseBrightness = Math.min(1.0, weight / 10.0 + 0.1);
+                        
+                        // Active synapses glow white/cyan, idle are dim blue
+                        if (activity > 0.1) {
+                            _tempColor.setRGB(0.5 + activity * 0.5, 0.8 + activity * 0.2, 1.0); 
+                        } else {
+                            _tempColor.setRGB(0.05 * baseBrightness, 0.2 * baseBrightness, 0.5 * baseBrightness);
+                        }
                         
                         synapseColors[idx] = _tempColor.r;
                         synapseColors[idx+1] = _tempColor.g;
@@ -229,9 +287,11 @@
                         synapseColors[idx+5] = _tempColor.b;
                     }
                 }
-                synapseLines.geometry.attributes.position.needsUpdate = true;
-                synapseLines.geometry.attributes.color.needsUpdate = true;
-                synapseLines.geometry.setDrawRange(0, synCount * 2);
+                if (synapseLines && synapseLines.geometry && synapseLines.geometry.attributes) {
+                    if (synapseLines.geometry.attributes.position) synapseLines.geometry.attributes.position.needsUpdate = true;
+                    if (synapseLines.geometry.attributes.color) synapseLines.geometry.attributes.color.needsUpdate = true;
+                    synapseLines.geometry.setDrawRange(0, synCount * 2);
+                }
 
                 document.getElementById('tick').innerText = `Tick: ${data.tick}`;
                 document.getElementById('neurons').innerText = `Neurons: ${data.total_neurons}`;
