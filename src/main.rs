@@ -1,9 +1,13 @@
 pub mod streamer;
 // src/main.rs
+use rand::prelude::*;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+
 mod ffi;
 mod graph;
-mod telemetry;
 mod constants;
+mod telemetry;
 
 use ffi::{NeuronType, Environment};
 use graph::NetworkGraph;
@@ -44,16 +48,38 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
     }
 
     // Creating synapses with Gaussian weights (Spec 06/11)
-    for _ in 0..synapses_count {
-        let source = rng.random_range(0..(neurons_count as u32));
-        let target = rng.random_range(0..(neurons_count as u32));
+    // Connectivity: strictly local (neighbor-to-neighbor)
+    let local_radius_sq = (COORD_SCALE * 0.15).powi(2); // 15% of the space
+    let mut actual_synapses = 0;
+    let target_synapses = synapses_count.max(30000); // Минимум 30к для плотности
+    while actual_synapses < target_synapses {
+        let source_idx = rng.random_range(0..neurons_count);
+        let target_idx = rng.random_range(0..neurons_count);
+        if source_idx == target_idx { continue; }
         
-        let weight = get_gaussian(DEFAULT_WEIGHT, WEIGHT_SIGMA).max(0.1).min(15.0);
-        
-        let is_inhib = rng.random_bool(0.2); 
-        let is_myelin = rng.random_bool(0.1); 
+        let n_source = &graph.neurons[source_idx];
+        let n_target = &graph.neurons[target_idx];
 
-        graph.connect(source, target, weight, 0, is_inhib, is_myelin);
+        let dx = (n_source.x as f32 - n_target.x as f32).abs();
+        let dy = (n_source.y as f32 - n_target.y as f32).abs();
+        let dz = (n_source.z as f32 - n_target.z as f32).abs();
+        let dist_sq = dx*dx + dy*dy + dz*dz;
+
+        if dist_sq < local_radius_sq || rng.random_bool(0.02) { // Mostly local, 2% long-range
+            let weight = get_gaussian(DEFAULT_WEIGHT * 2.0, WEIGHT_SIGMA).max(0.5).min(10.0);
+            let is_inhib = rng.random_bool(0.1); 
+            let is_myelin = rng.random_bool(0.2); 
+            let branch_id = rng.random_range(0..8) as u8;
+            graph.connect(source_idx as u32, target_idx as u32, weight, branch_id, is_inhib, is_myelin);
+            actual_synapses += 1;
+        }
+    }
+
+    // Добавим немного фоновой активности для стимуляции сети
+    for i in 0..neurons_count {
+        if rng.random_bool(0.1) {
+            graph.neurons[i].current_voltage = -30.0; // Деполяризация 10% нейронов
+        }
     }
 
     println!("Network generation complete.");
@@ -239,29 +265,34 @@ async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_t
             tokio::task::yield_now().await;
         }
 
-        // Phase 36: WebSocket Streaming (every 300 ticks)
+                // Phase 36: WebSocket Streaming (every 300 ticks)
         if let Some(ref tx) = tx {
             if tick % 300 == 0 {
                 let mut snapshot = streamer::StateSnapshot {
                     tick,
+                    total_neurons: graph.neurons.len(),
+                    total_synapses: graph.synapses.len(),
                     neurons: Vec::with_capacity(graph.neurons.len()),
                     synapses: Vec::with_capacity(graph.synapses.len()),
                 };
                 for n in &graph.neurons {
-                    let state = if n.current_voltage > 0.0 || n.spikes_in_last_window > 0 {
-                        1 // Spiking
-                    } else if n.energy_atp < 20.0 {
-                        2 // Starving
-                    } else {
-                        0 // Resting
-                    };
-                    snapshot.neurons.push((n.id, n.x, n.y, state));
+                    let atp_pct = (n.energy_atp / n.max_atp) * 100.0;
+                    snapshot.neurons.push((
+                        n.id,
+                        n.x as f32,
+                        n.y as f32,
+                        n.z as f32,
+                        n.current_voltage,
+                        n.activation_threshold,
+                        atp_pct,
+                    ));
                 }
-                for s in graph.synapses.iter().take(1000) {
+                
+                for s in &graph.synapses {
                     snapshot.synapses.push((s.source_id, s.target_id, s.weight));
                 }
                 if let Ok(json) = serde_json::to_string(&snapshot) {
-                    if let Err(e) = tx.send(json) {
+                    if let Err(_e) = tx.send(json) {
                         // Only print if there are actual receivers but send failed
                     }
                 }
@@ -294,6 +325,7 @@ async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_t
             let rust_start = Instant::now();
             graph.run_astrocyte_service(tick);
             graph.run_microglia_service(tick);
+            graph.run_neurogenesis_service(tick);
             tick_rust_time = rust_start.elapsed();
             total_rust_time += tick_rust_time;
         }
@@ -473,20 +505,25 @@ async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<br
             if tick % 10 == 0 {
                 let mut snapshot = streamer::StateSnapshot {
                     tick,
+                    total_neurons: graph.neurons.len(),
+                    total_synapses: graph.synapses.len(),
                     neurons: Vec::with_capacity(graph.neurons.len()),
                     synapses: Vec::with_capacity(graph.synapses.len()),
                 };
                 for n in &graph.neurons {
-                    let state = if n.current_voltage > 0.0 || n.spikes_in_last_window > 0 {
-                        1 // Spiking
-                    } else if n.energy_atp < 20.0 {
-                        2 // Starving
-                    } else {
-                        0 // Resting
-                    };
-                    snapshot.neurons.push((n.id, n.x, n.y, state));
+                    let atp_pct = (n.energy_atp / n.max_atp) * 100.0;
+                    snapshot.neurons.push((
+                        n.id,
+                        n.x as f32,
+                        n.y as f32,
+                        n.z as f32,
+                        n.current_voltage,
+                        n.activation_threshold,
+                        atp_pct,
+                    ));
                 }
-                for s in graph.synapses.iter().take(1000) {
+
+                for s in &graph.synapses {
                     snapshot.synapses.push((s.source_id, s.target_id, s.weight));
                 }
                 if let Ok(json) = serde_json::to_string(&snapshot) {
@@ -498,6 +535,7 @@ async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<br
         if tick % 10 == 0 {
             graph.run_astrocyte_service(tick);
             graph.run_microglia_service(tick);
+            graph.run_neurogenesis_service(tick);
         }
         
         track_metrics(&mut data, &graph, tick);
@@ -742,8 +780,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if is_benchmark {
-        let mut neurons = 10000;
-        let mut synapses = 100000;
+        let mut neurons = 1000;
+        let mut synapses = 50000;
         let mut ticks = 1000000;
 
         for i in 1..args.len() {
@@ -755,6 +793,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             if args[i] == "--ticks" && i + 1 < args.len() {
                 ticks = args[i+1].parse().unwrap_or(ticks);
+            }
+        }
+
+        // Force fresh start for benchmark if requested
+        if args.contains(&String::from("--fresh")) {
+            if std::path::Path::new("brain_save.bin").exists() {
+                println!("Deleting old brain_save.bin for a fresh start...");
+                let _ = std::fs::remove_file("brain_save.bin");
             }
         }
 

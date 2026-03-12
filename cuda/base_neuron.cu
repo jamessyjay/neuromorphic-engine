@@ -90,21 +90,22 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     if (n->vesicles_pool > MAX_VESICLES) n->vesicles_pool = MAX_VESICLES;
 
     // 3. Homeostatic Plasticity & Threshold Recovery (Phase 13 & 26)
-    if (n->spikes_in_last_window > HOMEOSTATIC_SPIKE_HIGH) {
-        n->activation_threshold += HOMEOSTATIC_PENALTY; // Raise threshold (Negative Feedback)
-    } else if (n->spikes_in_last_window < HOMEOSTATIC_SPIKE_LOW) {
-        // Recovery: Move back to resting threshold (Spec 11)
-        float base_threshold = THRESHOLD_VOLTAGE; // Standard Pyramidal
-        if (n->type == TYPE_PHOTORECEPTOR) base_threshold = 0.0f; // Could be PHOTO_RESTING but 0.0f is ok here
-        
-        if (n->activation_threshold > base_threshold) {
-             n->activation_threshold -= HOMEOSTATIC_RECOVERY;
-        } else if (n->activation_threshold < base_threshold) {
-             n->activation_threshold += HOMEOSTATIC_RECOVERY;
+    if (current_tick % 100 == 0) {
+        if (n->spikes_in_last_window > HOMEOSTATIC_SPIKE_HIGH) {
+            n->activation_threshold += HOMEOSTATIC_PENALTY; // Raise threshold (Negative Feedback)
+        } else if (n->spikes_in_last_window < HOMEOSTATIC_SPIKE_LOW) {
+            // Recovery: Move back to resting threshold (Spec 11)
+            float base_threshold = THRESHOLD_VOLTAGE; // Standard Pyramidal
+            if (n->type == TYPE_PHOTORECEPTOR) base_threshold = 0.0f; 
+            
+            if (n->activation_threshold > base_threshold) {
+                 n->activation_threshold -= HOMEOSTATIC_RECOVERY;
+            } else if (n->activation_threshold < base_threshold) {
+                 n->activation_threshold += HOMEOSTATIC_RECOVERY;
+            }
         }
+        n->spikes_in_last_window = 0; 
     }
-    n->spikes_in_last_window = 0; 
-
     // BASELINE LEAKAGE (Spec 11)
     float gradient_maintenance = BASELINE_LEAK_RATE * n->leak_coeff;
     if (n->energy_ATP < ATP_STRESS_THRESHOLD) gradient_maintenance *= LOW_ATP_LEAK_MULTIPLIER; 

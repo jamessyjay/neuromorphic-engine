@@ -12,15 +12,15 @@ pub const WINDOW_SIZE: u32 = 20;
 
 // --- Network Defaults ---
 pub const CLUSTERING_RADIUS_SQ: f32 = 400.0; // Distance sq < 20.0^2
-pub const STOCHASTIC_GROWTH_PROB: f64 = 0.2;
+pub const STOCHASTIC_GROWTH_PROB: f64 = 0.0005;
 pub const DEFAULT_WEIGHT: f32 = 2.0;
 pub const WEIGHT_SIGMA: f32 = 1.0;
-pub const SEED_WEIGHT: f32 = 0.05;
-pub const SEED_THICKNESS: f32 = 0.1;
+pub const SEED_WEIGHT: f32 = 0.5;
+pub const SEED_THICKNESS: f32 = 0.2;
 
 // --- Biological Thresholds & Limits ---
-pub const PRUNING_WEIGHT_THRESHOLD: f32 = 0.05;
-pub const PRUNING_TICK_THRESHOLD: u32 = 1000;
+pub const PRUNING_WEIGHT_THRESHOLD: f32 = 0.1;
+pub const PRUNING_TICK_THRESHOLD: u32 = 2000;
 pub const MAX_SYNAPSE_WEIGHT: f32 = 30.0;
 pub const EMERGENCY_ATP_THRESHOLD: f32 = 20.0;
 pub const MAX_ATP: f32 = 100.0;

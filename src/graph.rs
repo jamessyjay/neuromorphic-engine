@@ -260,21 +260,10 @@ impl NetworkGraph {
         // Phase 29: Structural Plasticity - PRUNING
         // Remove synapses that are:
         // 1. Connected to dead neurons
-        // 2. Below the weight threshold (0.01) - "Impotent connections"
-        self.synapses.retain_mut(|s| {
+        // 2. DISABLE weight pruning: synapses should stay even if they are thin (User request)
+        self.synapses.retain(|s| {
             let is_endpoint_dead = dead_ids.contains(&s.source_id) || dead_ids.contains(&s.target_id);
-            
-            // Phase 31: Hard Pruning with Persistence
-            let is_below_threshold = s.weight < PRUNING_WEIGHT_THRESHOLD;
-            if is_below_threshold {
-                s.ticks_below_threshold += SERVICE_TICK_INTERVAL; // Service runs every 10 ticks (Phase 34: Use constant)
-            } else {
-                s.ticks_below_threshold = 0;
-            }
-
-            let is_persistent_dead = s.ticks_below_threshold >= PRUNING_TICK_THRESHOLD;
-            
-            !is_endpoint_dead && !is_persistent_dead
+            !is_endpoint_dead
         });
     }
 
@@ -287,8 +276,11 @@ impl NetworkGraph {
         if num_neurons < 2 { return; }
 
         // Large Scale Mapping: Stochastic sampling instead of O(N^2)
-        // We check num_neurons pairs per service call
-        let check_count = num_neurons; 
+        // We check num_neurons * 2 pairs per service call to maintain biological speed
+        // Limit total synapses to 50x neurons to prevent "spaghetti"
+        if self.synapses.len() > num_neurons * 50 { return; }
+
+        let check_count = num_neurons * 2; 
         
         for _ in 0..check_count {
             let i = rng.random_range(0..num_neurons);
@@ -298,10 +290,14 @@ impl NetworkGraph {
             let n_source = &self.neurons[i];
             let n_target = &self.neurons[j];
 
-            // 1. Metabolic Check: Can source afford to grow?
-            if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 80.0 { continue; } // TODO: ATP Constant
+            // 1. Metabolic Check: Can source afford to grow? (ATP > 40)
+            if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 40.0 { continue; } 
 
-            // 2. Spatial Check: Are they close? (Simulating clusters via distance)
+            // Hard Limit: Max 50 outgoing synapses per neuron (Phase 37)
+            let outgoing_count = self.synapses.iter().filter(|s| s.source_id == n_source.id).count();
+            if outgoing_count >= 50 { continue; }
+
+            // 2. Spatial Check: Are they close? (CLUSTERING_RADIUS_SQ * 1.5)
             let x1 = n_source.x as f32 / COORD_SCALE;
             let y1 = n_source.y as f32 / COORD_SCALE;
             let z1 = n_source.z as f32 / COORD_SCALE;
@@ -315,19 +311,21 @@ impl NetworkGraph {
             let dz = z1 - z2;
             let dist_sq = dx*dx + dy*dy + dz*dz;
 
-            if dist_sq < CLUSTERING_RADIUS_SQ { 
-                // 3. Activity Correlation: Both spiked recently?
-                let s_active = current_tick - n_source.last_spike_tick < 100; // TODO: Correlation window constant
-                let t_active = current_tick - n_target.last_spike_tick < 100;
+            if dist_sq < CLUSTERING_RADIUS_SQ * 1.5 { 
+                // 3. Activity Correlation: Both spiked recently? (Window: 500 ticks)
+                let s_active = current_tick.saturating_sub(n_source.last_spike_tick) < 500; 
+                let t_active = current_tick.saturating_sub(n_target.last_spike_tick) < 500;
 
                 if s_active && t_active {
-                    // 4. Stochastic Growth
+                    // 4. Stochastic Growth (Phase 37: Use STOCHASTIC_GROWTH_PROB from constants)
                     if rng.random_bool(STOCHASTIC_GROWTH_PROB) {
                         // Success! Connect these neurons with target branch
-                        // Find a living branch or default to 0
                         let branch_id = rng.random_range(0..8) as u8;
-                        let is_inhib = rng.random_bool(0.2); 
+                        let is_inhib = rng.random_bool(0.1); 
                         self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
+                        if current_tick % 1000 == 0 {
+                            println!("NeuroGenesis: New synapse {} -> {} at tick {}", i, j, current_tick);
+                        }
                     }
                 }
             }

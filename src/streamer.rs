@@ -7,8 +7,10 @@ use futures_util::{StreamExt, SinkExt};
 #[derive(Serialize, Clone)]
 pub struct StateSnapshot {
     pub tick: u32,
-    pub neurons: Vec<(u32, u16, u16, u8)>, // id, x, y, visual_state
-    pub synapses: Vec<(u32, u32, f32)>,   // source_id, target_id, weight
+    pub total_neurons: usize,
+    pub total_synapses: usize,
+    pub neurons: Vec<(u32, f32, f32, f32, f32, f32, f32)>, // id, x, y, z, voltage, threshold, atp_pct
+    pub synapses: Vec<(u32, u32, f32)>,                    // source_id, target_id, weight
 }
 
 pub async fn start_server(tx: broadcast::Sender<String>) {
