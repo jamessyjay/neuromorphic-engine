@@ -105,8 +105,13 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
 
 pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
     let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
-        println!("Awakening network from brain_save.bin...");
-        loaded_graph
+        if loaded_graph.neurons.len() == neurons_count {
+            println!("Awakening network from brain_save.bin...");
+            loaded_graph
+        } else {
+            println!("Saved network size ({}) does not match requested size ({}). Generating new network...", loaded_graph.neurons.len(), neurons_count);
+            setup_benchmark(neurons_count, synapses_count)
+        }
     } else {
         setup_benchmark(neurons_count, synapses_count)
     };
