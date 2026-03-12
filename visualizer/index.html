@@ -50,13 +50,14 @@
     <script>
         // --- Configuration & Constants ---
         const MAX_COORD = 65535;
-        const NEURON_RADIUS = 150; 
-        const WORLD_SIZE = 2000;
+        const NEURON_RADIUS = 20; 
+        const WORLD_SIZE = 4000;
 
         // --- Three.js Setup ---
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
@@ -65,12 +66,12 @@
         controls.update();
 
         // --- Objects ---
-        let neuronMesh;
+        const neuronMeshes = new Map(); // type -> InstancedMesh
         let synapseLines;
         let synapsePositions;
         let synapseColors;
         
-        const neuronMap = new Map(); // id -> index in InstancedMesh
+        const neuronMap = new Map(); // id -> {x, y, z, type, typeIndex}
         let totalNeurons = 0;
 
         // Temporary objects to avoid allocation
@@ -78,24 +79,56 @@
         const _tempMatrix = new THREE.Matrix4();
         const _tempPos = new THREE.Vector3();
 
-        function initNetwork(neuronCount) {
-            totalNeurons = neuronCount;
+        function getGeometryForType(type) {
+            switch(type) {
+                case 5: return new THREE.TetrahedronBufferGeometry(30); // Sensors
+                case 4: return new THREE.OctahedronBufferGeometry(30);  // Motors
+                case 3: return new THREE.BoxBufferGeometry(40, 40, 40); // Timers
+                default: return new THREE.SphereBufferGeometry(20, 12, 12); // Others
+            }
+        }
+
+        function initNetwork(data) {
+            totalNeurons = data.total_neurons;
             
-            // Neurons: InstancedMesh for performance
-            const geometry = new THREE.SphereGeometry(NEURON_RADIUS, 8, 8);
-            const material = new THREE.MeshBasicMaterial();
-            neuronMesh = new THREE.InstancedMesh(geometry, material, neuronCount);
-            neuronMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-            neuronMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(neuronCount * 3), 3);
-            scene.add(neuronMesh);
+            // Clear existing meshes
+            neuronMeshes.forEach(mesh => scene.remove(mesh));
+            neuronMeshes.clear();
+
+            // Count neurons per type
+            const counts = {};
+            data.neurons.forEach(n => {
+                const type = n[7];
+                counts[type] = (counts[type] || 0) + 1;
+            });
+
+            // Create InstancedMeshes for each type present
+            for (const type in counts) {
+                const geometry = getGeometryForType(parseInt(type));
+                const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const mesh = new THREE.InstancedMesh(geometry, material, counts[type]);
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(counts[type] * 3), 3);
+                scene.add(mesh);
+                neuronMeshes.set(parseInt(type), {
+                    mesh: mesh,
+                    count: counts[type],
+                    index: 0
+                });
+            }
 
             // Synapses: BufferGeometry with LineSegments
+            if (synapseLines) scene.remove(synapseLines);
             const synGeometry = new THREE.BufferGeometry();
-            // We pre-allocate for a large number of synapses or update dynamically
-            // For now, we'll initialize empty and update on first big data burst
             synapseLines = new THREE.LineSegments(
                 synGeometry,
-                new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.6 })
+                new THREE.LineBasicMaterial({ 
+                    vertexColors: true, 
+                    transparent: true, 
+                    opacity: 0.6,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
             );
             scene.add(synapseLines);
         }
@@ -122,40 +155,49 @@
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 
-                if (!neuronMesh || data.total_neurons !== totalNeurons) {
-                    if (neuronMesh) scene.remove(neuronMesh);
-                    initNetwork(data.total_neurons);
+                if (neuronMeshes.size === 0 || data.total_neurons !== totalNeurons) {
+                    initNetwork(data);
                 }
+
+                // Reset indices for this frame
+                neuronMeshes.forEach(m => m.index = 0);
 
                 // Update Neurons
                 for (let i = 0; i < data.neurons.length; i++) {
-                    const [id, x, y, z, voltage, threshold, atp_pct] = data.neurons[i];
-                    
+                    const [id, x, y, z, voltage, threshold, atp_pct, type] = data.neurons[i];
+                    const meshData = neuronMeshes.get(type);
+                    if (!meshData) continue;
+
                     const nx = (x / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
                     const ny = (y / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
                     const nz = (z / MAX_COORD) * WORLD_SIZE - (WORLD_SIZE / 2);
 
                     _tempPos.set(nx, ny, nz);
                     _tempMatrix.setPosition(_tempPos);
-                    neuronMesh.setMatrixAt(i, _tempMatrix);
+                    
+                    const idx = meshData.index;
+                    meshData.mesh.setMatrixAt(idx, _tempMatrix);
                     neuronMap.set(id, { x: nx, y: ny, z: nz });
 
-                    // Color logic
+                    // Color logic (Highly Saturated & Normalized)
                     if (voltage > threshold) {
-                        _tempColor.setHex(0xffffff); // SPIKE!
+                        _tempColor.setRGB(1.0, 1.0, 1.0); // PURE WHITE SPIKE
                     } else if (atp_pct > 80) {
-                        _tempColor.setHex(0x00ff00); // Healthy Green
+                        _tempColor.setRGB(0.0, 1.0, 0.0); // BRIGHT GREEN (Healthy)
                     } else if (atp_pct > 30) {
-                        // Mix Green to Yellow
                         const factor = (atp_pct - 30) / 50;
-                        _tempColor.setRGB(1 - factor, 1, 0); 
+                        _tempColor.setRGB(1.0, 1.0, 0.0).lerp(new THREE.Color(0, 1, 0), factor); 
                     } else {
-                        _tempColor.setHex(0xff3300); // Exhausted Red
+                        _tempColor.setRGB(1.0, 0.0, 0.0); // PURE RED (Exhausted)
                     }
-                    neuronMesh.setColorAt(i, _tempColor);
+                    meshData.mesh.setColorAt(idx, _tempColor);
+                    meshData.index++;
                 }
-                neuronMesh.instanceMatrix.needsUpdate = true;
-                if (neuronMesh.instanceColor) neuronMesh.instanceColor.needsUpdate = true;
+
+                neuronMeshes.forEach(m => {
+                    m.mesh.instanceMatrix.needsUpdate = true;
+                    if (m.mesh.instanceColor) m.mesh.instanceColor.needsUpdate = true;
+                });
 
                 // Update Synapses
                 const synCount = data.synapses.length;
@@ -175,9 +217,9 @@
                         synapsePositions[idx+4] = dst.y;
                         synapsePositions[idx+5] = dst.z;
 
-                        // Synapse Color based on weight/activity
-                        const alpha = Math.min(0.8, weight / 10.0 + 0.1);
-                        _tempColor.setRGB(0.4, 0.7, 1.0).multiplyScalar(alpha);
+                        // Synapse Color based on weight/activity (Normalized)
+                        const brightness = Math.min(1.0, weight / 5.0 + 0.3);
+                        _tempColor.setRGB(0.1 * brightness, 0.5 * brightness, 1.0 * brightness); 
                         
                         synapseColors[idx] = _tempColor.r;
                         synapseColors[idx+1] = _tempColor.g;

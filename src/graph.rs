@@ -10,7 +10,6 @@ use sha2::{Sha256, Digest};
 const MAX_ATP: f32 = 100.0;
 const CLUSTERING_RADIUS_SQ: f32 = 400.0; 
 const STOCHASTIC_GROWTH_PROB: f64 = 0.05; 
-const NMDA_SPIKE_THRESHOLD: f32 = 5.0; // Phase 33
 
 #[derive(Serialize, Deserialize)]
 pub struct NetworkGraph {

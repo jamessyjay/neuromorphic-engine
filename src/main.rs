@@ -1,13 +1,12 @@
 pub mod streamer;
 // src/main.rs
-use rand::prelude::*;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::RngExt;
 
 mod ffi;
 mod graph;
 mod constants;
 mod telemetry;
+mod stimulus;
 
 use ffi::{NeuronType, Environment};
 use graph::NetworkGraph;
@@ -17,7 +16,6 @@ use plotters::prelude::*;
 use tokio::sync::broadcast;
 use std::env;
 use std::time::Instant;
-use rand::RngExt;
 
 // Simple Gaussian sampler (Box-Muller)
 fn get_gaussian(mu: f32, sigma: f32) -> f32 {
@@ -36,14 +34,27 @@ fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph 
 
     // Creating neurons
     for i in 0..neurons_count {
-        // Biased random types: 70% Pyramidal, others 10% each
-        let n_type = match rng.random_range(0..10) {
-            0..=6 => NeuronType::Pyramidal,
-            7 => NeuronType::Bipolar,
-            8 => NeuronType::Interneuron,
-            _ => NeuronType::Pacemaker,
+        // Initializing population with Morphological Casting (Phase 38)
+        let n_type = if i < 20 {
+            NeuronType::Photoreceptor // Input (Eyes)
+        } else if i >= 980 && i < 1000 {
+            NeuronType::Purkinje      // Output (Motors)
+        } else if i >= 20 && i < 40 {
+            NeuronType::Pacemaker     // Timers (Middle)
+        } else {
+            if rng.random_bool(0.7) { NeuronType::Pyramidal } else { NeuronType::Interneuron }
         };
+
         graph.add_neuron(n_type);
+        
+        // Spatial Constraints (Phase 38)
+        let n = &mut graph.neurons[i];
+        if i < 20 {
+            n.x = rng.random_range(0..5000); // Very low X (Left side)
+        } else if i >= 980 && i < 1000 {
+            n.x = rng.random_range(60000..65535); // Very high X (Right side)
+        }
+        
         graph.grow_dendritic_tree(i as u32);
     }
 
@@ -229,7 +240,7 @@ async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_t
 
     println!("Executing BENCHMARK for {} ticks...", total_ticks);
     
-    let env = Environment {
+    let mut current_env = Environment {
         global_oxygen_level: 1.0,  
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
@@ -238,6 +249,8 @@ async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_t
         seed: 42,
     };
     
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
+
     let mut data = BenchmarkData {
         ticks: Vec::with_capacity(total_ticks as usize),
         ffi_times: Vec::with_capacity(total_ticks as usize),
@@ -253,10 +266,13 @@ async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_t
     let mut telemetry = Telemetry::new();
 
     for tick in 1..=total_ticks {
+        // Phase 39: Pavlovian Stimulus & Dopamine Loop
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+
         let num_neurons = graph.neurons.len() as i32;
 
         let ffi_start = Instant::now();
-        graph.tick(tick, env);
+        graph.tick(tick, current_env);
         let ffi_elapsed = ffi_start.elapsed();
         total_ffi_time += ffi_elapsed;
 
@@ -277,14 +293,23 @@ async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_t
                 };
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * 100.0;
+                    
+                    // Phase 39: Visual Spike Persistence
+                    // We mark neuron as spiking if it fired in the last 30 ticks 
+                    // so the UI definitely catches the white flash.
+                    let is_spiking_now = n.current_voltage > n.activation_threshold;
+                    let spiked_recently = tick.saturating_sub(n.last_spike_tick) < 30;
+                    let visual_voltage = if is_spiking_now || spiked_recently { 100.0 } else { n.current_voltage };
+
                     snapshot.neurons.push((
                         n.id,
                         n.x as f32,
                         n.y as f32,
                         n.z as f32,
-                        n.current_voltage,
+                        visual_voltage,
                         n.activation_threshold,
                         atp_pct,
+                        n.type_,
                     ));
                 }
                 
@@ -473,7 +498,7 @@ async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<br
     println!("Executing {} ticks...", total_ticks);
     
     // Setup Global Environment
-    let env = Environment {
+    let mut current_env = Environment {
         global_oxygen_level: 1.0,  
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
@@ -482,18 +507,13 @@ async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<br
         seed: 1337,
     };
     
-    for tick in 1..=total_ticks {
-        
-        // Spec 8: Simulate Light/Dark environment for the Photoreceptor
-        if tick < 50 {
-            graph.neurons[0].current_voltage = -40.0;
-        } else if tick < 120 {
-            graph.neurons[0].current_voltage = -65.0;
-        } else {
-            graph.neurons[0].current_voltage = -40.0;
-        }
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
 
-        graph.tick(tick, env);
+    for tick in 1..=total_ticks {
+        // Phase 39: Pavlovian Stimulus & Dopamine Loop
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+
+        graph.tick(tick, current_env);
         
         // Give Tokio a chance to run the WebSocket server
         if tick % 50 == 0 {
@@ -512,14 +532,23 @@ async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<br
                 };
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * 100.0;
+                    
+                    // Phase 39: Visual Spike Persistence
+                    // We mark neuron as spiking if it fired in the last 30 ticks 
+                    // so the UI definitely catches the white flash.
+                    let is_spiking_now = n.current_voltage > n.activation_threshold;
+                    let spiked_recently = tick.saturating_sub(n.last_spike_tick) < 30;
+                    let visual_voltage = if is_spiking_now || spiked_recently { 100.0 } else { n.current_voltage };
+
                     snapshot.neurons.push((
                         n.id,
                         n.x as f32,
                         n.y as f32,
                         n.z as f32,
-                        n.current_voltage,
+                        visual_voltage,
                         n.activation_threshold,
                         atp_pct,
+                        n.type_,
                     ));
                 }
 
@@ -535,7 +564,6 @@ async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<br
         if tick % 10 == 0 {
             graph.run_astrocyte_service(tick);
             graph.run_microglia_service(tick);
-            graph.run_neurogenesis_service(tick);
         }
         
         track_metrics(&mut data, &graph, tick);
@@ -679,7 +707,7 @@ fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
         setup_benchmark(1000, 10000)
     };
 
-    let env = Environment {
+    let mut current_env = Environment {
         global_oxygen_level: 1.0,
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
@@ -688,10 +716,14 @@ fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
         seed: 42,
     };
 
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
+
     println!("Injecting artificial fatigue to trigger sleep cycle...");
     
     for tick in 1..=50000 {
-        graph.tick(tick, env);
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+
+        graph.tick(tick, current_env);
         
         // Artificially age the network for the test to bypass biological real-time waiting
         for n in &mut graph.neurons {
@@ -884,7 +916,7 @@ fn setup_inhibition_loop() -> NetworkGraph {
 fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING INHIBITION LOOP SCENARIO (Phase 19) ---");
     let mut graph = setup_inhibition_loop();
-    let env = Environment { 
+    let mut current_env = Environment { 
         global_oxygen_level: 1.0, 
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
@@ -893,14 +925,19 @@ fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
         seed: 999 
     };
 
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
+
     let total_ticks = 1000;
     let mut history = vec![];
 
     for tick in 1..=total_ticks {
+        // Phase 39: Pavlovian Stimulus & Dopamine Loop
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+
         // Subtle constant stimulus to avoid metabolic exhaustion
         graph.neurons[0].current_voltage += 0.7;
 
-        graph.tick(tick, env);
+        graph.tick(tick, current_env);
         
         if tick % 10 == 0 {
             graph.run_astrocyte_service(tick);
@@ -923,26 +960,18 @@ fn render_inhibition_chart(data: &[(u32, f32, f32)], filename: &str) -> Result<(
     let root = BitMapBackend::new(filename, (1200, 800)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    let areas = root.split_evenly((2, 1));
-
-    // Panel 1: Pyramidal (Target)
-    let mut chart1 = ChartBuilder::on(&areas[0])
-        .caption("1. Pyramidal Neuron (Excited with Constant Stimulus + GABA Inhibition)", ("sans-serif", 20).into_font())
-        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, -90f32..50f32)?;
-    chart1.configure_mesh().y_desc("Voltage (mV)").draw()?;
-    chart1.draw_series(LineSeries::new(data.iter().map(|&(t, v, _)| (t as f32, v)), &RED))?
+    let mut chart = ChartBuilder::on(&root)
+        .caption("Inhibition Loop", ("sans-serif", 30).into_font())
+        .margin(10)
+        .x_label_area_size(40)
+        .y_label_area_size(50)
+        .build_cartesian_2d(0f32..1000f32, -90f32..50f32)?;
+    chart.configure_mesh().y_desc("Voltage (mV)").draw()?;
+    chart.draw_series(LineSeries::new(data.iter().map(|&(t, v, _)| (t as f32, v)), &RED))?
         .label("Pyramidal Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
-    chart1.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
-
-    // Panel 2: Interneuron (Inhibitor)
-    let mut chart2 = ChartBuilder::on(&areas[1])
-        .caption("2. GABA Interneuron (Driven by Pyramidal Spikes)", ("sans-serif", 20).into_font())
-        .margin(10).x_label_area_size(30).y_label_area_size(40).build_cartesian_2d(0f32..1000f32, -90f32..50f32)?;
-    chart2.configure_mesh().y_desc("Voltage (mV)").draw()?;
-    chart2.draw_series(LineSeries::new(data.iter().map(|&(t, _, v)| (t as f32, v)), &BLUE))?
+    chart.draw_series(LineSeries::new(data.iter().map(|&(t, _, v)| (t as f32, v)), &BLUE))?
         .label("Interneuron Voltage").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
-    chart2.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
-
+    chart.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
     root.present()?;
     Ok(())
 }
@@ -972,13 +1001,14 @@ fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_oxygen_level: 1.0, 
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
-        toxin_levels: 0.0,
-        light_level: 0.0,
+        toxin_levels: 0.0, 
+        light_level: 0.0, 
         seed: 888 
     };
 
     let total_ticks = 1200;
     let mut history = vec![];
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
 
     for tick in 1..=total_ticks {
         // Stimulus: Rhythmic blinking
@@ -990,6 +1020,8 @@ fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             env.dopamine_multiplier = 1.0;
         }
+
+        stimulus_service.process_tick(&mut graph, &mut env, tick);
 
         graph.tick(tick, env);
         
@@ -1070,6 +1102,8 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         seed: 666 
     };
 
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
+
     // Case 1: Hypoxic Shutdown (10 Neurons)
     println!("Case 1: Hypoxic Shutdown...");
     for _ in 0..10 { graph.add_neuron(NeuronType::Pyramidal); }
@@ -1094,6 +1128,8 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             println!(">>> DISASTER: Oxygen Level dropped to 1%: Total Hypoxia!");
             env.global_oxygen_level = 0.01; 
         }
+
+        stimulus_service.process_tick(&mut graph, &mut env, tick as u32);
 
         graph.tick(tick, env);
         
@@ -1135,7 +1171,7 @@ fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING DOPAMINE RUSH (Phase 14) ---");
     let mut graph = NetworkGraph::new();
-    let mut env = Environment { 
+    let mut current_env = Environment { 
         global_oxygen_level: 1.0, 
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
@@ -1143,6 +1179,8 @@ fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
         light_level: 0.0, 
         seed: 777 
     };
+
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
 
     // Setup: 2 Neurons with a weak connection
     let n1 = graph.add_neuron(NeuronType::Pacemaker); // Source fires constantly
@@ -1152,24 +1190,30 @@ fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut weight_history = vec![];
     
     println!("Step 1: Low Dopamine (0.1x) - Learning is stalled");
-    env.dopamine_multiplier = 0.1;
+    current_env.dopamine_multiplier = 0.1;
     for tick in 0..200 {
-        graph.tick(tick, env);
-        weight_history.push((tick, graph.synapses[0].weight, env.dopamine_multiplier));
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
+
+        graph.tick(tick, current_env);
+        weight_history.push((tick, graph.synapses[0].weight, current_env.dopamine_multiplier));
     }
 
     println!("Step 2: DOPAMINE RUSH (5.0x) - Learning explosion!");
-    env.dopamine_multiplier = 5.0;
+    current_env.dopamine_multiplier = 5.0;
     for tick in 200..600 {
-        graph.tick(tick, env);
-        weight_history.push((tick, graph.synapses[0].weight, env.dopamine_multiplier));
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
+
+        graph.tick(tick, current_env);
+        weight_history.push((tick, graph.synapses[0].weight, current_env.dopamine_multiplier));
     }
 
     println!("Step 3: Normal State (1.0x) - Stability");
-    env.dopamine_multiplier = 1.0;
+    current_env.dopamine_multiplier = 1.0;
     for tick in 600..1000 {
-        graph.tick(tick, env);
-        weight_history.push((tick, graph.synapses[0].weight, env.dopamine_multiplier));
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
+
+        graph.tick(tick, current_env);
+        weight_history.push((tick, graph.synapses[0].weight, current_env.dopamine_multiplier));
     }
 
     render_plasticity_chart(&weight_history, "graphs/dopamine_rush_results.png")?;
@@ -1189,12 +1233,10 @@ fn render_plasticity_chart(history: &[(u32, f32, f32)], filename: &str) -> Resul
 
     chart.configure_mesh().y_desc("Synaptic Weight").draw()?;
     chart.configure_secondary_axes().y_desc("Dopamine Level").draw()?;
-
-    // Weight Curve
+    
     chart.draw_series(LineSeries::new(history.iter().map(|&(t, w, _)| (t as f32, w)), &RED.mix(0.8)))?
         .label("Synaptic Weight").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
 
-    // Dopamine Curve (Secondary)
     chart.draw_secondary_series(AreaSeries::new(history.iter().map(|&(t, _, d)| (t as f32, d)), 0.0, &CYAN.mix(0.2)))?
         .label("Dopamine Multiplier").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], CYAN));
 
@@ -1218,15 +1260,12 @@ fn render_stress_chart(results: &[(u32, f32, usize, f32)], filename: &str) -> Re
     chart.configure_mesh().y_desc("ATP Level / Death Count").draw()?;
     chart.configure_secondary_axes().y_desc("Metabolic Wear").draw()?;
 
-    // ATP Curve
     chart.draw_series(LineSeries::new(results.iter().map(|&(t, atp, _, _)| (t as f32, atp)), &BLUE))?
         .label("Avg ATP").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
 
-    // Death Count (Scaled to 100 for visibility)
     chart.draw_series(LineSeries::new(results.iter().map(|&(t, _, d, _)| (t as f32, d as f32 * 7.5)), &RED))?
         .label("Mortality (scaled)").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
 
-    // Wear Curve (Secondary axis)
     chart.draw_secondary_series(LineSeries::new(results.iter().map(|&(t, _, _, w)| (t as f32, w)), &BLACK))?
         .label("Mitochondrial Wear").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLACK));
 
@@ -1250,27 +1289,22 @@ fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     
     let total_ticks = 2000;
     let mut history = vec![];
-    let mut env = Environment { 
-        global_oxygen_level: 1.0, 
-        global_glucose_level: 1.0, 
-        dopamine_multiplier: 1.5, 
-        toxin_levels: 0.0, 
-        light_level: 0.0, 
-        seed: 42 
+    let mut current_env = Environment {
+        global_oxygen_level: 1.0,  
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0, 
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 1337,
     };
+    
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
 
     for tick in 1..=total_ticks {
-        // Frequency 1: 10Hz (Pulse every 100 ticks)
-        // Frequency 2: 50Hz (Pulse every 20 ticks)
-        if tick < 1000 {
-            // Train on 10Hz
-            env.light_level = if (tick / 50) % 2 == 0 { 0.8 } else { 0.0 };
-        } else {
-            // Test on 50Hz
-            env.light_level = if (tick / 10) % 2 == 0 { 0.8 } else { 0.0 };
-        }
+        // Phase 39: Pavlovian Stimulus & Dopamine Loop
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
 
-        graph.tick(tick, env);
+        graph.tick(tick, current_env);
         
         if tick % 10 == 0 {
             graph.run_astrocyte_service(tick);
@@ -1306,7 +1340,7 @@ fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     
     let total_ticks = 3000;
     let mut history = vec![];
-    let env = Environment { 
+    let mut current_env = Environment { 
         global_oxygen_level: 1.0, 
         global_glucose_level: 1.0, 
         dopamine_multiplier: 5.0, // Maximum survival drive
@@ -1315,13 +1349,18 @@ fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         seed: 1234 
     };
 
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
+
     for tick in 1..=total_ticks {
+        // Phase 39: Pavlovian Stimulus & Dopamine Loop
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+
         // Stimulate specific cluster (Central Hub) - First 200 neurons
         for i in 0..200 {
             graph.neurons[i].current_voltage += 15.0; 
         }
 
-        graph.tick(tick, env);
+        graph.tick(tick, current_env);
         
         if tick % 10 == 0 {
             graph.run_astrocyte_service(tick);
@@ -1424,7 +1463,7 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     
     let total_ticks = 3000;
     let mut history = vec![];
-    let env = Environment { 
+    let mut current_env = Environment { 
         global_oxygen_level: 1.0, 
         global_glucose_level: 1.0, 
         dopamine_multiplier: 2.0, // Stable growth
@@ -1433,17 +1472,22 @@ fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
         seed: 777 
     };
 
+    let mut stimulus_service = stimulus::StimulusService::new(1000, 50);
+
     if !graph.synapses.is_empty() {
         println!("Initial: Weight={}", graph.synapses[0].weight);
     }
 
     for tick in 1..=total_ticks {
+        // Phase 39: Pavlovian Stimulus & Dopamine Loop
+        stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+
         // Stimulate source to spike and drive LTP
         if tick % 25 == 0 {
             graph.neurons[source as usize].current_voltage += 35.0; 
         }
 
-        graph.tick(tick, env);
+        graph.tick(tick, current_env);
         
         if tick % 10 == 0 {
             graph.run_astrocyte_service(tick);

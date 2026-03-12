@@ -9,7 +9,7 @@ pub struct StateSnapshot {
     pub tick: u32,
     pub total_neurons: usize,
     pub total_synapses: usize,
-    pub neurons: Vec<(u32, f32, f32, f32, f32, f32, f32)>, // id, x, y, z, voltage, threshold, atp_pct
+    pub neurons: Vec<(u32, f32, f32, f32, f32, f32, f32, u8)>, // id, x, y, z, voltage, threshold, atp_pct, type
     pub synapses: Vec<(u32, u32, f32)>,                    // source_id, target_id, weight
 }
 
