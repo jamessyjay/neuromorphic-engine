@@ -1,0 +1,200 @@
+use neuromorphic_engine::graph::NetworkGraph;
+use neuromorphic_engine::ffi::{Environment, NeuronType, Compartment};
+
+fn default_env() -> Environment {
+    Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        seed: 42,
+    }
+}
+
+// Macro to pack/unpack floats to fixed-point for tests (matching C++ macros)
+fn pack_voltage(v: f32) -> u16 {
+    let mut shifted = v + 100.0;
+    if shifted < 0.0 { shifted = 0.0; }
+    if shifted > 65535.0 / 100.0 { shifted = 65535.0 / 100.0; }
+    (shifted * 100.0) as u16
+}
+
+fn unpack_voltage(v: u16) -> f32 {
+    (v as f32 / 100.0) - 100.0
+}
+
+#[test]
+fn test_spatial_summation_basal() {
+    let mut graph = NetworkGraph::new();
+    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    // Set up branch 1 as Basal
+    graph.neurons[id as usize].branches[1] = Compartment {
+        branch_type: 1, // Basal
+        refractory_timer: 0,
+        voltage: pack_voltage(0.0),
+        nmda_threshold: pack_voltage(50.0), // High threshold to avoid NMDA spike
+        _padding: [0; 2],
+    };
+    
+    let initial_voltage = graph.neurons[id as usize].current_voltage;
+    
+    for tick in 1..=10 {
+        // Send a weak signal to branch 1
+        let current_branch_v = unpack_voltage(graph.neurons[id as usize].branches[1].voltage);
+        graph.neurons[id as usize].branches[1].voltage = pack_voltage(current_branch_v + 10.0);
+        
+        graph.tick(tick, env.clone());
+    }
+    
+    let final_voltage = graph.neurons[id as usize].current_voltage;
+    assert!(final_voltage > initial_voltage, "Soma voltage should increase due to spatial summation");
+}
+
+#[test]
+fn test_nmda_spike_trigger() {
+    let mut graph = NetworkGraph::new();
+    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    graph.neurons[id as usize].current_voltage = -70.0;
+    let initial_voltage = -70.0;
+
+    graph.neurons[id as usize].branches[1] = Compartment {
+        branch_type: 1,
+        refractory_timer: 0,
+        voltage: pack_voltage(0.0),
+        nmda_threshold: pack_voltage(20.0), // Threshold = 20
+        _padding: [0; 2],
+    };
+    
+    // Send a signal above threshold
+    graph.neurons[id as usize].branches[1].voltage = pack_voltage(25.0);
+    graph.tick(1, env.clone());
+    
+    assert!(graph.neurons[id as usize].current_voltage > initial_voltage + 50.0, "NMDA spike should inject massive voltage into soma");
+}
+
+#[test]
+fn test_branch_isolation() {
+    let mut graph = NetworkGraph::new();
+    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    graph.neurons[id as usize].branches[1] = Compartment {
+        branch_type: 1,
+        refractory_timer: 0,
+        voltage: pack_voltage(50.0),
+        nmda_threshold: pack_voltage(100.0),
+        _padding: [0; 2],
+    };
+    
+    graph.neurons[id as usize].branches[2] = Compartment {
+        branch_type: 1,
+        refractory_timer: 0,
+        voltage: pack_voltage(0.0),
+        nmda_threshold: pack_voltage(100.0),
+        _padding: [0; 2],
+    };
+    
+    graph.tick(1, env.clone());
+    
+    let v2 = unpack_voltage(graph.neurons[id as usize].branches[2].voltage);
+    assert!(v2.abs() < 0.1, "Branch 2 should remain isolated from Branch 1");
+}
+
+#[test]
+fn test_trunk_vs_tuft_penalty() {
+    let mut graph_trunk = NetworkGraph::new();
+    let mut graph_tuft = NetworkGraph::new();
+    let id_trunk = graph_trunk.add_neuron(NeuronType::Pyramidal);
+    let id_tuft = graph_tuft.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    graph_trunk.neurons[id_trunk as usize].energy_atp = 100.0;
+    graph_tuft.neurons[id_tuft as usize].energy_atp = 100.0;
+    
+    graph_trunk.neurons[id_trunk as usize].branches[1] = Compartment {
+        branch_type: 2, // Trunk
+        refractory_timer: 0,
+        voltage: pack_voltage(10.0),
+        nmda_threshold: pack_voltage(100.0),
+        _padding: [0; 2],
+    };
+    
+    graph_tuft.neurons[id_tuft as usize].branches[1] = Compartment {
+        branch_type: 3, // Tuft
+        refractory_timer: 0,
+        voltage: pack_voltage(10.0),
+        nmda_threshold: pack_voltage(100.0),
+        _padding: [0; 2],
+    };
+    
+    graph_trunk.tick(1, env.clone());
+    graph_tuft.tick(1, env.clone());
+    
+    let atp_trunk = graph_trunk.neurons[id_trunk as usize].energy_atp;
+    let atp_tuft = graph_tuft.neurons[id_tuft as usize].energy_atp;
+    
+    assert!(atp_trunk < atp_tuft, "Trunk should consume more ATP than Tuft");
+}
+
+#[test]
+fn test_branch_refractory_period() {
+    let mut graph = NetworkGraph::new();
+    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    graph.neurons[id as usize].branches[1] = Compartment {
+        branch_type: 1,
+        refractory_timer: 0,
+        voltage: pack_voltage(30.0),
+        nmda_threshold: pack_voltage(20.0), // Force NMDA spike
+        _padding: [0; 2],
+    };
+    
+    graph.tick(1, env.clone()); // NMDA spike happens here
+    
+    let timer = graph.neurons[id as usize].branches[1].refractory_timer;
+    assert_eq!(timer, 3, "Branch should enter refractory period of 3 ticks");
+    
+    // Tick 2: Should be refractory, ignores new voltage
+    graph.neurons[id as usize].branches[1].voltage = pack_voltage(50.0);
+    graph.tick(2, env.clone());
+    let v_ref = unpack_voltage(graph.neurons[id as usize].branches[1].voltage);
+    assert!(v_ref < 1.0, "Voltage should be reset during refractory period");
+    assert_eq!(graph.neurons[id as usize].branches[1].refractory_timer, 2);
+}
+
+#[test]
+fn test_passive_leak_diffusion() {
+    let mut graph = NetworkGraph::new();
+    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    graph.neurons[id as usize].current_voltage = -70.0;
+    
+    graph.neurons[id as usize].branches[1] = Compartment {
+        branch_type: 1,
+        refractory_timer: 0,
+        voltage: pack_voltage(10.0), 
+        nmda_threshold: pack_voltage(100.0),
+        _padding: [0; 2],
+    };
+    
+    graph.tick(1, env.clone());
+    
+    let soma_v = graph.neurons[id as usize].current_voltage;
+    println!("Soma V after leak: {}", soma_v);
+    
+    // In evaluate_branches:
+    // v = 10.0 * 0.9 = 9.0
+    // passive_leak = 9.0 * 0.05 = 0.45
+    // n->current_voltage += 0.45  => -69.55
+    // But then there's VOLTAGE_DECAY_RATE (0.1) in process_spike if we were above resting voltage, but we are below resting voltage? No, resting is -70.
+    // Wait, process_spike might pull it back towards resting voltage, or ATP drain might happen.
+    
+    assert!(soma_v > -70.0, "Soma should receive a small passive leak charge");
+}
