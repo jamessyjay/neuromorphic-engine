@@ -91,10 +91,25 @@ cargo run --release -- --benchmark
 
 ## Directory Structure
 
-- `src/`: Rust source code (App orchestrator, FFI, Graph management).
-- `cuda/`: C++/CUDA kernels for biological simulation.
-- `specs/`: Detailed technical specifications and mathematical models.
-- `graphs/`: Auto-generated visualization results.
+- `cuda/`: C++/CUDA kernels. Massively parallel mathematics and core biology.
+  - `allocator.h` — Unified Memory management wrappers.
+  - `base_neuron.h` — Structural definitions and constants for C++.
+  - `base_neuron.cu` — Heavy-lifting kernels (`tick_neurons_kernel`, `tick_synapses_kernel`, etc.) for STDP, voltage, and metabolism.
+- `src/`: Rust source code. Orchestrator, memory owner, and ecosystem logic.
+  - `main.rs` — CLI parser and entry point.
+  - `modes.rs` — Simulation routines (benchmark, standard, visualization modes).
+  - `graph.rs` — The `NetworkGraph` struct representing the brain, and High-Level services (Astrocytes, Microglia).
+  - `ffi.rs` — Foreign Function Interface definitions to bind Rust with C++.
+  - `streamer.rs` — Async WebSocket server (Tokio + Warp) for real-time 3D UI.
+  - `visualization.rs` — Static charting tools (Plotters) for generating 2D graphs.
+  - `telemetry.rs` — Engine profiler (TPS, Memory overhead).
+  - `stimulus.rs` — External signal generators.
+  - `constants.rs` — Global simulation tunables.
+- `visualizer/`: Standalone Real-Time 3D Frontend.
+  - `index.html` — Three.js + WebGL Decoupled Observer canvas.
+- `specs/`: Detailed technical specifications, biology formulas, and roadmap.
+- `docs/`: In-depth architectural documentation and FFI guides.
+- `graphs/`: Auto-generated 2D visualization results from tests.
 
 ---
 *Created with ❤️ by the DL.*
