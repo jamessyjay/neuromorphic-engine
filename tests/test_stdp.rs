@@ -39,8 +39,8 @@ fn test_stdp_trace_decay() {
     }
 
     let final_trace = graph.neurons[n as usize].spike_trace;
-    assert!(final_trace < 0.5 && final_trace > 0.0, "Trace should have decayed to approx 0.358: {}", final_trace);
-    assert!((final_trace - 0.358).abs() < 0.05, "Trace value incorrect: {}", final_trace);
+    assert!(final_trace < 0.5 && final_trace > 0.0, "Trace should have decayed to approx 0.1215: {}", final_trace);
+    assert!((final_trace - 0.1215).abs() < 0.05, "Trace value incorrect: {}", final_trace);
 }
 
 #[test]
@@ -179,10 +179,10 @@ fn test_stdp_weight_clamping() {
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
     let mut env = default_env();
-    env.stdp_learning_rate = 1.0; // High rate to ensure clamp
+    env.stdp_learning_rate = 50.0; // High rate to ensure clamp
     
     // Note: MAX_SYNAPSE_WEIGHT is 50.0f
-    let max_weight = 50.0;
+    let max_weight = 5.0;
     
     let synapse = Synapse {
         source_id: src,

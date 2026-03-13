@@ -11,8 +11,17 @@
     #define __global__
     #define __device__
     #define __host__
-    // Mock atomicAdd for CPU testing - simplified for speed
+    #ifdef __cplusplus
+    #include <atomic>
+    // Thread-safe atomicAdd for CPU testing using C++ std::atomic
+    inline void atomicAdd(float* addr, float val) {
+        std::atomic<float>* a = reinterpret_cast<std::atomic<float>*>(addr);
+        float current = a->load(std::memory_order_relaxed);
+        while (!a->compare_exchange_weak(current, current + val, std::memory_order_release, std::memory_order_relaxed));
+    }
+#else
     #define atomicAdd(addr, val) (*(addr) += (val))
+#endif
 #endif
 
 extern "C" {
@@ -37,7 +46,7 @@ extern "C" {
 #define VOLTAGE_DECAY_RATE 0.1f // Membrane leak
 #define CALCIUM_SPIKE_GAIN 5.0f
 #define FATAL_CALCIUM_LEVEL 1000.0f
-#define MAX_SYNAPSE_WEIGHT 50.0f
+#define MAX_SYNAPSE_WEIGHT 5.0f
 
 #define DEATH_NONE 0
 #define DEATH_ATP_LOW 1
@@ -96,9 +105,9 @@ extern "C" {
 // STDP (Spike-Timing-Dependent Plasticity) Parameters (Phase 45)
 #define STDP_TAU_PLUS 20.0f
 #define STDP_TAU_MINUS 20.0f
-#define STDP_A_PLUS 0.2f
-#define STDP_A_MINUS 0.24f
-#define STDP_DECAY 0.95f
+#define STDP_A_PLUS 0.005f
+#define STDP_A_MINUS 0.007f
+#define STDP_DECAY 0.90f
 #define MIN_SYNAPSE_WEIGHT 0.01f
 
 #define CONSTANT_PHOTORECEPTOR_LEAK 2.0f
@@ -111,7 +120,7 @@ extern "C" {
 #define SYNAPSE_SCALING_LOW 1
 #define SYNAPSE_PENALTY 0.05f
 #define SYNAPSE_RECOVERY 0.01f
-#define SYNAPSE_RECOVERY_MAX_WEIGHT 15.0f
+#define SYNAPSE_RECOVERY_MAX_WEIGHT 5.0f
 #define SYNAPSE_RELIABILITY_THRESHOLD 0.5f
 #define SYNAPSE_RELIABILITY_PENALTY 0.8f
 

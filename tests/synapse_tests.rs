@@ -22,7 +22,7 @@ fn test_classic_ltp() {
     let synapse = Synapse {
         source_id: src,
         target_id: tgt,
-        weight: 10.0,
+        weight: 2.5,
         neurotransmitter_buffer: 0.0,
         last_activation_tick: 0,
         ticks_below_threshold: 0,
@@ -44,7 +44,7 @@ fn test_classic_ltp() {
     graph.neurons[tgt as usize].last_spike_tick = 6;
     graph.tick(6, env.clone());
     
-    assert!(graph.synapses[0].weight > 10.0, "Weight should increase due to LTP");
+    assert!(graph.synapses[0].weight > 2.5, "Weight should increase due to LTP");
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn test_classic_ltd() {
     let synapse = Synapse {
         source_id: src,
         target_id: tgt,
-        weight: 10.0,
+        weight: 2.5,
         neurotransmitter_buffer: 0.0,
         last_activation_tick: 0,
         ticks_below_threshold: 0,
@@ -77,7 +77,7 @@ fn test_classic_ltd() {
     
     for tick in 11..=30 { graph.tick(tick, env.clone()); }
     
-    assert!(graph.synapses[0].weight < 10.0, "Weight should decrease due to LTD");
+    assert!(graph.synapses[0].weight < 2.5, "Weight should decrease due to LTD");
 }
 
 #[test]
@@ -87,11 +87,12 @@ fn test_dopamine_amplification() {
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
     let mut env = default_env();
     env.dopamine_multiplier = 10.0;
+    env.stdp_learning_rate = 50.0;
     
     let synapse = Synapse {
         source_id: src,
         target_id: tgt,
-        weight: 10.0,
+        weight: 2.5,
         neurotransmitter_buffer: 0.0,
         last_activation_tick: 0,
         ticks_below_threshold: 0,
@@ -111,7 +112,12 @@ fn test_dopamine_amplification() {
     graph.neurons[tgt as usize].last_spike_tick = 6;
     graph.tick(6, env.clone());
     
-    assert!(graph.synapses[0].weight > 10.5, "Weight should grow much faster with dopamine");
+    
+    // With env.stdp_learning_rate = 50.0 and dopa_mult = 10.0,
+    // Source spiked at 1, target at 6. Trace = 0.9^5 = 0.59
+    // delta_w = 0.59 * 50.0 * 0.005 * 10.0 = 1.475
+    // Final weight should be ~3.975
+    assert!(graph.synapses[0].weight > 3.5, "Weight should grow much faster with dopamine");
 }
 
 #[test]
@@ -124,7 +130,7 @@ fn test_synaptic_scaling() {
     let synapse = Synapse {
         source_id: src,
         target_id: tgt,
-        weight: 10.0,
+        weight: 2.5,
         neurotransmitter_buffer: 0.0,
         last_activation_tick: 0,
         ticks_below_threshold: 0,
@@ -145,7 +151,7 @@ fn test_reliability_fade() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
-    let mut env = default_env();
+    let env = default_env();
      
     
     let synapse = Synapse {

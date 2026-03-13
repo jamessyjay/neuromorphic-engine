@@ -225,7 +225,10 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
 
 static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, uint32_t current_tick) {
     // Phase 40 Performance: Early exit for dead neural pathways
-    if (!source->is_alive || !target->is_alive) return;
+    if (!source->is_alive || !target->is_alive) {
+        s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
+        return;
+    }
 
     if (source->type == TYPE_PHOTORECEPTOR) {
         if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
@@ -245,13 +248,11 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     // Phase 45: Spike-Timing-Dependent Plasticity (STDP) with Dopamine Modulation
     uint8_t is_inhibitory = (s->flags & 0x08) != 0;
     
-    if (!is_inhibitory) {
-        // Trace-based LTP (Potentiation)
-        // If target just spiked, apply LTP based on source's existing trace
-        if (target->last_spike_tick == current_tick) {
-            float delta_w = source->spike_trace * env.stdp_learning_rate;
-            s->weight += delta_w * env.dopamine_multiplier;
-        }
+    // Trace-based LTP (Potentiation)
+    // If target just spiked, apply LTP based on source's existing trace
+    if (!is_inhibitory && target->last_spike_tick == current_tick) {
+        float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
+        s->weight += delta_w * env.dopamine_multiplier;
     }
     
     // Legacy LTP/LTD updates commented out to rely on pure STDP
@@ -290,15 +291,20 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
             // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
-            uint32_t expected_delivery_delay = ((s->flags & 0x10) != 0) ? 0 : 1; 
-            if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) == expected_delivery_delay) {
-                float delta_w = target->spike_trace * (env.stdp_learning_rate * 0.5f);
-                s->weight -= delta_w * env.dopamine_multiplier;
-            }
-
-            // Limits (Applied here too after LTD)
-            if (s->weight > MAX_SYNAPSE_WEIGHT) s->weight = MAX_SYNAPSE_WEIGHT; 
-            if (s->weight < MIN_SYNAPSE_WEIGHT) s->weight = MIN_SYNAPSE_WEIGHT; 
+            uint32_t expected_delivery_delay = ((s->flags & 0x10) != 0) ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
+            // Since delivery is handled by ticking down ticks_until_delivery starting from delay,
+            // at the moment of arrival, current_tick - source->last_spike_tick == expected_delivery_delay + 1.
+            // But wait, the source might have spiked *again* before delivery. Let's just check if it spiked recently.
+            // We arrived! Check if source spiked recently enough
+            if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= expected_delivery_delay + 2) {
+                // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
+                // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
+                // In acausal firing (LTD territory), target fired, then source fired, so target->last_spike_tick <= source->last_spike_tick
+                if (target->last_spike_tick > 0 && target->last_spike_tick <= source->last_spike_tick) {
+                    float delta_w = target->spike_trace * env.stdp_learning_rate * STDP_A_MINUS;
+                    s->weight -= delta_w * env.dopamine_multiplier;
+                }
+            } 
 
             // 1. Reliability Check (Phase 30/31): Thin synapses are unreliable
             // 1. Reliability Check: (Simplified since thickness is gone from struct)
@@ -343,6 +349,9 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             }
         }
     }
+
+    // Limits (Applied globally at the very end of process_synapse to catch LTP, Homeostatic Scaling, and LTD)
+    s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
 }
 
 #ifdef USE_CUDA
@@ -350,7 +359,12 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
 __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
-    if (!neurons[idx].is_alive) return;
+    
+    // Trace Cleanup: Ensure spike_trace is properly decayed or zeroed
+    if (!neurons[idx].is_alive) {
+        neurons[idx].spike_trace = 0.0f;
+        return;
+    }
     
     update_metabolism(&neurons[idx], env);
     update_calcium(&neurons[idx]);
@@ -395,12 +409,15 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 #ifndef USE_CUDA
 extern "C" {
     void tick_neuron_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
-        if (neuron->is_alive) {
-            update_metabolism(neuron, env);
-            update_calcium(neuron);
-            evaluate_branches(neuron);
-            process_spike(neuron, env, current_tick);
+        if (!neuron->is_alive) {
+            neuron->spike_trace = 0.0f;
+            return;
         }
+        
+        update_metabolism(neuron, env);
+        update_calcium(neuron);
+        evaluate_branches(neuron);
+        process_spike(neuron, env, current_tick);
     }
 
     void tick_synapse_cpu(Synapse* synapse, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
