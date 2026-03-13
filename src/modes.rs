@@ -330,12 +330,8 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         graph.tick(tick, current_env);
         
-        if tick % 50 == 0 {
-            tokio::task::yield_now().await;
-        }
-
         if let Some(ref tx) = tx {
-            if tx.receiver_count() > 0 && tick == 1 {
+            if tick == 1 {
                 let mut initial_state = streamer::InitialStatePayload {
                     total_neurons: graph.neurons.len(),
                     total_synapses: graph.synapses.len(),
@@ -357,7 +353,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
                 });
             }
 
-            if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_SIMULATION == 0 {
+            if tick % WS_SNAPSHOT_INTERVAL_SIMULATION == 0 {
                 let mut accumulated_spikes = 0;
                 let mut update = streamer::TickUpdatePayload {
                     tick,
@@ -385,6 +381,14 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
                         let _ = tx_clone.send(json);
                     }
                 });
+
+                // Throttle: ~60 FPS visual update rate
+                tokio::time::sleep(tokio::time::Duration::from_millis(16)).await;
+            }
+        } else {
+            // Only yield in headless mode to not block the executor entirely
+            if tick % 50 == 0 {
+                tokio::task::yield_now().await;
             }
         }
         
@@ -1048,7 +1052,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>) -> 
         });
     }
 
-    let mut env = Environment {
+    let env = Environment {
         global_oxygen_level: 1.0,
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,

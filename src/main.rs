@@ -36,22 +36,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_bench_io = args.contains(&String::from("--bench-io"));
     let is_ui_test = args.contains(&String::from("--ui-test"));
 
+    let mut parsed_neurons = DEFAULT_BENCHMARK_NEURONS;
+    let mut parsed_synapses = DEFAULT_BENCHMARK_SYNAPSES;
+    let mut parsed_ticks = DEFAULT_SIMULATION_TICKS;
+
+    for i in 1..args.len() {
+        if args[i] == "--neurons" && i + 1 < args.len() {
+            parsed_neurons = args[i+1].parse().unwrap_or(parsed_neurons);
+        }
+        if args[i] == "--synapses" && i + 1 < args.len() {
+            parsed_synapses = args[i+1].parse().unwrap_or(parsed_synapses);
+        }
+        if args[i] == "--ticks" && i + 1 < args.len() {
+            parsed_ticks = args[i+1].parse().unwrap_or(parsed_ticks);
+        }
+    }
+
     let (tx, _rx) = broadcast::channel(100);
     
-    // Spawn WebSocket server only if --ui flag is present
-    if is_ui_enabled {
-        println!("UI Mode enabled. Starting WebSocket server...");
+    let tx_option = if is_ui_enabled || is_ui_test {
+        println!("Spawning WebSocket server on port 3030...");
         let tx_clone = tx.clone();
         tokio::spawn(async move {
             crate::streamer::start_server(tx_clone).await;
         });
-        // Give the server a moment to actually bind the port before we hammer the CPU
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        Some(tx)
     } else {
         println!("UI Mode disabled. Running in headless high-performance mode (use --ui to enable visualizer).");
-    }
-
-    let tx_option = if is_ui_enabled { Some(tx.clone()) } else { None };
+        None
+    };
 
     if is_bench_scaling {
         modes::run_bench_scaling().await?;
@@ -59,28 +73,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         modes::run_bench_io().await?;
     } else if is_ui_test {
         modes::run_ui_test(tx_option.clone()).await?;
+        println!("Simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        }
     } else if is_sleep_test {
         run_sleep_test()?;
         return Ok(());
     }
 
     if is_benchmark {
-        let mut neurons = DEFAULT_BENCHMARK_NEURONS;
-        let mut synapses = DEFAULT_BENCHMARK_SYNAPSES;
-        let mut ticks = DEFAULT_BENCHMARK_TICKS;
-
-        for i in 1..args.len() {
-            if args[i] == "--neurons" && i + 1 < args.len() {
-                neurons = args[i+1].parse().unwrap_or(neurons);
-            }
-            if args[i] == "--synapses" && i + 1 < args.len() {
-                synapses = args[i+1].parse().unwrap_or(synapses);
-            }
-            if args[i] == "--ticks" && i + 1 < args.len() {
-                ticks = args[i+1].parse().unwrap_or(ticks);
-            }
-        }
-
         // Force fresh start for benchmark if requested
         if args.contains(&String::from("--fresh")) {
             if std::path::Path::new("brain_save.bin").exists() {
@@ -89,7 +91,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        let data = run_benchmark_mode(neurons, synapses, ticks, tx_option).await?;
+        if tx_option.is_some() {
+            println!("\n=======================================================");
+            println!("🚀 UI MODE ACTIVE: Open http://127.0.0.1:3030/index.html");
+            println!("⏳ Waiting 5 seconds for WebSocket connection before starting ticks...");
+            println!("=======================================================\n");
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        }
+
+        let data = run_benchmark_mode(parsed_neurons, parsed_synapses, parsed_ticks, tx_option).await?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
         return Ok(());
     }
@@ -150,8 +160,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         setup_simulation()
     };
-    let data = run_simulation(graph, DEFAULT_SIMULATION_TICKS, tx_option).await;
+    
+    if tx_option.is_some() {
+        println!("\n=======================================================");
+        println!("🚀 UI MODE ACTIVE: Open http://127.0.0.1:3030/index.html");
+        println!("⏳ Waiting 5 seconds for WebSocket connection before starting ticks...");
+        println!("=======================================================\n");
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    }
+
+    let data = run_simulation(graph, parsed_ticks, tx_option.clone()).await;
     render_chart(&data, "graphs/phase8_sensors.png")?;
+
+    if is_ui_enabled || is_ui_test {
+        println!("Simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        }
+    }
 
     Ok(())
 }
