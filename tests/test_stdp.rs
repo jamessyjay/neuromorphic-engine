@@ -292,8 +292,11 @@ fn test_stdp_associative_persistence_under_noise() {
         }
     }
 
-    // Phase 1 — Associative Conditioning (100 cycles)
-    env.stdp_learning_rate = 500.0; // Scaled up to compensate for 100 cycles limit and 0.9^20 trace decay
+    // Step 2: Phase 1 — Associative Conditioning (100 cycles)
+    // To reach >3.0 weight in exactly 100 cycles with only 1 spike pair per cycle,
+    // we must scale the stdp_learning_rate significantly higher than 0.1 
+    // because STDP_A_PLUS is very small (0.005) and the trace decays by 0.9^20.
+    env.stdp_learning_rate = 500.0; 
     env.dopamine_multiplier = 5.0;
     
     let mut tick = 1;
