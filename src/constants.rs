@@ -114,7 +114,7 @@ pub const SECONDS_PER_TICK: f64 = 0.001; // 1 tick = 1ms of biological time
 pub const WEIGHT_BINS_COUNT: usize = 10;
 pub const ATP_BINS_COUNT: usize = 5;
 pub const MAX_U16_AS_F32: f32 = 65535.0; // Normalization constant for 16-bit fixed-point metrics
-pub const FATIGUE_SLEEP_THRESHOLD: f32 = 5000.0; // Metabolic wear limit to trigger Sleep Cycle
+pub const FATIGUE_SLEEP_THRESHOLD: f32 = 60_000.0; // Metabolic wear limit to trigger Sleep Cycle
 
 // --- Constants from Phase 34 Tests ---
 pub const VOLTAGE_10_PACKED: u16 = 11000;  // (10.0 + 100.0) * 100.0

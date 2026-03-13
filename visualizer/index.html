@@ -22,15 +22,15 @@
             position: absolute;
             top: 10px;
             left: 10px;
-            color: #0f0;
+            color: #4ade80;
             background: rgba(0, 20, 0, 0.8);
             padding: 10px;
-            border: 1px solid #0f0;
+            border: 1px solid #4ade80;
             pointer-events: none;
             font-size: 12px;
             text-transform: uppercase;
         }
-        .label { font-weight: bold; color: #5f5; }
+        .label { font-weight: bold; color: #86efac; }
         #status { font-weight: bold; }
     </style>
 </head>
@@ -42,7 +42,7 @@
         <div id="neurons">Neurons: 0</div>
         <div id="synapses">Synapses: 0</div>
         <div style="margin-top: 5px; color: #aaa;">[LMB] ROTATE | [RMB] PAN | [WHEEL] ZOOM</div>
-        <div id="log-container" style="margin-top: 10px; max-height: 150px; overflow-y: auto; border-top: 1px solid #0f0; padding-top: 5px; font-size: 10px;">
+        <div id="log-container" style="margin-top: 10px; max-height: 150px; overflow-y: auto; border-top: 1px solid #86dba5; padding-top: 5px; font-size: 10px;">
             <div style="color: #aaa; margin-bottom: 2px;">-- DEBUG LOGS --</div>
             <div id="logs"></div>
         </div>
@@ -57,7 +57,7 @@
             const status = document.getElementById('status');
             if (status) {
                 status.innerText = "JS ERROR: " + msg;
-                status.style.color = "#f0f";
+                status.style.color = "#86dba5";
             }
             logMsg(`ERROR: ${msg} (Line: ${lineNo}:${columnNo})`);
             if (error && error.stack) {
@@ -230,13 +230,13 @@
 
             ws.onopen = () => {
                 document.getElementById('status').innerText = "Status: ONLINE (3D)";
-                document.getElementById('status').style.color = "#0f0";
+                document.getElementById('status').style.color = "#86dba5";
                 logMsg("WebSocket ONLINE.");
             };
 
             ws.onclose = () => {
                 document.getElementById('status').innerText = "Status: DISCONNECTED";
-                document.getElementById('status').style.color = "#f00";
+                document.getElementById('status').style.color = "#86dba0";
                 logMsg("WebSocket DISCONNECTED. Reconnecting in 2s...");
                 setTimeout(connect, 2000);
             };
@@ -384,9 +384,11 @@
                                     _tempColor.setRGB(1.0, 1.0, 1.0); // Спайк = вспышка белым
                                 } else {
                                     // Градиент усталости: 100% АТФ = Зеленый, 0% = Красный
-                                    const r = 1.0 - (atp_pct / 100.0);
-                                    const g = atp_pct / 100.0;
-                                    _tempColor.setRGB(r, g, 0.0);
+                                    // Градиент усталости: 100% АТФ = Мягкий изумрудный, 0% = Приглушенный красный
+                                    const r = (1.0 - (atp_pct / 100.0)) * 0.9;
+                                    const g = (atp_pct / 100.0) * 0.8;
+                                    const b = (atp_pct / 100.0) * 0.4; // Капля синего для свежести
+                                    _tempColor.setRGB(r, g, b);
                                 }
                                 meshData.mesh.setColorAt(nData.meshIdx, _tempColor);
                             }

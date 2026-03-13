@@ -216,11 +216,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         if tick % 1000 == 0 && graph.is_sleep_needed() {
             println!("Fatigue threshold reached. Entering Sleep Cycle...");
             graph.initiate_sleep_cycle();
-            println!("Wake up! Network consolidated and saved.");
-        }
-
-        if tick % 5000 == 0 {
-            graph.save_to_disk();
+            println!("Wake up! Network consolidated.");
         }
 
         let mut spikes = 0;
@@ -395,10 +391,6 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
         if tick % SERVICE_TICK_INTERVAL == 0 {
             graph.run_astrocyte_service(tick);
             graph.run_microglia_service(tick);
-        }
-        
-        if tick % 5000 == 0 {
-            graph.save_to_disk();
         }
         
         data.ticks.push(tick);

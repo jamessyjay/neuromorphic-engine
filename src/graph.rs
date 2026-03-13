@@ -55,12 +55,6 @@ impl NetworkGraph {
             }
         }
         println!("  -> Neurons fully recovered.");
-
-        // Snapshot (Serialization)
-        println!("  -> Serializing network to disk...");
-        let file = File::create("brain_save.bin").expect("Failed to create brain_save.bin");
-        let writer = BufWriter::new(file);
-        bincode::serialize_into(writer, &self).expect("Failed to serialize network");
     }
 
     pub fn save_to_disk(&self) {
