@@ -95,6 +95,7 @@ Any new feature must pass Stress-Tests (Spec 11):
 ## [!] HARDWARE TELEMETRY & SCALING
 
 To prevent "apocalypse" during scaling:
+
 1. **Telemetry Service:** In `graph.rs` there must be a module that outputs every 1000 ticks:
    - `Simulation Speed`: what % of real-time (e.g., 1.0x — keeping up with time).
    - `Memory Overhead`: how many bytes are spent on 1 neuron and 1 synapse in Unified Memory.

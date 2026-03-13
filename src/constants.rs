@@ -1,6 +1,5 @@
 // src/constants.rs
 // Centralized registry for all neuromorphic engine constants
-// Some constants are reserved for future use (e.g. on Jetson Orin Nano with real CUDA).
 #![allow(dead_code)]
 
 // --- Simulation Timing & Intervals ---
@@ -17,7 +16,7 @@ pub const VISUAL_SPIKE_PERSISTENCE_TICKS: u32 = 25;
 pub const DEFAULT_SIMULATION_TICKS: u32 = 5000;
 pub const DEFAULT_BENCHMARK_TICKS: u32 = 50_000;
 pub const DEFAULT_BENCHMARK_NEURONS: usize = 1000;
-pub const DEFAULT_BENCHMARK_SYNAPSES: usize = 25000;
+pub const DEFAULT_BENCHMARK_SYNAPSES: usize = 25_000;
 
 // --- Stimulus & Pavlovian Conditioning ---
 pub const STIMULUS_DEFAULT_INTERVAL: u32 = 1000;
@@ -29,29 +28,31 @@ pub const STOCHASTIC_GROWTH_PROB: f64 = 0.01;
 pub const DEFAULT_WEIGHT: f32 = 2.0;
 pub const WEIGHT_SIGMA: f32 = 1.0;
 pub const SEED_WEIGHT: f32 = 0.5;
-pub const SEED_THICKNESS: f32 = 0.2;
 
 pub const LONG_RANGE_PROB: f64 = 0.02;
 pub const INHIBITORY_PROB: f64 = 0.1;
 pub const MYELIN_PROB: f64 = 0.2;
 pub const PYRAMIDAL_PROB: f64 = 0.7;
 
-// --- Biological Thresholds & Limits ---
+// --- Biological Thresholds & Limits (СИНХРОНИЗИРОВАНО С base_neuron.h) ---
 pub const PRUNING_WEIGHT_THRESHOLD: f32 = 0.1;
 pub const PRUNING_TICK_THRESHOLD: u32 = 2000;
-pub const MAX_SYNAPSE_WEIGHT: f32 = 30.0;
-pub const MAX_SYNAPSES_TOTAL: usize = 1000000;
+pub const MAX_SYNAPSE_WEIGHT: f32 = 50.0; // ПОФИКСЕНО (было 30.0)
+pub const MAX_SYNAPSES_TOTAL: usize = 1_000_000;
 pub const MAX_SYNAPSES_PER_NEURON: usize = 2000;
 pub const MAX_SYNAPSE_WEIGHT_BENCHMARK: f32 = 10.0;
 pub const MIN_SYNAPSE_WEIGHT_BENCHMARK: f32 = 0.5;
-pub const EMERGENCY_ATP_THRESHOLD: f32 = 20.0;
+
 pub const MAX_ATP: f32 = 100.0;
+pub const EMERGENCY_ATP_THRESHOLD: f32 = 20.0; // Порог засыпания (Silence)
+pub const EMERGENCY_ATP_DEATH_THRESHOLD: f32 = 0.01; // Порог смерти
+
 pub const ASTROCYTE_ATP_SUPPLY: f32 = 10.0;
 pub const ASTROCYTE_CLEAN_THRESHOLD: f32 = 50.0;
 pub const ASTROCYTE_CLEAN_AMOUNT: f32 = 10.0;
 
 // --- Physics (Mirrored from CUDA for initialization) ---
-pub const NMDA_SPIKE_THRESHOLD: f32 = 5.0;
+pub const NMDA_SPIKE_GAIN: f32 = 5.0; // ПЕРЕИМЕНОВАНО (было NMDA_SPIKE_THRESHOLD)
 pub const RESTING_VOLTAGE: f32 = -70.0;
 pub const THRESHOLD_VOLTAGE: f32 = -55.0;
 pub const SPIKE_VOLTAGE: f32 = 40.0;
@@ -89,10 +90,10 @@ pub const TICK_LIMIT_CHART: f32 = 1000.0;
 pub const METRIC_MIN_F32: f32 = 0.0;
 pub const METRIC_MAX_F32: f32 = 100.0;
 pub const VOLTAGE_MIN_F32: f32 = -90.0;
-pub const VOLTAGE_MAX_F32: f32 = 50.0;
+pub const VOLTAGE_MAX_F32: f32 = 60.0; // ПОФИКСЕНО (чтобы графики не обрезали пики)
 pub const BUFFER_MAX_F32: f32 = 20.0;
-pub const WEIGHT_MAX_F32: f32 = 20.0;
-pub const DOPAMINE_MAX_F32: f32 = 6.0;
+pub const WEIGHT_MAX_F32: f32 = 50.0; // ПОФИКСЕНО (совпадает с MAX_SYNAPSE_WEIGHT)
+pub const DOPAMINE_MAX_F32: f32 = 8.0; // ПОФИКСЕНО (под твой хардкорный буст из stimulus.rs)
 pub const EMERGENCE_TIME_LIMIT: f32 = 2000.0;
 pub const MORPHOLOGY_TIME_LIMIT: f32 = 3000.0;
 pub const REFLEX_TIME_LIMIT: f32 = 1000.0;
