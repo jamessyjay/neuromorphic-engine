@@ -300,26 +300,25 @@
                     data.neurons.forEach(n => {
                         const id = n[0];
                         const type = n[4];
+                        const SPACE_SIZE = 100.0;
+                        const HALF_SIZE = SPACE_SIZE / 2.0;
                         
-                        // Compress 65535 units into a neat 100x100 cube
+                        // Compress 65535 units into a neat SPACE_SIZE^3 cube
                         // USING LET INSTEAD OF CONST so coordinates can be overwritten
-                        let x = (n[1] / 65535.0) * 100.0 - 50.0;
-                        let y = (n[2] / 65535.0) * 100.0 - 50.0;
-                        let z = (n[3] / 65535.0) * 100.0 - 50.0;
+                        let x = (n[1] / 65535.0) * SPACE_SIZE - HALF_SIZE;
+                        let y = (n[2] / 65535.0) * SPACE_SIZE - HALF_SIZE;
+                        let z = (n[3] / 65535.0) * SPACE_SIZE - HALF_SIZE;
 
                         // LAYER SORTING
-                        if (type === 3) {
-                            // Pacemakers (Cubes) pushed to the LEFT edge
-                            x = -45.0; 
-                        } else if (type === 5) {
+                        if (type === 5) {
                             // Sensors (Pyramids/Tetrahedrons) pushed to the RIGHT edge
-                            x = 75.0;
+                            x = SPACE_SIZE * -0.75; // -3/4 of the space
                         } else if (type === 4) {
                             // Motors (Octahedrons/Rhombus) grouped FAR RIGHT
-                            x = 10.0;
-                        } else if (type === 0) {
-                            // Pyramidal neurons (Sphere by default) grouped on the RIGHT, slightly left of sensors
-                            x = 30.0 + (Math.random() * 10.0 - 5.0); // Slight random scatter so they don't merge into one point
+                            x = SPACE_SIZE * 0.75; // +3/4 of the space
+                        } else if (type === 0 || type == 3) {
+                            // Pyramidal and Pacemaker neurons (Sphere and Cube by default) grouped on the RIGHT, slightly left of sensors
+                            x = SPACE_SIZE * -0.10 + (Math.random() * HALF_SIZE - HALF_SIZE * 0.1); // Slight random scatter so they don't merge into one point
                         }
 
                         const meshData = neuronMeshes.find(m => m.type === type);
