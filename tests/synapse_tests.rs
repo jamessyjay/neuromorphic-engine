@@ -8,7 +8,7 @@ fn default_env() -> Environment {
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
         light_level: 0.0,
-        seed: 42,
+        stdp_learning_rate: 0.1,
     }
 }
 
@@ -146,7 +146,7 @@ fn test_reliability_fade() {
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
     let mut env = default_env();
-    env.seed = 999; 
+     
     
     let synapse = Synapse {
         source_id: src,

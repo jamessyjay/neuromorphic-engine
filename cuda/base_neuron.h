@@ -93,6 +93,14 @@ extern "C" {
 #define HYPERPOLARIZATION_OFFSET 10.0f
 #define RELATIVE_REFRACTORY_MULTIPLIER 1.5f
 
+// STDP (Spike-Timing-Dependent Plasticity) Parameters (Phase 45)
+#define STDP_TAU_PLUS 20.0f
+#define STDP_TAU_MINUS 20.0f
+#define STDP_A_PLUS 0.2f
+#define STDP_A_MINUS 0.24f
+#define STDP_DECAY 0.95f
+#define MIN_SYNAPSE_WEIGHT 0.01f
+
 #define CONSTANT_PHOTORECEPTOR_LEAK 2.0f
 #define BULK_NEUROTRANSMITTER_RELEASE 25.0f
 #define LTP_TIME_WINDOW 20
@@ -168,7 +176,7 @@ typedef struct alignas(64) {
     bool is_alive;            // 1 byte
     uint8_t _pad1;            // 1 byte
     
-    float size;
+    float spike_trace;
     float current_voltage;
     
     // Adaptive thresholds
@@ -203,7 +211,7 @@ typedef struct {
     float dopamine_multiplier;    // > 1.0 boosts signal
     float toxin_levels;           
     float light_level;            
-    uint32_t seed;                
+    float stdp_learning_rate;                
 } Environment;
 
 // Synaptic buffer representation (Packed: 24 bytes)

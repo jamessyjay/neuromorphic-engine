@@ -34,7 +34,7 @@ pub struct BaseNeuron {
     pub is_alive: bool,
     pub _pad1: u8,
     
-    pub size: f32,
+    pub spike_trace: f32, // Replaces `size` to keep strict 128-byte layout
     pub current_voltage: f32,
     
     pub activation_threshold: f32,
@@ -84,7 +84,7 @@ pub struct Environment {
     pub dopamine_multiplier: f32,
     pub toxin_levels: f32,
     pub light_level: f32,
-    pub seed: u32,
+    pub stdp_learning_rate: f32,
 }
 
 #[link(name = "neuron_kernels", kind = "static")]

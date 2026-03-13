@@ -158,7 +158,7 @@ impl NetworkGraph {
             death_reason: 0,
             is_alive: true,
             _pad1: 0,
-            size: 1.0,
+            spike_trace: 0.0,
             current_voltage: 0.0,
             activation_threshold: 0.0,
             resting_voltage: 0.0,
@@ -264,6 +264,9 @@ impl NetworkGraph {
             if neuron.is_alive && neuron.energy_atp < ASTROCYTE_CLEAN_THRESHOLD {
                 neuron.energy_atp = f32::min(neuron.max_atp, neuron.energy_atp + ASTROCYTE_ATP_SUPPLY);
             }
+            
+            // Phase 45 Fix: Reset homeostatic spike counter for the new window
+            neuron.spikes_in_last_window = 0;
         });
     }
 

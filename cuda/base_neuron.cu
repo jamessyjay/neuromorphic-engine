@@ -153,6 +153,9 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
 }
 
 static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint32_t current_tick) {
+    // Phase 45: Trace decay
+    n->spike_trace *= STDP_DECAY;
+
     if (n->refractory_time_left > 0.0f) {
         n->refractory_time_left -= 1.0f; 
         n->current_voltage = n->resting_voltage - HYPERPOLARIZATION_OFFSET; // Hyperpolarization
@@ -190,6 +193,7 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
             n->current_voltage = ACTION_POTENTIAL_PEAK;
             n->last_spike_tick = current_tick;
             n->refractory_time_left = ABSOLUTE_REFRACTORY_PERIOD;
+            n->spike_trace = 1.0f; // Phase 45: Reset trace on spike
             
             // Metabolic Cost
             n->energy_ATP -= ATP_SPIKE_COST;
@@ -238,14 +242,26 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         }
     }
 
-    // STDP Learning Logic... (Keep weight growth logic, Phase 7 & 23 & 26 & 30)
+    // Phase 45: Spike-Timing-Dependent Plasticity (STDP) with Dopamine Modulation
+    uint8_t is_inhibitory = (s->flags & 0x08) != 0;
+    
+    if (!is_inhibitory) {
+        // Trace-based LTP (Potentiation)
+        // If target just spiked, apply LTP based on source's existing trace
+        if (target->last_spike_tick == current_tick) {
+            float delta_w = source->spike_trace * env.stdp_learning_rate;
+            s->weight += delta_w * env.dopamine_multiplier;
+        }
+    }
+    
+    // Legacy LTP/LTD updates commented out to rely on pure STDP
+    /*
     float learning_rate = STDP_LEARNING_RATE * env.dopamine_multiplier;
     
     // LTP: Potentiation + Thickness Growth (Phase 30)
     if (s->last_activation_tick > 0 && target->last_spike_tick == current_tick) {
         if (current_tick - s->last_activation_tick <= LTP_TIME_WINDOW) {
             s->weight += learning_rate;
-            // Physical growth removed since thickness field is gone
             s->last_activation_tick = 0; // Consumption
         }
     }
@@ -254,10 +270,10 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     if (s->last_activation_tick > 0 && current_tick - s->last_activation_tick >= LTD_TIME_WINDOW) {
         if (target->last_spike_tick < s->last_activation_tick) {
             s->weight -= learning_rate * LTD_PENALTY_MULTIPLIER;
-            // Structural decay removed
             s->last_activation_tick = 0; // Reset after depression
         }
     }
+    */
     
     // Homeostatic Scaling of Weights (Phase 23)
     if (target->spikes_in_last_window > SYNAPSE_SCALING_HIGH) {
@@ -265,10 +281,6 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     } else if (target->spikes_in_last_window < SYNAPSE_SCALING_LOW && s->weight < SYNAPSE_RECOVERY_MAX_WEIGHT) {
         s->weight += SYNAPSE_RECOVERY;
     }
-
-    // Limits
-    if (s->weight > MAX_SYNAPSE_WEIGHT) s->weight = MAX_SYNAPSE_WEIGHT; 
-    if (s->weight < 0.0f) s->weight = 0.0f; 
     
     // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08 + Phase 30)
     if (s->ticks_until_delivery >= 0) {
@@ -277,6 +289,17 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         }
         
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
+            // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
+            uint32_t expected_delivery_delay = ((s->flags & 0x10) != 0) ? 0 : 1; 
+            if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) == expected_delivery_delay) {
+                float delta_w = target->spike_trace * (env.stdp_learning_rate * 0.5f);
+                s->weight -= delta_w * env.dopamine_multiplier;
+            }
+
+            // Limits (Applied here too after LTD)
+            if (s->weight > MAX_SYNAPSE_WEIGHT) s->weight = MAX_SYNAPSE_WEIGHT; 
+            if (s->weight < MIN_SYNAPSE_WEIGHT) s->weight = MIN_SYNAPSE_WEIGHT; 
+
             // 1. Reliability Check (Phase 30/31): Thin synapses are unreliable
             // 1. Reliability Check: (Simplified since thickness is gone from struct)
             // We use weight as a proxy for maturity
@@ -389,7 +412,7 @@ extern "C" {
 void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed) {
     neuron->id = id;
     neuron->type = type;
-    neuron->size = INIT_SIZE_MEAN; 
+    neuron->spike_trace = 0.0f; 
     
     uint32_t local_seed = seed + id;
 
@@ -433,7 +456,7 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->leak_coeff = get_gaussian(&local_seed, INIT_LEAK_COEFF_MEAN, DEFAULT_LEAK_VAR);
     
     // Randomized structural properties
-    neuron->size = get_gaussian(&local_seed, INIT_SIZE_MEAN, DEFAULT_SIZE_VAR);
+    neuron->spike_trace = 0.0f;
     neuron->vesicles_pool = get_gaussian(&local_seed, MAX_VESICLES, DEFAULT_VESICLES_VAR);
 
     neuron->energy_ATP = neuron->max_atp;

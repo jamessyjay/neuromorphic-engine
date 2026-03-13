@@ -8,8 +8,7 @@ fn default_env() -> Environment {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
-        light_level: 0.0,
-        seed: 42,
+        light_level: 0.0, stdp_learning_rate: 0.1,
     }
 }
 

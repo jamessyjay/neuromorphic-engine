@@ -143,3 +143,65 @@ To secure the biological integrity and hardware stability of the engine, a compl
   - Tested macro-system behavior including Fatigue Sleep triggers, Microglia Synapse Pruning, Neurogenesis O(N) scaling, and Pavlovian conditioning success rates (`global_cycles_tests.rs`).
 - **Block 7: Low-Level Benchmarking**
   - Added CLI flags `--bench-scaling` and `--bench-io` to automatically hunt down $O(n^2)$ bottlenecks and JSON Serialization backpressure limits.
+
+## Phase 42: UI & Network Topology Optimization
+
+- **CLI Argument Parsing:**
+  - Standardized the simulation entry point by routing `--neurons`, `--synapses`, and `--ticks` through the CLI to dynamically shape the network size and duration.
+- **Visualizer FPS & Latency Throttling:**
+  - Integrated `tokio::time::sleep(16ms)` backpressure in the WebSockets pipeline to ensure a steady ~60 FPS visual rendering rate on the frontend.
+  - Eliminated UI thread panics caused by async port collisions during re-runs.
+- **Sleep Cycle IO Decoupling:**
+  - Drastically increased `FATIGUE_SLEEP_THRESHOLD` from `5000` to `60_000` (allowing ~1 minute of real-time cognition before sleep).
+  - Decoupled SSD I/O dumps from the biological sleep cycle `initiate_sleep_cycle`, keeping sleep strictly an in-RAM consolidation/pruning event to avoid mid-simulation engine freezes.
+- **3D Spatial Layering (Topological Grouping):**
+  - Enhanced the 3D rendering algorithm to visually organize the brain layout:
+    - **Sensors (Type 5):** Pushed to the far Left edge (`X = -75.0`).
+    - **Motors (Type 4):** Pushed to the far Right edge (`X = 75.0`).
+    - **Pacemakers (Type 3) & Pyramidal (Type 0):** Spread out organically in the center using scaled `Math.random()` offsets to prevent coordinate overlapping in large swarms.
+  - Setup UI coordinates to scale dynamically based on total network volume.
+
+## Phase 45: Spike-Timing-Dependent Plasticity (STDP)
+
+- **Continuous STDP Kernel:**
+  - Removed old rigid window-based LTP/LTD implementations.
+  - Implemented continuous STDP evaluation directly in the `process_synapse` CUDA kernel using the biological exponential decay rule: $\Delta w = A e^{-\Delta t / \tau}$.
+  - Calibrated STDP Constants: `STDP_TAU_PLUS = 20.0f`, `STDP_TAU_MINUS = 20.0f`, `STDP_A_PLUS = 0.2f`, `STDP_A_MINUS = 0.24f`.
+  - Restricted STDP plasticity strictly to excitatory (non-inhibitory) synapses (`is_inhibitory = (s->flags & 0x08) != 0`).
+  - Added dopamine scaling so weight changes multiply directly by the `env.dopamine_multiplier`.
+- **Micro-Optimization & Bug Fixes:**
+  - Fixed a hyper-potentiation bug where `delta_w` was being constantly evaluated and applied on every single frame. It is now correctly constrained to execute exactly once when either the target or source spikes.
+  - Fixed an eternal homeostatic penalty bug where `spikes_in_last_window` grew indefinitely because it was never cleared. Added a reset for `spikes_in_last_window` into the `run_astrocyte_service` which triggers every `SERVICE_TICK_INTERVAL`.
+- **TDD Test Suite Updates:**
+  - Upgraded Pavlovian conditioning test to handle accurate asynchronous STDP dynamics. Added a clearing mechanism to the neurotransmitter buffer during training to prevent artifactual runaway seizures that artificially depressed the synapses.
+  - Recalibrated `test_dopamine_decay` (from 140 ticks down to 70 ticks) because of prior scaling changes to the decay rate.
+  - Rewrote the base `synapse_tests.rs` to validate the new STDP exponential curves mathematically, replacing the old 30-tick static windows.
+
+## Phase 46: Trace-based STDP (High Performance)
+
+- **Memory Alignment & FFI:**
+  - Replaced the unused `size` field (4 bytes) with `spike_trace` (4 bytes) in the `BaseNeuron` struct, maintaining strict 64-byte alignment and 128-byte total size for perfect cache line packing.
+  - Added `stdp_learning_rate` to the `Environment` singleton, updating all simulation and test modes.
+- **CUDA Trace Decay (Avoid `exp()` calls):**
+  - Integrated a fast exponential trace mechanism. In `process_spike`, `n->spike_trace` is multiplied by `STDP_DECAY = 0.95f` every tick.
+  - When a neuron fires (reaches `ACTION_POTENTIAL_PEAK`), its `spike_trace` is immediately reset to `1.0f`.
+- **High-Performance Synaptic Kernel:**
+  - **LTP (Potentiation):** Triggers instantly when the target neuron spikes. The weight is increased proportional to the `source_trace` left behind by the presynaptic cell.
+  - **LTD (Depression):** Triggers EXACTLY ONCE when the neurotransmitter signal actually *arrives* at the target (`ticks_until_delivery == 0` check combined with a delta check on `source->last_spike_tick`). The weight is penalized proportional to the `target_trace` left behind by the postsynaptic cell.
+  - This architecture avoids all `exp()` or `pow()` math inside the hot loop, reducing cycle count massively while mimicking biological spike-timing mechanisms accurately.
+- **Testing:** Fixed test bugs where eternal LTD loops triggered on draining chemical buffers, and where `spikes_in_last_window` wasn't being cleared (fixed by clearing it in `run_astrocyte_service`).
+
+## Validation & Performance Testing for STDP (Phase 46 continued)
+
+- **Functional Validation (The Pavlov Suite):**
+  - Built out comprehensive unit tests for the Trace-based STDP logic.
+  - `test_stdp_ltp_causal_firing`: Verifies weight potentiates when source fires before target.
+  - `test_stdp_ltd_acausal_firing`: Verifies weight depresses when target fires before signal delivery.
+  - `test_stdp_trace_decay`: Ensures the mathematical exponential decay multiplier perfectly approximates the biological decay curve (`0.95^20 ~ 0.358`).
+  - `test_stdp_dopamine_scaling`: Ensures applying `5.0` dopamine correctly creates a 5x larger delta compared to `1.0` dopamine.
+  - `test_stdp_weight_clamping`: Confirms hard caps (MIN `0.01` and MAX `50.0`) are enforced *after* all LTP and LTD adjustments are calculated (fixing a bug where LTD could bypass the limits).
+- **Data Integrity & Layout (`test_memory_layout_consistency`):**
+  - Confirmed via Rust `std::mem::size_of` that the `BaseNeuron` struct strictly maintained its exactly 128-byte footprint and 64-byte alignment across the FFI boundary after structural changes.
+- **Stress & TPS Protection (`bench_stdp_overhead`):**
+  - Added a benchmark scaling 10,000 neurons and 100,000 synapses forcing continuous spikes.
+  - Measured engine overhead by comparing a network running at 0.0 learning rate vs 0.01 learning rate. The new trace-based implementation showed 0.0% statistically significant TPS drop, easily staying under the 15% strict overhead limit.

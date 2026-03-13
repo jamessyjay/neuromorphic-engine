@@ -1,0 +1,300 @@
+use neuromorphic_engine::graph::NetworkGraph;
+use neuromorphic_engine::ffi::{Environment, NeuronType, Synapse, BaseNeuron};
+use std::mem;
+use std::time::Instant;
+
+fn default_env() -> Environment {
+    Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        stdp_learning_rate: 0.1,
+    }
+}
+
+#[test]
+fn test_memory_layout_consistency() {
+    assert_eq!(mem::size_of::<BaseNeuron>(), 128, "BaseNeuron must be exactly 128 bytes");
+    assert_eq!(mem::align_of::<BaseNeuron>(), 64, "BaseNeuron must be aligned to 64 bytes");
+}
+
+#[test]
+fn test_stdp_trace_decay() {
+    let mut graph = NetworkGraph::new();
+    let n = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+
+    // Fire neuron
+    graph.neurons[n as usize].current_voltage = 40.0; 
+    graph.tick(1, env.clone());
+
+    let trace_after_spike = graph.neurons[n as usize].spike_trace;
+    assert_eq!(trace_after_spike, 1.0, "Trace should be 1.0 immediately after spike");
+
+    // Run 20 ticks
+    for tick in 2..=21 {
+        graph.tick(tick, env.clone());
+    }
+
+    let final_trace = graph.neurons[n as usize].spike_trace;
+    assert!(final_trace < 0.5 && final_trace > 0.0, "Trace should have decayed to approx 0.358: {}", final_trace);
+    assert!((final_trace - 0.358).abs() < 0.05, "Trace value incorrect: {}", final_trace);
+}
+
+#[test]
+fn test_stdp_ltp_causal_firing() {
+    let mut graph = NetworkGraph::new();
+    let src = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    // Disable homeostatic scaling to purely test STDP
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    
+    let synapse = Synapse {
+        source_id: src,
+        target_id: tgt,
+        weight: 1.0,
+        neurotransmitter_buffer: 0.0,
+        last_activation_tick: 0,
+        ticks_below_threshold: 0,
+        ticks_until_delivery: 0,
+        flags: 0, // Unmyelinated excitatory
+        _padding: [0; 2],
+    };
+    graph.synapses.push(synapse);
+
+    // Tick 1: Source fires
+    graph.neurons[src as usize].current_voltage = 40.0;
+    graph.tick(1, env.clone());
+    graph.neurons[tgt as usize].spikes_in_last_window = 10; // keep it balanced
+
+    for tick in 2..=4 {
+        graph.tick(tick, env.clone());
+        graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    }
+
+    // Tick 5: Target fires
+    graph.neurons[tgt as usize].current_voltage = 40.0;
+    graph.tick(5, env.clone());
+
+    let new_weight = graph.synapses[0].weight;
+    assert!(new_weight > 1.0, "Weight should increase due to LTP. W: {}", new_weight);
+}
+
+#[test]
+fn test_stdp_ltd_acausal_firing() {
+    let mut graph = NetworkGraph::new();
+    let src = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    let env = default_env();
+    
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    
+    let synapse = Synapse {
+        source_id: src,
+        target_id: tgt,
+        weight: 1.0,
+        neurotransmitter_buffer: 0.0,
+        last_activation_tick: 0,
+        ticks_below_threshold: 0,
+        ticks_until_delivery: 0,
+        flags: 0, // Unmyelinated excitatory
+        _padding: [0; 2],
+    };
+    graph.synapses.push(synapse);
+
+    // Tick 1: Target fires
+    graph.neurons[tgt as usize].current_voltage = 40.0;
+    graph.tick(1, env.clone());
+
+    for tick in 2..=4 {
+        graph.tick(tick, env.clone());
+        graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    }
+
+    // Tick 5: Source fires
+    graph.neurons[src as usize].current_voltage = 40.0;
+    graph.tick(5, env.clone());
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    
+    // We need to wait for signal to arrive at tgt (unmyelinated delivery happens 1 tick after spike)
+    graph.tick(6, env.clone());
+
+    let new_weight = graph.synapses[0].weight;
+    assert!(new_weight < 1.0, "Weight should decrease due to LTD. W: {}", new_weight);
+}
+
+#[test]
+fn test_stdp_dopamine_scaling() {
+    let run_ltp = |dopamine: f32| -> f32 {
+        let mut graph = NetworkGraph::new();
+        let src = graph.add_neuron(NeuronType::Pyramidal);
+        let tgt = graph.add_neuron(NeuronType::Pyramidal);
+        let mut env = default_env();
+        env.dopamine_multiplier = dopamine;
+        
+        let synapse = Synapse {
+            source_id: src,
+            target_id: tgt,
+            weight: 1.0,
+            neurotransmitter_buffer: 0.0,
+            last_activation_tick: 0,
+            ticks_below_threshold: 0,
+            ticks_until_delivery: 0,
+            flags: 0, 
+            _padding: [0; 2],
+        };
+        graph.synapses.push(synapse);
+
+        graph.neurons[src as usize].current_voltage = 40.0;
+        graph.neurons[tgt as usize].spikes_in_last_window = 10;
+        graph.tick(1, env.clone());
+
+        for tick in 2..=4 {
+            graph.neurons[tgt as usize].spikes_in_last_window = 10;
+            graph.tick(tick, env.clone());
+        }
+
+        graph.neurons[tgt as usize].spikes_in_last_window = 10;
+        graph.neurons[tgt as usize].current_voltage = 40.0;
+        graph.tick(5, env.clone());
+
+        // Since homeostatic scaling might add a tiny bit or we might just calculate raw delta
+        // let's grab the raw weight and subtract 1.0 to see the pure STDP delta (since spikes_in_last_window=10 means no homeostatic change)
+        graph.synapses[0].weight - 1.0
+    };
+
+    let delta_1 = run_ltp(1.0);
+    let delta_5 = run_ltp(5.0);
+
+    assert!((delta_5 - delta_1 * 5.0).abs() < 0.0001, "Dopamine scaling failed: 1x={} 5x={}", delta_1, delta_5);
+}
+
+#[test]
+fn test_stdp_weight_clamping() {
+    let mut graph = NetworkGraph::new();
+    let src = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    let mut env = default_env();
+    env.stdp_learning_rate = 1.0; // High rate to ensure clamp
+    
+    // Note: MAX_SYNAPSE_WEIGHT is 50.0f
+    let max_weight = 50.0;
+    
+    let synapse = Synapse {
+        source_id: src,
+        target_id: tgt,
+        weight: max_weight - 0.01,
+        neurotransmitter_buffer: 0.0,
+        last_activation_tick: 0,
+        ticks_below_threshold: 0,
+        ticks_until_delivery: 0,
+        flags: 0, 
+        _padding: [0; 2],
+    };
+    graph.synapses.push(synapse);
+
+    // Force LTP
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    graph.neurons[src as usize].current_voltage = 40.0;
+    graph.tick(1, env.clone());
+    
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    graph.neurons[tgt as usize].current_voltage = 40.0;
+    graph.tick(2, env.clone()); 
+
+    let new_weight = graph.synapses[0].weight;
+    assert_eq!(new_weight, max_weight, "Weight should be clamped to {}, was: {}", max_weight, new_weight);
+    
+    // Now test min clamping (LTD)
+    let min_weight = 0.01;
+    graph.synapses[0].weight = min_weight + 0.01; 
+    
+    // Force LTD
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    graph.neurons[tgt as usize].current_voltage = 40.0;
+    graph.tick(3, env.clone());
+    
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    graph.neurons[src as usize].current_voltage = 40.0;
+    graph.tick(4, env.clone());
+    
+    graph.neurons[tgt as usize].spikes_in_last_window = 10;
+    graph.tick(5, env.clone()); // Delivery
+
+    let final_weight = graph.synapses[0].weight;
+    assert_eq!(final_weight, min_weight, "Weight should be clamped to {}, was: {}", min_weight, final_weight);
+}
+
+#[test]
+fn bench_stdp_overhead() {
+    let mut graph_zero = NetworkGraph::new();
+    let mut graph_stdp = NetworkGraph::new();
+    
+    let num_neurons = 10_000;
+    let num_synapses = 100_000;
+    let ticks = 1000; // Drop to 1000 for realistic test time
+
+    for _ in 0..num_neurons {
+        graph_zero.add_neuron(NeuronType::Pyramidal);
+        graph_stdp.add_neuron(NeuronType::Pyramidal);
+    }
+
+    for i in 0..num_synapses {
+        let src = i % num_neurons;
+        let tgt = (i + 1) % num_neurons;
+        
+        let syn = Synapse {
+            source_id: src,
+            target_id: tgt,
+            weight: 1.0,
+            neurotransmitter_buffer: 0.0,
+            last_activation_tick: 0,
+            ticks_below_threshold: 0,
+            ticks_until_delivery: 0,
+            flags: 0, 
+            _padding: [0; 2],
+        };
+        graph_zero.synapses.push(syn.clone());
+        graph_stdp.synapses.push(syn);
+    }
+    
+    let run_bench = |graph: &mut NetworkGraph, learning_rate: f32| -> f64 {
+        let mut env = default_env();
+        env.stdp_learning_rate = learning_rate;
+        
+        let start = Instant::now();
+        for t in 1..=ticks {
+            // Force 10% of neurons to spike continuously to trigger STDP
+            if t % 5 == 0 {
+                for i in 0..1000 {
+                    graph.neurons[i as usize].current_voltage = 40.0;
+                }
+            }
+            graph.tick(t, env.clone());
+        }
+        let elapsed = start.elapsed().as_secs_f64();
+        ticks as f64 / elapsed
+    };
+
+    let tps_zero = run_bench(&mut graph_zero, 0.0);
+    let tps_stdp = run_bench(&mut graph_stdp, 0.01);
+    
+    println!("--- STDP Performance Benchmark ---");
+    println!("TPS (lr=0.0):  {:.2}", tps_zero);
+    println!("TPS (lr=0.01): {:.2}", tps_stdp);
+    
+    // We allow TPS stdp to be slightly higher randomly, but not drastically lower.
+    let drop_ratio = if tps_zero > tps_stdp {
+        (tps_zero - tps_stdp) / tps_zero
+    } else {
+        0.0 
+    };
+    
+    println!("STDP Overhead Drop: {:.2}%", drop_ratio * 100.0);
+    
+    assert!(drop_ratio < 0.15, "Performance drop is too high: {:.2}% (Limit is 15%)", drop_ratio * 100.0);
+}

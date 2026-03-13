@@ -3,78 +3,72 @@ use crate::graph::NetworkGraph;
 use crate::ffi::Environment;
 
 pub struct StimulusService {
-    pub stimulus_interval: u32,
-    pub response_window: u32,
-    pub last_stimulus_tick: u32,
-    pub waiting_for_response: bool,
+    pub interval: u32,
+    pub delay_between_stimuli: u32, // Delay between Bell and Meat stimuli
+    pub last_tick: u32,
+    pub training_mode: bool,        // If true - train, if false - test
 }
 
 impl StimulusService {
-    pub fn new(interval: u32, window: u32) -> Self {
+    pub fn new(interval: u32) -> Self {
         Self {
-            stimulus_interval: interval,
-            response_window: window,
-            last_stimulus_tick: 0,
-            waiting_for_response: false,
+            interval,
+            delay_between_stimuli: 30, // 30ms - ideal window for STDP
+            last_tick: 0,
+            training_mode: true,
         }
     }
 
     pub fn process_tick(&mut self, graph: &mut NetworkGraph, env: &mut Environment, current_tick: u32) {
         let num_neurons = graph.neurons.len();
         if num_neurons == 0 { return; }
-        let num_sensors = (num_neurons as f32 * 0.02) as usize;
-        let num_motors = (num_neurons as f32 * 0.02) as usize;
-        let motor_start_idx = num_neurons.saturating_sub(num_motors);
 
-        // Phase A: The Flash (Stimulus)
-        if current_tick % self.stimulus_interval == 0 {
-            // Apply stimulus to the first 2% (Sensors)
-            for i in 0..num_sensors {
+        // Take 4% of neurons for sensors (to fit two groups)
+        let total_sensors = (num_neurons as f32 * 0.04) as usize;
+        let group_size = total_sensors / 2;
+        
+        let bell_sensors = 0..group_size;
+        let meat_sensors = group_size..total_sensors;
+
+        // --- PHASE 1: BELL (Stimulus A) ---
+        // Give bell every `interval` ticks
+        if current_tick % self.interval == 0 {
+            println!("[STIMULUS] BELL (Stimulus A)");
+            for i in bell_sensors {
                 if i < graph.neurons.len() {
-                    let n = &mut graph.neurons[i];
-                    if n.is_alive {
-                        n.current_voltage = 40.0; // Spike voltage
-                        n.energy_atp = n.max_atp; // Full energy for reliable spike
-                    }
+                    graph.neurons[i].current_voltage = 40.0; // Forced spike
                 }
-            }
-            self.last_stimulus_tick = current_tick;
-            self.waiting_for_response = true;
-            
-            // Set a "learning floor" - dopamine drops to force pruning of non-contributors
-            env.dopamine_multiplier = 0.5; 
-        }
-
-        // Phase B: The Observation (Response Window)
-        if self.waiting_for_response {
-            let mut response_detected = false;
-            
-            // Check if any motor neuron spiked
-            for i in motor_start_idx..num_neurons {
-                if graph.neurons[i].last_spike_tick == current_tick {
-                    response_detected = true;
-                    break;
-                }
-            }
-
-            if response_detected {
-                // Success!
-                env.dopamine_multiplier = 8.0; // EVEN BIGGER RUSH for visibility
-                self.waiting_for_response = false;
-                println!("[DOPAMINE RUSH] Motor Response Detected at tick {}! Rewarding network.", current_tick);
-            } else if current_tick > self.last_stimulus_tick + self.response_window {
-                // Window expired
-                self.waiting_for_response = false;
-                env.dopamine_multiplier = 0.5; 
             }
         }
 
-        // Phase C: Dopamine Decay (Smooth transition)
-        // If dopamine is high, let it decay back to baseline (1.0)
+        // --- PHASE 2: MEAT (Stimulus B) ---
+        // Give meat only in training mode and with delay after bell
+        if self.training_mode && (current_tick % self.interval == self.delay_between_stimuli) {
+            println!("[STIMULUS] MEAT (Stimulus B) + Dopamine");
+            for i in meat_sensors {
+                if i < graph.neurons.len() {
+                    graph.neurons[i].current_voltage = 40.0;
+                }
+            }
+            // Meat itself causes pleasure
+            env.dopamine_multiplier = 5.0; 
+        }
+
+        // --- PHASE 3: TEST (Testing for stupidity) ---
+        // Every 5 training cycles disable meat and watch the reaction
+        if current_tick > 0 && current_tick % (self.interval * 5) == 0 {
+            self.training_mode = !self.training_mode;
+            if !self.training_mode {
+                println!("\n--- TEST: GIVING ONLY BELL, NO MEAT ---");
+                env.dopamine_multiplier = 1.0; // Reset dopamine to normal
+            } else {
+                println!("\n--- RETURNING TO TRAINING ---");
+            }
+        }
+
+        // Gradual dopamine decay to not keep the network in eternal ecstasy
         if env.dopamine_multiplier > 1.0 {
-            env.dopamine_multiplier -= 0.05; // 5% decay per tick
-        } else if env.dopamine_multiplier < 1.0 && !self.waiting_for_response {
-            env.dopamine_multiplier += 0.01; // Recover to baseline
+            env.dopamine_multiplier -= 0.1;
         }
     }
 }

@@ -123,11 +123,10 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS,
-        light_level: DEFAULT_LIGHT,
-        seed: SEED_BENCHMARK as u32,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
     };
     
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
 
     let mut data = BenchmarkData {
         ticks: Vec::with_capacity(total_ticks as usize),
@@ -316,11 +315,10 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
-        light_level: 0.0,
-        seed: SEED_SIMULATION as u32,
+        light_level: 0.0, stdp_learning_rate: 0.1,
     };
     
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
 
     for tick in 1..=total_ticks {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
@@ -427,8 +425,7 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
-        light_level: 0.0,
-        seed: SEED_BENCHMARK as u32,
+        light_level: 0.0, stdp_learning_rate: 0.1,
     };
 
     for i in 0..10 {
@@ -497,8 +494,7 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
-        light_level: 0.0,
-        seed: SEED_BENCHMARK as u32,
+        light_level: 0.0, stdp_learning_rate: 0.1,
     };
 
     graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED;
@@ -538,11 +534,10 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE,
         toxin_levels: DEFAULT_TOXINS,
-        light_level: DEFAULT_LIGHT,
-        seed: SEED_BENCHMARK as u32,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
 
     for tick in 1..=50000 {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
@@ -580,11 +575,10 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS,
-        light_level: DEFAULT_LIGHT,
-        seed: SEED_INHIBITION as u32 
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
     for tick in 1..=1000 {
@@ -624,11 +618,10 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0, 
-        light_level: 0.0, 
-        seed: SEED_REFLEX as u32 
+        light_level: 0.0, stdp_learning_rate: 0.1, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
     for tick in 1..=1200 {
@@ -670,11 +663,10 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE, 
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, 
-        seed: SEED_STRESS as u32 
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
 
     for _ in 0..10 { graph.add_neuron(NeuronType::Pyramidal); }
     let n1 = graph.add_neuron(NeuronType::Pyramidal);
@@ -720,11 +712,10 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, 
-        seed: SEED_DOPAMINE as u32 
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let n1 = graph.add_neuron(NeuronType::Pacemaker);
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
     graph.connect(n1, n2, 1.0, 0, false, true);
@@ -771,11 +762,10 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
-        light_level: 0.0,
-        seed: SEED_SIMULATION as u32,
+        light_level: 0.0, stdp_learning_rate: 0.1,
     };
     
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
     for tick in 1..=2000 {
@@ -808,11 +798,10 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE, 
         dopamine_multiplier: EMERGENCE_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, 
-        seed: SEED_EMERGENCE as u32 
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
     for tick in 1..=3000 {
@@ -849,11 +838,10 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE, 
         dopamine_multiplier: MORPHOLOGY_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, 
-        seed: SEED_DOPAMINE as u32 
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL, STIMULUS_DEFAULT_WINDOW);
+    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
     for tick in 1..=3000 {
@@ -914,8 +902,7 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
             global_glucose_level: 1.0,
             dopamine_multiplier: 1.0,
             toxin_levels: 0.0,
-            light_level: 0.0,
-            seed: 42,
+            light_level: 0.0, stdp_learning_rate: 0.1,
         };
         
         let start = Instant::now();
@@ -1049,12 +1036,12 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>) -> 
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
-        light_level: 0.0,
-        seed: 42,
+        light_level: 0.0, stdp_learning_rate: 0.1,
     };
 
     println!("Network Ready. Initiating slow tick loop for visualizer debugging...");
     
+    let start_time = std::time::Instant::now();
     let mut tick = 1;
     loop {
         // Send a stimulus wave every 50 ticks
@@ -1107,5 +1094,12 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>) -> 
         tick += 1;
         // Super slow loop so user can watch UI
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        if start_time.elapsed().as_secs() >= 300 {
+            println!("UI Test limit reached (5 minutes). Exiting.");
+            break;
+        }
     }
+    
+    Ok(())
 }
