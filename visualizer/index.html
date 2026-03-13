@@ -52,383 +52,228 @@
     <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        // Global error handler for debugging
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            const status = document.getElementById('status');
-            if (status) {
-                status.innerText = "JS ERROR: " + msg;
-                status.style.color = "#86dba5";
-            }
-            logMsg(`ERROR: ${msg} (Line: ${lineNo}:${columnNo})`);
-            if (error && error.stack) {
-                logMsg(`STACK: ${error.stack}`);
-            }
-            console.error("Global Error:", msg, url, lineNo, columnNo, error);
-            return false;
-        };
+        // --- Глобальные переменные и WebSocket ---
+        let ws; // Вот он, родненький, теперь определён
+        const nodeMap = new Map();
+        let neuronMeshes = [];
+        let synapseLines, pulseSystem;
+        const activePulses = [];
 
-        window.onunhandledrejection = function(event) {
-            logMsg(`PROMISE REJECTION: ${event.reason}`);
-            console.error("Unhandled Rejection:", event.reason);
-        };
+        // --- Настройки производительности ---
+        const MAX_PULSES = 5000; 
+        const PULSE_SPEED = 0.04;
+        const pulsePositions = new Float32Array(MAX_PULSES * 3);
+        const pulseGeometry = new THREE.BufferGeometry();
+        pulseGeometry.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3));
+        pulseGeometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
 
+        // Вспомогательные объекты для расчётов (чтобы не плодить мусор)
+        const _tempColor = new THREE.Color();
+        const _dummy = new THREE.Object3D();
+
+        // Логгер
         function logMsg(msg) {
             const logs = document.getElementById('logs');
             if (!logs) return;
             const div = document.createElement('div');
             div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logs.appendChild(div);
-            // Keep only last 20 logs
-            while (logs.children.length > 20) {
-                logs.removeChild(logs.firstChild);
-            }
-            document.getElementById('log-container').scrollTop = document.getElementById('log-container').scrollHeight;
+            logs.prepend(div);
+            while (logs.children.length > 20) logs.removeChild(logs.lastChild);
         }
 
-        // --- Configuration & Constants ---
-        const MAX_COORD = 65535;
-        const NEURON_RADIUS = 20; 
-        const WORLD_SIZE = 4000;
-
-        // --- Three.js Setup ---
+        // --- Three.js База ---
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        camera.position.set(0, 0, 150);
-        controls.update();
-
-        // --- Objects ---
-        let neuronMeshes = []; // Array of {type, mesh, currentIndex}
-        let synapseLines;
-        
-        const nodeMap = new Map(); // id -> {x, y, z, type, meshIdx}
-        let totalNeurons = 0;
-
-        // Temporary objects to avoid allocation
-        const _tempColor = new THREE.Color();
-        const _tempMatrix = new THREE.Matrix4();
-        const _tempPos = new THREE.Vector3();
-        const _dummy = new THREE.Object3D();
-
-        function getGeometryForType(type) {
-            switch(type) {
-                case 5: return new THREE.TetrahedronBufferGeometry(1); // Sensors
-                case 4: return new THREE.OctahedronBufferGeometry(1);  // Motors
-                case 3: return new THREE.BoxBufferGeometry(2, 2, 2); // Timers
-                default: return new THREE.SphereBufferGeometry(1, 16, 16); // Others
-            }
-        }
+        camera.position.set(0, 0, 200);
+        controls.enableDamping = true;
 
         function initNetwork(data) {
-            totalNeurons = data.total_neurons;
+            // Чистим старьё, освобождаем GPU
+            neuronMeshes.forEach(m => {
+                scene.remove(m.mesh);
+                m.mesh.geometry.dispose();
+                m.mesh.material.dispose();
+            });
+            neuronMeshes = [];
+            if (synapseLines) {
+                scene.remove(synapseLines);
+                synapseLines.geometry.dispose();
+                synapseLines.material.dispose();
+            }
+            if (pulseSystem) scene.remove(pulseSystem);
             
-            // Clear existing meshes
-            neuronMeshes.forEach(mesh => scene.remove(mesh));
-            neuronMeshes.clear();
+            nodeMap.clear();
+            activePulses.length = 0;
 
-            // Count neurons per type
             const counts = {};
-            data.neurons.forEach(n => {
-                const type = n[7];
-                counts[type] = (counts[type] || 0) + 1;
+            data.neurons.forEach(n => { counts[n[4]] = (counts[n[4]] || 0) + 1; });
+
+            const geometries = {
+                5: new THREE.TetrahedronGeometry(2),
+                4: new THREE.OctahedronGeometry(2),
+                3: new THREE.BoxGeometry(3, 3, 3),
+                default: new THREE.SphereGeometry(1.5, 8, 8)
+            };
+            const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            Object.keys(counts).forEach(typeStr => {
+                const type = parseInt(typeStr);
+                const mesh = new THREE.InstancedMesh(geometries[type] || geometries.default, material.clone(), counts[type]);
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                scene.add(mesh);
+                neuronMeshes.push({ type, mesh, currentIndex: 0 });
             });
 
-            // Create InstancedMeshes for each type present
-            for (const type in counts) {
-                const geometry = getGeometryForType(parseInt(type));
-                const material = new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff
+            // Твоя ювелирная расстановка слоёв
+            data.neurons.forEach(n => {
+                const id = n[0], type = n[4];
+                const SPACE = 100.0, HALF = 50.0;
+                let x = (n[1] / 65535.0) * SPACE - HALF;
+                let y = (n[2] / 65535.0) * SPACE - HALF;
+                let z = (n[3] / 65535.0) * SPACE - HALF;
+
+                if (type === 5) x = -75.0; 
+                else if (type === 4) x = 75.0;
+                else if (type === 0 || type === 3) x = -10.0 + (Math.random() * 20 - 5);
+
+                const meshData = neuronMeshes.find(m => m.type === type);
+                if (meshData) {
+                    _dummy.position.set(x, y, z);
+                    _dummy.updateMatrix();
+                    meshData.mesh.setMatrixAt(meshData.currentIndex, _dummy.matrix);
+                    meshData.mesh.setColorAt(meshData.currentIndex, new THREE.Color(0x4ade80));
+                    nodeMap.set(id, { x, y, z, type, meshIdx: meshData.currentIndex, outgoing: [] });
+                    meshData.currentIndex++;
+                }
+            });
+            neuronMeshes.forEach(m => m.mesh.instanceMatrix.needsUpdate = true);
+
+            // Синапсы с яркостью от веса
+            if (data.synapses && data.synapses.length > 0) {
+                const pos = new Float32Array(data.synapses.length * 6);
+                const col = new Float32Array(data.synapses.length * 6);
+                
+                data.synapses.forEach((syn, i) => {
+                    const src = nodeMap.get(syn[0]), tgt = nodeMap.get(syn[1]);
+                    const weight = syn[2] || 1.0;
+                    if (src && tgt) {
+                        const idx = i * 6;
+                        pos[idx] = src.x; pos[idx+1] = src.y; pos[idx+2] = src.z;
+                        pos[idx+3] = tgt.x; pos[idx+4] = tgt.y; pos[idx+5] = tgt.z;
+                        
+                        const intensity = Math.min(weight / 5.0, 1.0);
+                        _tempColor.setHSL(0.4, 0.8, 0.1 + intensity * 0.4);
+                        col[idx] = _tempColor.r; col[idx+1] = _tempColor.g; col[idx+2] = _tempColor.b;
+                        col[idx+3] = _tempColor.r; col[idx+4] = _tempColor.g; col[idx+5] = _tempColor.b;
+                        
+                        src.outgoing.push({ targetId: syn[1], weight: weight });
+                    }
                 });
-                // In Three.js r128, to use instance colors with MeshBasicMaterial without getting black,
-                // we sometimes need vertexColors to be true on the material AND provide colors.
-                // However, an easier approach in r128 is using MeshPhongMaterial which handles instanceColor well natively.
-                const betterMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                
-                const mesh = new THREE.InstancedMesh(geometry, betterMaterial, counts[type]);
-                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                        mesh.frustumCulled = false;
-                        const tempM = new THREE.Matrix4();
-                        tempM.makeScale(0,0,0);
-                        for(let i=0; i<counts[type]; i++) mesh.setMatrixAt(i, tempM);
-                        mesh.instanceMatrix.needsUpdate = true;
-                
-                const white = new THREE.Color(0xffffff);
-                        for (let i = 0; i < counts[type]; i++) {
-                            mesh.setColorAt(i, white);
-                        }
-                        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-                
-                scene.add(mesh);
-                neuronMeshes.set(parseInt(type), {
-                    mesh: mesh,
-                    count: counts[type],
-                    index: 0
-                });
-            }
 
-            // Bring back some light for PhongMaterial
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-            directionalLight.position.set(1, 1, 1).normalize();
-            scene.add(directionalLight);
+                const lineGeo = new THREE.BufferGeometry();
+                lineGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                lineGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+                synapseLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ 
+                    vertexColors: true, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending 
+                }));
+                scene.add(synapseLines);
 
-            // Synapses: BufferGeometry with LineSegments
-            if (synapseLines) scene.remove(synapseLines);
-            const synGeometry = new THREE.BufferGeometry();
-            synapseLines = new THREE.LineSegments(
-                synGeometry,
-                new THREE.LineBasicMaterial({ 
-                    vertexColors: true, 
-                    transparent: true, 
-                    opacity: 0.6,
-                    blending: THREE.AdditiveBlending,
-                    depthWrite: false
-                })
-            );
-            scene.add(synapseLines);
-        }
-
-        function updateSynapseGeometry(count) {
-            if (!synapsePositions || synapsePositions.length < count * 6) {
-                synapsePositions = new Float32Array(count * 6);
-                synapseColors = new Float32Array(count * 6);
-                synapseLines.geometry.setAttribute('position', new THREE.BufferAttribute(synapsePositions, 3));
-                synapseLines.geometry.setAttribute('color', new THREE.BufferAttribute(synapseColors, 3));
-            }
-        }
-
-        // --- WebSocket ---
-        function getBaseColorForType(type) {
-            switch(type) {
-                // Spec 13 overrides
-                case 0: return new THREE.Color(0x0088ff); // Pyramidal - Dim Blue (Resting)
-                case 1: return new THREE.Color(0x0088ff); // Bipolar - Dim Blue
-                case 2: return new THREE.Color(0x0088ff); // Interneuron - Dim Blue
-                case 3: return new THREE.Color(0x0088ff); // Pacemaker - Dim Blue
-                case 4: return new THREE.Color(0x0088ff); // Purkinje - Dim Blue
-                case 5: return new THREE.Color(0x00ffff); // Photoreceptor - Cyan
-                case 6: return new THREE.Color(0x00ffff); // Nociceptor - Cyan
-                default: return new THREE.Color(0x0088ff);
+                // Инициализируем систему импульсов
+                pulseSystem = new THREE.Points(pulseGeometry, new THREE.PointsMaterial({
+                    color: 0xffffff, size: 1.2, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending
+                }));
+                pulseSystem.frustumCulled = false;
+                scene.add(pulseSystem);
             }
         }
 
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.hostname || '127.0.0.1';
-            const port = window.location.port || '3030';
-            const wsUrl = `${protocol}//${host}:${port}/stream`;
-            
-            console.log("Connecting to WebSocket:", wsUrl);
-            logMsg(`Connecting to ${wsUrl}...`);
-            const ws = new WebSocket(wsUrl);
+            const host = window.location.host || '127.0.0.1';
+            ws = new WebSocket(`${protocol}//${host}/stream`);
 
-            ws.onopen = () => {
-                document.getElementById('status').innerText = "Status: ONLINE (3D)";
-                document.getElementById('status').style.color = "#86dba5";
-                logMsg("WebSocket ONLINE.");
-            };
-
-            ws.onclose = () => {
-                document.getElementById('status').innerText = "Status: DISCONNECTED";
-                document.getElementById('status').style.color = "#86dba0";
-                logMsg("WebSocket DISCONNECTED. Reconnecting in 2s...");
-                setTimeout(connect, 2000);
-            };
-
-            ws.onerror = (err) => {
-                logMsg("WebSocket ERROR occurred.");
-                console.error("WS Error:", err);
+            ws.onopen = () => { 
+                logMsg("WebSocket Connected."); 
+                document.getElementById('status').innerText = "Status: ONLINE (STDP-READY)";
+                document.getElementById('status').style.color = "#4ade80";
             };
 
             ws.onmessage = (event) => {
-                try {
-                    const msg = JSON.parse(event.data);
-                    
-                    if (msg.type === 'InitialState') {
-                    const data = msg.payload; 
-                    
-                    // 1. Remove old stuff from the screen on reconnect
-                    neuronMeshes.forEach(m => {
-                        scene.remove(m.mesh);
-                        m.mesh.geometry.dispose();
-                        m.mesh.material.dispose();
-                    });
-                    neuronMeshes = [];
-                    if (synapseLines) {
-                        scene.remove(synapseLines);
-                        synapseLines.geometry.dispose();
-                        synapseLines.material.dispose();
-                    }
-                    nodeMap.clear();
-
-                    // 2. Count the number of each type received
-                    const counts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-                    data.neurons.forEach(n => counts[n[4]] = (counts[n[4]] || 0) + 1);
-
-                    // 3. CREATE GEOMETRY (Otherwise everything is black)
-                    const geometries = {
-                        5: new THREE.TetrahedronGeometry(2),   // Sensors (Eyes)
-                        4: new THREE.OctahedronGeometry(2),    // Motors (Muscles)
-                        3: new THREE.BoxGeometry(3, 3, 3),     // Pacemakers
-                        default: new THREE.SphereGeometry(1.5, 8, 8)
-                    };
-                    // BasicMaterial is awesome because it doesn't need light in the scene
-                    const material = new THREE.MeshBasicMaterial({ color: 0xffffff }); 
-
-                    Object.keys(counts).forEach(typeStr => {
-                        const type = parseInt(typeStr);
-                        const count = counts[type];
-                        if (count > 0) {
-                            const geo = geometries[type] || geometries.default;
-                            const mesh = new THREE.InstancedMesh(geo, material.clone(), count);
-                            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                            scene.add(mesh);
-                            neuronMeshes.push({ type: type, mesh: mesh, currentIndex: 0 });
-                        }
-                    });
-
-                    // 4. Place neurons in their positions
-                    const dummy = new THREE.Object3D();
-                    const baseColor = new THREE.Color(0x00ff00);
-
-                    data.neurons.forEach(n => {
-                        const id = n[0];
-                        const type = n[4];
-                        const SPACE_SIZE = 100.0;
-                        const HALF_SIZE = SPACE_SIZE / 2.0;
-                        
-                        // Compress 65535 units into a neat SPACE_SIZE^3 cube
-                        // USING LET INSTEAD OF CONST so coordinates can be overwritten
-                        let x = (n[1] / 65535.0) * SPACE_SIZE - HALF_SIZE;
-                        let y = (n[2] / 65535.0) * SPACE_SIZE - HALF_SIZE;
-                        let z = (n[3] / 65535.0) * SPACE_SIZE - HALF_SIZE;
-
-                        // LAYER SORTING
-                        if (type === 5) {
-                            // Sensors (Pyramids/Tetrahedrons) pushed to the RIGHT edge
-                            x = SPACE_SIZE * -0.75; // -3/4 of the space
-                        } else if (type === 4) {
-                            // Motors (Octahedrons/Rhombus) grouped FAR RIGHT
-                            x = SPACE_SIZE * 0.75; // +3/4 of the space
-                        } else if (type === 0 || type == 3) {
-                            // Pyramidal and Pacemaker neurons (Sphere and Cube by default) grouped on the RIGHT, slightly left of sensors
-                            x = SPACE_SIZE * -0.10 + (Math.random() * HALF_SIZE - HALF_SIZE * 0.1); // Slight random scatter so they don't merge into one point
-                        }
-
-                        const meshData = neuronMeshes.find(m => m.type === type);
-                        if (meshData) {
-                            dummy.position.set(x, y, z);
-                            dummy.updateMatrix();
-                            meshData.mesh.setMatrixAt(meshData.currentIndex, dummy.matrix);
-                            meshData.mesh.setColorAt(meshData.currentIndex, baseColor);
-                            
-                            // Save NORMALIZED coordinates for synapses!
-                            nodeMap.set(id, { x, y, z, type, meshIdx: meshData.currentIndex });
-                            meshData.currentIndex++;
-                        }
-                    });
-
-                    neuronMeshes.forEach(m => m.mesh.instanceMatrix.needsUpdate = true);
-
-                    // 5. Draw synapses
-                    if (data.synapses.length > 0) {
-                        const positions = new Float32Array(data.synapses.length * 6);
-                        const colors = new Float32Array(data.synapses.length * 6);
-                        let idx = 0;
-                        let cIdx = 0;
-                        
-                        data.synapses.forEach(syn => {
-                            const source = nodeMap.get(syn[0]);
-                            const target = nodeMap.get(syn[1]);
-                            if (source && target) {
-                                positions[idx++] = source.x; positions[idx++] = source.y; positions[idx++] = source.z;
-                                positions[idx++] = target.x; positions[idx++] = target.y; positions[idx++] = target.z;
-                                
-                                // Dark blue base color for the web, so it doesn't overpower neurons
-                                colors[cIdx++] = 0.1; colors[cIdx++] = 0.2; colors[cIdx++] = 0.5;
-                                colors[cIdx++] = 0.1; colors[cIdx++] = 0.2; colors[cIdx++] = 0.5;
-                            }
-                        });
-                        
-                        const lineGeo = new THREE.BufferGeometry();
-                        lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                        lineGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-                        
-                        const lineMat = new THREE.LineBasicMaterial({
-                            vertexColors: true,
-                            transparent: true,
-                            opacity: 0.4,
-                            blending: THREE.AdditiveBlending,
-                            depthWrite: false
-                        });
-                        synapseLines = new THREE.LineSegments(lineGeo, lineMat);
-                        scene.add(synapseLines);
-                    }
-
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'InitialState') {
+                    initNetwork(msg.payload);
                 } else if (msg.type === 'TickUpdate') {
-                    const data = msg.payload; 
-                    
-                    const _tempColor = new THREE.Color();
-                    
+                    const data = msg.payload;
                     data.neurons.forEach(n => {
-                        const id = n[0];
-                        const state = n[1];
-                        const atp_pct = n[2];
-                        
+                        const id = n[0], state = n[1], atp = n[2];
                         const nData = nodeMap.get(id);
                         if (nData) {
-                            const meshData = neuronMeshes.find(m => m.type === nData.type);
-                            if (meshData) {
-                                if (state === 2.0) {
-                                    _tempColor.setRGB(1.0, 1.0, 1.0); // Spike = white flash
-                                } else {
-                                    // Fatigue gradient: 100% ATP = Soft emerald, 0% = Muted red
-                                    const r = (1.0 - (atp_pct / 100.0)) * 0.9;
-                                    const g = (atp_pct / 100.0) * 0.8;
-                                    const b = (atp_pct / 100.0) * 0.4; // A drop of blue for freshness
-                                    _tempColor.setRGB(r, g, b);
+                            const mData = neuronMeshes.find(m => m.type === nData.type);
+                            if (state === 2.0) { // SPIKE!
+                                _tempColor.set(0xffffff);
+                                // Пускаем импульсы, если не превышен лимит
+                                if (activePulses.length < MAX_PULSES) {
+                                    nData.outgoing.forEach(syn => {
+                                        if (activePulses.length < MAX_PULSES) {
+                                            const tgt = nodeMap.get(syn.targetId);
+                                            if (tgt) activePulses.push({ s: nData, t: tgt, p: 0 });
+                                        }
+                                    });
                                 }
-                                meshData.mesh.setColorAt(nData.meshIdx, _tempColor);
+                            } else {
+                                const h = atp / 100.0;
+                                _tempColor.setRGB((1-h)*0.8, h*0.6, h*0.4 + 0.2);
                             }
+                            mData.mesh.setColorAt(nData.meshIdx, _tempColor);
                         }
                     });
-
-                    neuronMeshes.forEach(m => {
-                        if (m.mesh.instanceColor) m.mesh.instanceColor.needsUpdate = true;
-                    });
-
+                    neuronMeshes.forEach(m => m.mesh.instanceColor.needsUpdate = true);
                     document.getElementById('tick').innerText = `Tick: ${data.tick}`;
-                    document.getElementById('neurons').innerText = `Neurons: ${nodeMap.size}`;
-                }
-                } catch (err) {
-                    logMsg(`ONMESSAGE ERROR: ${err.message}`);
-                    if (err.stack) {
-                        console.error(err.stack);
-                    }
                 }
             };
 
-            ws.onclose = () => {
-                document.getElementById('status').innerText = "Status: OFFLINE (Retrying)";
-                document.getElementById('status').style.color = "#f00";
-                setTimeout(connect, 1000);
+            ws.onclose = () => { 
+                logMsg("WS Closed. Reconnecting..."); 
+                document.getElementById('status').innerText = "Status: RECONNECTING...";
+                setTimeout(connect, 2000); 
             };
         }
 
-        connect();
-
-        // --- Render Loop ---
         function animate() {
             requestAnimationFrame(animate);
+            
+            if (pulseSystem && activePulses.length > 0) {
+                const positions = pulseSystem.geometry.attributes.position.array;
+                for (let i = 0; i < MAX_PULSES; i++) {
+                    const idx = i * 3;
+                    if (i < activePulses.length) {
+                        const pulse = activePulses[i];
+                        pulse.p += PULSE_SPEED;
+                        if (pulse.p >= 1.0) {
+                            activePulses.splice(i, 1);
+                            i--; continue;
+                        }
+                        positions[idx] = pulse.s.x + (pulse.t.x - pulse.s.x) * pulse.p;
+                        positions[idx+1] = pulse.s.y + (pulse.t.y - pulse.s.y) * pulse.p;
+                        positions[idx+2] = pulse.s.z + (pulse.t.z - pulse.s.z) * pulse.p;
+                    } else {
+                        positions[idx] = positions[idx+1] = positions[idx+2] = 10000;
+                    }
+                }
+                pulseSystem.geometry.attributes.position.needsUpdate = true;
+            }
+
             controls.update();
             renderer.render(scene, camera);
         }
+
+        connect();
         animate();
 
         window.addEventListener('resize', () => {
@@ -436,7 +281,6 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
     </script>
 </body>
 </html>
