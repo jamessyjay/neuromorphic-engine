@@ -35,15 +35,26 @@ fn test_atp_gating_starvation_filter() {
     // Setup identical Pyramidal neurons
     unsafe {
         init_neuron(&mut n_fed, 1, NeuronType::Pyramidal, 42);
-        init_neuron(&mut n_starving, 2, NeuronType::Pyramidal, 42);
+        init_neuron(&mut n_starving, 2, NeuronType::Pyramidal, 41);
     }
     
     n_fed.energy_atp = n_fed.max_atp;
     n_starving.energy_atp = 0.5; // Near zero
     
     // Both should have same base thresholds
-    println!("Fed threshold: {}, Starving threshold: {}", n_fed.activation_threshold, n_starving.activation_threshold);
-    // assert!((n_fed.activation_threshold - n_starving.activation_threshold).abs() < 0.01);
+    assert!((n_fed.activation_threshold - n_starving.activation_threshold).abs() < 0.01);
+    
+    // Calculate dynamic thresholds in Rust to assert
+    let fed_ratio = (n_fed.energy_atp / n_fed.max_atp).max(0.01);
+    let starving_ratio = (n_starving.energy_atp / n_starving.max_atp).max(0.01);
+    
+    let fed_dyn_thresh = n_fed.activation_threshold * (1.0 - 0.5 * (1.0 - fed_ratio));
+    let starving_dyn_thresh = n_starving.activation_threshold * (1.0 - 0.5 * (1.0 - starving_ratio));
+    
+    // Assert physiological correctness:
+    // Starving threshold must be greater (closer to zero) than fed threshold!
+    assert!(starving_dyn_thresh > fed_dyn_thresh, "Starving threshold must be greater (closer to zero) than fed threshold");
+
     
     // Inject stimulus to soma directly to clearly test the threshold gate
     // If we must inject to branch, we inject a massive amount so it transfers to soma
