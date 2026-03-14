@@ -253,3 +253,57 @@ fn test_true_snapshot_integrity() {
     assert!((loaded_snapshot.environment.global_oxygen_level - 0.4242).abs() < 0.0001, "Environment state must be preserved for homeostasis");
     assert_eq!(loaded_snapshot.graph.neurons.len(), 10, "Neurons count should match");
 }
+
+#[test]
+fn test_performance_scaling_tps() {
+    println!("--- EXECUTING PERFORMANCE SCALING TPS TEST ---");
+    let scales = vec![
+        (2, 20),
+        (10, 100),
+        (100, 1000),
+        (1000, 10_000),
+        (10_000, 100_000),
+        (100_000, 1_000_000),
+    ];
+    let ticks = 50; // Use a smaller number of ticks for fast unit testing, but enough to measure TPS
+
+    println!("{:<15} | {:<15} | {:<15} | {:<15}", "Neurons", "Synapses", "Time (ms)", "TPS");
+    println!("{:-<15}-+-{:-<15}-+-{:-<15}-+-{:-<15}", "", "", "", "");
+
+    for (neurons, synapses) in scales {
+        let mut graph = NetworkGraph::new();
+        // Setup graph
+        for _ in 0..neurons {
+            graph.add_neuron(NeuronType::Pyramidal);
+        }
+        for i in 0..synapses {
+            let src = (i % neurons) as u32;
+            let tgt = ((i + 1) % neurons) as u32;
+            graph.connect(src, tgt, 1.0, 0, false, false);
+        }
+
+        let env = Environment {
+            global_oxygen_level: 1.0,
+            global_glucose_level: 1.0,
+            dopamine_multiplier: 1.0,
+            toxin_levels: 0.0,
+            light_level: 0.0,
+            stdp_learning_rate: 0.1,
+        };
+
+        let start = std::time::Instant::now();
+        for tick in 1..=ticks {
+            graph.tick(tick, env);
+        }
+        let elapsed = start.elapsed();
+        let elapsed_ms = elapsed.as_millis();
+        let tps = if elapsed.as_secs_f32() > 0.0 {
+            (ticks as f32 / elapsed.as_secs_f32()) as u32
+        } else {
+            0
+        };
+
+        println!("{:<15} | {:<15} | {:<15} | {:<15}", neurons, synapses, elapsed_ms, tps);
+    }
+    println!("{:-<15}-+-{:-<15}-+-{:-<15}-+-{:-<15}", "", "", "", "");
+}
