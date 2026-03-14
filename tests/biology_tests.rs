@@ -129,7 +129,7 @@ fn test_calcium_overdose() {
     
     for tick in 1..=500 {
         // Force spike every tick, bypassing refractory by artificially resetting it
-        if graph.neurons[id as usize].is_alive {
+        if graph.neurons[id as usize].is_alive == 1 {
             graph.neurons[id as usize].current_voltage = 100.0; 
             graph.neurons[id as usize].refractory_time_left = 0.0;
             // Also supply ATP so it doesn't just sleep
@@ -139,7 +139,7 @@ fn test_calcium_overdose() {
     }
     
     println!("Calcium after forced spikes: {}, Alive: {}", graph.neurons[id as usize].calcium_level, graph.neurons[id as usize].is_alive);
-    assert_eq!(graph.neurons[id as usize].is_alive, false, "Neuron should die from excitotoxicity (calcium overdose).");
+    assert_eq!(graph.neurons[id as usize].is_alive, 0, "Neuron should die from excitotoxicity (calcium overdose).");
     assert_eq!(graph.neurons[id as usize].death_reason, 2 /* DEATH_CALCIUM_HIGH */);
 }
 
@@ -157,5 +157,5 @@ fn test_calcium_recovery_rate() {
     }
     
     assert!(graph.neurons[id as usize].calcium_level < 1.0, "Calcium should have recovered fully after idle period.");
-    assert_eq!(graph.neurons[id as usize].is_alive, true, "Neuron should survive normal calcium load.");
+    assert_eq!(graph.neurons[id as usize].is_alive, 1, "Neuron should survive normal calcium load.");
 }

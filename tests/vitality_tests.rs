@@ -75,7 +75,7 @@ fn test_thermal_noise_prevents_freezing() {
 fn test_phoenix_resurrection() {
     let mut neuron = create_test_neuron(2, NeuronType::Pyramidal);
     // Force it to die
-    neuron.is_alive = false;
+    neuron.is_alive = 0;
     neuron.energy_atp = 0.0;
     neuron.dead_ticks = 0;
     
@@ -92,13 +92,13 @@ fn test_phoenix_resurrection() {
     // Tick 999 times - should remain dead
     for tick in 1..=999 {
         unsafe { tick_neuron_cpu(&mut neuron, env.clone(), tick); }
-        assert_eq!(neuron.is_alive, false, "Neuron should remain dead at tick {}", tick);
+        assert_eq!(neuron.is_alive, 0, "Neuron should remain dead at tick {}", tick);
     }
     
     // Tick 1000 - Resurrection!
     unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 1000); }
     
-    assert_eq!(neuron.is_alive, true, "Phoenix loop must resurrect neuron at 1000 ticks");
+    assert_eq!(neuron.is_alive, 1, "Phoenix loop must resurrect neuron at 1000 ticks");
     assert_eq!(neuron.energy_atp, neuron.max_atp, "Resurrected neuron must have full ATP");
     assert_eq!(neuron.dead_ticks, 0, "Dead ticks counter must reset");
 }

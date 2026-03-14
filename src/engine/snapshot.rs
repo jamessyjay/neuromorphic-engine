@@ -14,6 +14,8 @@ pub struct BrainSnapshot {
 
 impl BrainSnapshot {
     pub fn save_to_disk(&self, filename: &str) {
+        unsafe { crate::engine::ffi::synchronize_device(); }
+
         println!("  -> Saving true snapshot to disk ({})...", filename);
         let file = File::create(filename).unwrap_or_else(|_| panic!("Failed to create {}", filename));
         let writer = BufWriter::new(file);
@@ -25,7 +27,11 @@ impl BrainSnapshot {
             let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
             let reader = BufReader::new(file);
             match bincode::deserialize_from(reader) {
-                Ok(snapshot) => Some(snapshot),
+                Ok(mut snapshot) => {
+                    let mut snap: BrainSnapshot = snapshot;
+                    snap.graph.optimize_memory_layout();
+                    Some(snap)
+                },
                 Err(e) => {
                     eprintln!("Failed to deserialize {}: {}", filename, e);
                     None

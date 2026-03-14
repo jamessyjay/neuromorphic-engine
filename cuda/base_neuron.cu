@@ -637,4 +637,10 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     }
 }
 
+
+void synchronize_device() {
+#ifdef USE_CUDA
+    cudaDeviceSynchronize();
+#endif
+}
 } // extern "C"
