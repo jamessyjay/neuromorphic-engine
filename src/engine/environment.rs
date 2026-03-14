@@ -1,4 +1,4 @@
-use crate::ffi::Environment;
+use crate::engine::ffi::Environment;
 
 const TARGET_TICK_MS: f32 = 2.0;
 const CRITICAL_TICK_MS: f32 = 10.0;

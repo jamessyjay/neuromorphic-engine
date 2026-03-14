@@ -96,3 +96,10 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 - **NMDA Multiplexing (Logical AND)**: Checks dendritic logic: distributed weak signals do not trigger a spike, whereas the exact same signals concentrated on one branch cross the `nmda_threshold` and force a somatic spike.
 - **The Matrix (Golden Master Snapshot)**: Generates and asserts a 100-tick lifecycle of a Pyramidal neuron to prevent any mathematical regressions in future engine updates.
 
+
+
+### Environment Regulator Tests (`regulator_tests.rs`)
+- `test_regulator_perfect_conditions`: Feeds perfect tick latencies (1.0ms) and ensures Oxygen and Glucose remain at 1.0 (100%).
+- `test_regulator_sudden_lag`: Feeds a single massive latency spike (10.0ms) and verifies Oxygen drops to 0.0 instantly, while Glucose remains high due to EMA smoothing.
+- `test_regulator_chronic_lag`: Simulates 500 ticks of chronic lag and verifies both Oxygen and Glucose hit rock bottom.
+- `test_homeostasis_loop_integration`: Integrates the regulator into a live simulation loop, mocks hardware lag, and verifies the environment state dynamically updates based on actual execution time.

@@ -2,8 +2,8 @@
 
 use std::time::Instant;
 use std::fs;
-use crate::ffi::{BaseNeuron, Synapse};
-use crate::constants::*;
+use crate::engine::ffi::{BaseNeuron, Synapse};
+use crate::engine::constants::*;
 
 pub struct Telemetry {
     start_time: Instant,

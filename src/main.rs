@@ -1,17 +1,9 @@
-pub mod environment;
-pub mod streamer;
-pub mod ffi;
-pub mod graph;
-pub mod constants;
-pub mod telemetry;
-pub mod stimulus;
-pub mod modes;
-pub mod visualization;
 
-use crate::constants::*;
-use crate::modes::*;
-use crate::visualization::*;
-use crate::graph::NetworkGraph;
+
+use neuromorphic_engine::engine::constants::*;
+use neuromorphic_engine::runner::modes::*;
+use neuromorphic_engine::monitor::visualization::*;
+use neuromorphic_engine::network::graph::NetworkGraph;
 use tokio::sync::broadcast;
 use std::env;
 use std::sync::{Arc, Mutex};
@@ -57,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, _rx) = broadcast::channel(100);
 
     // Shared Environment for UI updates
-    let default_env = crate::ffi::Environment {
+    let default_env = neuromorphic_engine::engine::ffi::Environment {
         global_oxygen_level: 100.0,
         global_glucose_level: 100.0,
         dopamine_multiplier: 1.0,
@@ -73,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let tx_clone = tx.clone();
         let env_clone = shared_env.clone();
         tokio::spawn(async move {
-            crate::streamer::start_server(tx_clone, env_clone).await;
+            neuromorphic_engine::monitor::streamer::start_server(tx_clone, env_clone).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
         Some(tx)
@@ -83,11 +75,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if is_bench_scaling {
-        modes::run_bench_scaling().await?;
+        run_bench_scaling().await?;
     } else if is_bench_io {
-        modes::run_bench_io().await?;
+        run_bench_io().await?;
     } else if is_ui_test {
-        modes::run_ui_test(tx_option.clone(), shared_env.clone()).await?;
+        run_ui_test(tx_option.clone(), shared_env.clone()).await?;
         println!("Simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;

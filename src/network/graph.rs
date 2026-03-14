@@ -1,5 +1,5 @@
-use crate::ffi::{BaseNeuron, Synapse, NeuronType, init_neuron};
-use crate::constants::*;
+use crate::engine::ffi::{BaseNeuron, Synapse, NeuronType, init_neuron};
+use crate::engine::constants::*;
 use rand::RngExt;
 use serde::{Serialize, Deserialize};
 use std::fs::File;
@@ -175,7 +175,7 @@ impl NetworkGraph {
             y: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             z: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             _pad2: 0,
-            branches: [crate::ffi::Compartment {
+            branches: [crate::engine::ffi::Compartment {
                 branch_type: 0,
                 refractory_timer: 0,
                 voltage: 0,
@@ -195,20 +195,20 @@ impl NetworkGraph {
         id
     }
 
-    pub fn tick(&mut self, current_tick: u32, env: crate::ffi::Environment) {
+    pub fn tick(&mut self, current_tick: u32, env: crate::engine::ffi::Environment) {
         #[cfg(target_os = "macos")]
         {
             // MacOS CPU Fallback using Rayon Multi-Threading
             self.neurons.par_iter_mut().for_each(|n| {
-                unsafe { crate::ffi::tick_neuron_cpu(n, env, current_tick); }
+                unsafe { crate::engine::ffi::tick_neuron_cpu(n, env, current_tick); }
             });
 
             // Convert pointer to usize to make it trivially Send+Sync
             let neurons_ptr_usize = self.neurons.as_mut_ptr() as usize;
             
             self.synapses.par_iter_mut().for_each(|s| {
-                let ptr = neurons_ptr_usize as *mut crate::ffi::BaseNeuron;
-                unsafe { crate::ffi::tick_synapse_cpu(s, ptr, env, current_tick); }
+                let ptr = neurons_ptr_usize as *mut crate::engine::ffi::BaseNeuron;
+                unsafe { crate::engine::ffi::tick_synapse_cpu(s, ptr, env, current_tick); }
             });
         }
         
@@ -216,7 +216,7 @@ impl NetworkGraph {
         {
             // Jetson/CUDA mode
             unsafe {
-                crate::ffi::launch_tick_neurons(
+                crate::engine::ffi::launch_tick_neurons(
                     self.neurons.as_mut_ptr(),
                     self.neurons.len() as i32,
                     self.synapses.as_mut_ptr(),

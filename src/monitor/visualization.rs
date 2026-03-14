@@ -1,7 +1,7 @@
 // src/visualization.rs
 use plotters::prelude::*;
-use crate::constants::*;
-use crate::modes::{BenchmarkData, SimulationData};
+use crate::engine::constants::*;
+use crate::runner::modes::{BenchmarkData, SimulationData};
 
 type DrawingAreaBackend<'a> = DrawingArea<BitMapBackend<'a>, plotters::coord::Shift>;
 

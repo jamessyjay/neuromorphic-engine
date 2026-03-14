@@ -222,3 +222,13 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Live Environment Controls (WebSockets):**
   - Upgraded the Rust backend (`main.rs`, `streamer.rs`) to process incoming `UpdateEnvironment` JSON messages from the WebGL frontend.
   - Enabled thread-safe live tweaking of simulation parameters (Dopamine levels, STDP Learning Rate) using an `Arc<Mutex<Environment>>` without blocking the core CUDA execution thread.
+
+## Phase 46: Enterprise Architecture Refactoring & Environment Regulator (MMN v1.1)
+
+**Summary:** 
+- **Cyber-Biological Homeostasis:** Implemented `EnvironmentRegulator` in Rust that translates hardware Tick Latency into biological `hypoxia_penalty` and `glucose` starvation. If the system lags, the network literally chokes, reducing spikes to save hardware. Closed the feedback loop.
+- **Enterprise Refactoring:** Migrated the flat `src/` directory to a Domain-Driven structure without touching C++ physics. 
+  - `src/engine/`: FFI, Environment, Constants
+  - `src/network/`: Graph, Stimulus
+  - `src/monitor/`: Telemetry, Streamer, Visualization
+  - `src/runner/`: Simulation Modes

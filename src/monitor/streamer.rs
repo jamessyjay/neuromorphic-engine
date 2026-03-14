@@ -36,7 +36,7 @@ pub struct TickUpdatePayload {
     pub neurons: Vec<(u32, f32, f32)>, // id, visual_state, atp_pct
 }
 
-pub async fn start_server(tx: broadcast::Sender<String>, shared_env: Arc<Mutex<crate::ffi::Environment>>) {
+pub async fn start_server(tx: broadcast::Sender<String>, shared_env: Arc<Mutex<crate::engine::ffi::Environment>>) {
     let tx = Arc::new(tx);
     let tx_for_filter = tx.clone();
     let tx_for_bg = tx.clone();
@@ -65,7 +65,7 @@ pub async fn start_server(tx: broadcast::Sender<String>, shared_env: Arc<Mutex<c
         .and(tx_filter)
         .and(cache_filter)
         .and(env_filter)
-        .map(|ws: warp::ws::Ws, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>, shared_env: Arc<Mutex<crate::ffi::Environment>>| {
+        .map(|ws: warp::ws::Ws, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>, shared_env: Arc<Mutex<crate::engine::ffi::Environment>>| {
             ws.on_upgrade(move |socket| handle_client(socket, tx, cache, shared_env))
         });
 
@@ -78,7 +78,7 @@ pub async fn start_server(tx: broadcast::Sender<String>, shared_env: Arc<Mutex<c
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
 
-async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>, shared_env: Arc<Mutex<crate::ffi::Environment>>) {
+async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>, shared_env: Arc<Mutex<crate::engine::ffi::Environment>>) {
     let mut rx = tx.subscribe();
     let (mut client_ws_sender, mut client_ws_rcv) = ws.split();
 

@@ -1,15 +1,15 @@
-use crate::environment::EnvironmentRegulator;
+use crate::engine::environment::EnvironmentRegulator;
 use std::sync::{Arc, Mutex};
 // src/modes.rs
 use std::time::Instant;
 use tokio::sync::broadcast;
-use crate::ffi::{Environment, NeuronType};
-use crate::graph::NetworkGraph;
-use crate::telemetry::Telemetry;
-use crate::stimulus;
-use crate::streamer;
-use crate::constants::*;
-use crate::visualization;
+use crate::engine::ffi::{Environment, NeuronType};
+use crate::network::graph::NetworkGraph;
+use crate::monitor::telemetry::Telemetry;
+use crate::network::stimulus;
+use crate::monitor::streamer;
+use crate::engine::constants::*;
+use crate::monitor::visualization;
 
 pub struct BenchmarkData {
     pub ticks: Vec<u32>,
@@ -116,7 +116,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     graph
 }
 
-pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>, _shared_env: Arc<Mutex<crate::ffi::Environment>>, use_dynamic_homeostasis: bool) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
+pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>, _shared_env: Arc<Mutex<crate::engine::ffi::Environment>>, use_dynamic_homeostasis: bool) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
     let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         if loaded_graph.neurons.len() == neurons_count {
             println!("Awakening network from brain_save.bin...");
@@ -294,7 +294,7 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
         println!("\n>> Testing Scale: {} Neurons...", n);
         let s = n * 10;
         let start = Instant::now();
-        let dummy_env = std::sync::Arc::new(std::sync::Mutex::new(crate::ffi::Environment {
+        let dummy_env = std::sync::Arc::new(std::sync::Mutex::new(crate::engine::ffi::Environment {
             global_oxygen_level: 100.0,
             global_glucose_level: 100.0,
             dopamine_multiplier: 1.0,
@@ -306,8 +306,8 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
         let elapsed = start.elapsed().as_secs_f64();
         let tps = 500.0 / elapsed;
         
-        let neuron_mem = std::mem::size_of::<crate::ffi::BaseNeuron>();
-        let synapse_mem = std::mem::size_of::<crate::ffi::Synapse>();
+        let neuron_mem = std::mem::size_of::<crate::engine::ffi::BaseNeuron>();
+        let synapse_mem = std::mem::size_of::<crate::engine::ffi::Synapse>();
         let total_mem_kb = (n * neuron_mem + s * synapse_mem) as f32 / 1024.0;
 
         results.push_str(&format!("| {} | {} | {:.2} | {:.2} | {:.2} |\n", n, s, tps, elapsed, total_mem_kb));
@@ -479,7 +479,7 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
 
     graph.synapses.clear();
     graph.neurons[target as usize].current_voltage = -70.0;
-    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
+    graph.neurons[target as usize].branches[1] = crate::engine::ffi::Compartment {
         branch_type: 1,
         refractory_timer: 0,
         voltage: ZERO_VOLTAGE_PACKED,
@@ -517,7 +517,7 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
     let target = graph.add_neuron(NeuronType::Pyramidal);
     graph.neurons[target as usize].current_voltage = -70.0;
     
-    graph.neurons[target as usize].branches[1] = crate::ffi::Compartment {
+    graph.neurons[target as usize].branches[1] = crate::engine::ffi::Compartment {
         branch_type: 1,
         refractory_timer: 0,
         voltage: ZERO_VOLTAGE_PACKED,
@@ -916,12 +916,12 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
     
     for &size in &sizes {
         let synapses = size * 10;
-        let mut graph = crate::graph::NetworkGraph::new();
+        let mut graph = crate::network::graph::NetworkGraph::new();
         for _ in 0..size {
-            graph.add_neuron(crate::ffi::NeuronType::Pyramidal);
+            graph.add_neuron(crate::engine::ffi::NeuronType::Pyramidal);
         }
         for i in 0..synapses {
-            graph.synapses.push(crate::ffi::Synapse {
+            graph.synapses.push(crate::engine::ffi::Synapse {
                 source_id: (i % size) as u32,
                 target_id: ((i + 1) % size) as u32,
                 weight: 1.0,
@@ -934,7 +934,7 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
         
-        let env = crate::ffi::Environment {
+        let env = crate::engine::ffi::Environment {
             global_oxygen_level: 1.0,
             global_glucose_level: 1.0,
             dopamine_multiplier: 1.0,
@@ -977,12 +977,12 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
     let syn_count = 5000;
     let ticks = 100;
     
-    let mut graph = crate::graph::NetworkGraph::new();
+    let mut graph = crate::network::graph::NetworkGraph::new();
     for _ in 0..size {
-        graph.add_neuron(crate::ffi::NeuronType::Pyramidal);
+        graph.add_neuron(crate::engine::ffi::NeuronType::Pyramidal);
     }
     for i in 0..syn_count {
-        graph.synapses.push(crate::ffi::Synapse {
+        graph.synapses.push(crate::engine::ffi::Synapse {
             source_id: (i % size) as u32,
             target_id: ((i + 1) % size) as u32,
             weight: 1.0,
@@ -1001,7 +1001,7 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
         for t in 1..=ticks {
             // Fake the serialization work
             if t % interval == 0 {
-                let mut snapshot = crate::streamer::InitialStatePayload {
+                let mut snapshot = crate::monitor::streamer::InitialStatePayload {
                     total_neurons: graph.neurons.len(),
                     total_synapses: graph.synapses.len(),
                     neurons: Vec::with_capacity(graph.neurons.len()),
@@ -1030,9 +1030,9 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, shared_env: Arc<Mutex<crate::ffi::Environment>>) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::graph::NetworkGraph;
-    use crate::ffi::{NeuronType, Environment, Synapse};
+pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, shared_env: Arc<Mutex<crate::engine::ffi::Environment>>) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::network::graph::NetworkGraph;
+    use crate::engine::ffi::{NeuronType, Environment, Synapse};
     
     println!("--- EXECUTING UI TEST MODE ---");
     println!("Spawning a tiny predictable network to test visualizer functionality.");
@@ -1104,7 +1104,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         if let Some(ref sender) = tx {
             // First tick: send InitialState
             if tick == 1 {
-                let mut initial = crate::streamer::InitialStatePayload {
+                let mut initial = crate::monitor::streamer::InitialStatePayload {
                     total_neurons: graph.neurons.len(),
                     total_synapses: graph.synapses.len(),
                     neurons: Vec::new(),
@@ -1117,10 +1117,10 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                     initial.synapses.push((s.source_id, s.target_id, s.weight));
                 }
                 
-                let msg = crate::streamer::StreamMessage::InitialState(initial);
+                let msg = crate::monitor::streamer::StreamMessage::InitialState(initial);
                 let _ = sender.send(serde_json::to_string(&msg).unwrap());
             } else {
-                let mut update = crate::streamer::TickUpdatePayload {
+                let mut update = crate::monitor::streamer::TickUpdatePayload {
                     tick,
                     total_spikes: 0,
                     neurons: Vec::new(),
@@ -1131,7 +1131,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                     update.neurons.push((n.id, state as f32, atp_percent as f32));
                 }
                 
-                let msg = crate::streamer::StreamMessage::TickUpdate(update);
+                let msg = crate::monitor::streamer::StreamMessage::TickUpdate(update);
                 let _ = sender.send(serde_json::to_string(&msg).unwrap());
             }
         }

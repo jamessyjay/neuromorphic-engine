@@ -1,7 +1,7 @@
 // src/stimulus.rs
-use crate::graph::NetworkGraph;
-use crate::ffi::Environment;
-use crate::constants::*;
+use crate::network::graph::NetworkGraph;
+use crate::engine::ffi::Environment;
+use crate::engine::constants::*;
 
 pub struct StimulusService {
     pub interval: u32,

@@ -4,6 +4,10 @@ trigger: always_on
 
 # AI Agent Development Guidelines (Neuromorphic Engine)
 
+Welcome to the Neuromorphic Engine. This project is a biologically plausible, massively parallel neural network simulation designed to run on the GPU (CUDA/C++) while being orchestrated by a high-performance host (Rust). It features Homeostatic Plasticity, Dendritic computation, STDP, and dynamic Environment regulation.
+
+Before touching anything, READ THIS CAREFULLY.
+
 ## [!] ANTI-HALLUCINATION POLICY (ZERO TOLERANCE)
 
 AI agents naturally tend to guess logic. In this project, **THIS IS STRICTLY PROHIBITED**.
@@ -11,6 +15,19 @@ AI agents naturally tend to guess logic. In this project, **THIS IS STRICTLY PRO
 1. **NO GUESSING:** If a formula is not in `./specs/`, you DO NOT HAVE THE RIGHT to invent it. You must stop and ask the user.
 2. **CITE YOUR SOURCES:** Before writing any math, indicate in a comment which specification file you took it from.
 3. **NO GHOST DEPENDENCIES:** Importing third-party libraries without permission is prohibited.
+
+---
+
+## [!] DOMAIN-DRIVEN ARCHITECTURE (RUST)
+
+The project uses a strict domain-driven module structure. Do not place everything in the root `src/` directory.
+
+- `src/engine/`: Core logic, FFI bindings (`ffi.rs`), Constants (`constants.rs`), and Environment Regulation (`environment.rs`).
+- `src/network/`: The brain graph topology (`graph.rs`) and external stimulus injection (`stimulus.rs`).
+- `src/monitor/`: Live WebSocket UI streamers (`streamer.rs`), Data exporters (`visualization.rs`), and Telemetry (`telemetry.rs`).
+- `src/runner/`: Simulation loops, execution modes, and benchmark handlers (`modes.rs`).
+
+*Note: All C++ and CUDA code remains in the `cuda/` directory.*
 
 ---
 
@@ -36,21 +53,21 @@ AI agents naturally tend to guess logic. In this project, **THIS IS STRICTLY PRO
 ### 1. TECHNOLOGY STACK
 
 - **RUST (Host/CPU):** Orchestrator. Manages ticks, memory, and `Environment`. It is prohibited to use `.unwrap()` unnecessarily.
-- **C++ / CUDA C (Device/GPU):** Massively parallel mathematics. Only **Unified Memory** (`cudaMallocManaged`).
+- **C++ / CUDA C (Device/GPU):** Massively parallel mathematics. Only **Unified Memory** (`cudaMallocManaged`). 
 
-### 2. HETEROGENEITY AND CHAOS (NEW)
+### 2. HETEROGENEITY AND CHAOS
 
 There are no clones in nature.
 
-- **Initialization:** When creating neurons, using identical constants is PROHIBITED. Use normal distribution (Gaussian) for `resting_voltage`, `threshold`, and `atp_capacity`.
+- **Initialization:** When creating neurons, using identical constants is PROHIBITED. Use normal distribution (Gaussian) for parameters.
 - **Random Seeds:** In CUDA kernels, use `curand` to generate unique parameters for each neuron.
 
 ### 3. HOMEOSTATIC PLASTICITY (EVOLUTION)
 
 Neurons must adapt under load.
 
-- **Threshold Scaling:** Implement dynamic threshold changes. If a neuron fires too often, the threshold must rise (`activation_threshold` increases).
-- **Metabolic Stress:** At low ATP, pump efficiency must drop.
+- **ATP-Gating & Threshold Scaling:** If a neuron fires too often or lacks ATP, the dynamic threshold must rise (`activation_threshold` increases), ignoring weak stimuli.
+- **Metabolic Stress:** Handled dynamically via Rust's `EnvironmentRegulator`, which drops Global Oxygen/Glucose if the hardware lags.
 
 ---
 
@@ -72,46 +89,35 @@ __global__ void tick_neurons(BaseNeuron* neurons, int count) {
 
 ## [!] TESTING & VALIDATION (DIGITAL TWIN)
 
-Any new feature must pass Stress-Tests (Spec 11):
+Any new feature must pass the rigorous validation suites in `tests/`:
 
-- **Synaptic Fatigue:** Checking signal attenuation when vesicles are depleted.
-- **Hypoxic Shutdown:** Checking proper shutdown when `oxygen_level -> 0`.
-- **Epileptic Feedback:** Checking Apoptosis triggering during network self-acceleration.
+- **Synaptic Fatigue & Receptor Saturation:** Validated in `synapse_tests.rs`.
+- **Hypoxic Shutdown:** Handled globally by `EnvironmentRegulator` and tested in `biology_tests.rs`.
+- **Dendritic Logic (NMDA AND-Gates):** Validated in `neuron_physics_tests.rs`.
+- **Precise STDP & Pavlovian Learning:** Tested with causal/acausal firing in `test_stdp.rs`.
 
-**VALIDATION:** Compare output graphs (Voltage/Time) with biological benchmarks (Allen Brain Institute). The spike shape must have a hyperpolarization phase.
+**VALIDATION RULE:** All new Rust logic must have a passing unit test before committing. Never merge failing tests.
 
 ---
 
 ## DEVELOPMENT PROCESS
 
 1. **Task Analysis:** Do I understand the task? Which formula from `./specs/` is needed? If not — ASK!
-2. **Search for existing code:** Check `src/` and `cuda/` folders for ready-made tools.
-3. **Planning (FFI):** Describe `.h` headers and Rust `extern "C"` wrapper. Ensure that types `f32` (Rust) and `float` (C++) match.
+2. **Search for existing code:** Check `src/` (in proper subdirectories) and `cuda/` folders for ready-made tools.
+3. **Planning (FFI):** Ensure that types `f32` (Rust) and `float` (C++) match exactly. Be hyper-aware of `#[repr(C)]` alignment!
 4. **Implementation:** Write atomic functions. Follow SOLID.
-5. **Verification:** Check code for Warp Divergence in CUDA and Memory Safety in Rust.
-
----
-
-## [!] HARDWARE TELEMETRY & SCALING
-
-To prevent "apocalypse" during scaling:
-
-1. **Telemetry Service:** In `graph.rs` there must be a module that outputs every 1000 ticks:
-   - `Simulation Speed`: what % of real-time (e.g., 1.0x — keeping up with time).
-   - `Memory Overhead`: how many bytes are spent on 1 neuron and 1 synapse in Unified Memory.
-2. **GPU Profiling:** When running on Jetson, code must be able to return GPU Utilization data (via NVML).
+5. **Verification:** Run `cargo test`. Ensure 100% tests pass.
 
 ---
 
 ## [!] PRE-DELIVERY CHECKLIST
 
 - [ ] Have I read the corresponding file from `./specs/`?
-- [ ] Have I added parameter randomization (heterogeneity) during initialization?
-- [ ] Is dynamic adaptation (homeostasis) of parameters implemented?
 - [ ] Is Unified Memory used without local allocations in kernels?
+- [ ] Did I place the Rust file in the correct Domain directory (engine, network, monitor, runner)?
 - [ ] Is logic separated by SRP (1 function = 1 action)?
+- [ ] Are all 60 tests still green? (`cargo test`)
 - [ ] Is the code in English, and comments in Russian?
-- [ ] Do I reference specification files in the comments?
 - [ ] Have I logged information about changes in `./docs/walkthrough.md`?
 
 **IF EVEN ONE POINT IS NOT MET — REWRITE THE CODE.**

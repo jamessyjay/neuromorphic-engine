@@ -119,7 +119,11 @@ cargo test --test biology_tests
   - `allocator.h` — Unified Memory management wrappers.
   - `base_neuron.h` — Structural definitions and constants for C++.
   - `base_neuron.cu` — Heavy-lifting kernels (`tick_neurons_kernel`, `tick_synapses_kernel`, etc.) for STDP, voltage, and metabolism.
-- `src/`: Rust source code. Orchestrator, memory owner, and ecosystem logic.
+- `src/`: Rust orchestrator, memory owner, and ecosystem logic.
+  - `engine/`: FFI bindings, physics constants, and the cyber-biological `EnvironmentRegulator`.
+  - `network/`: Graph topology, network connectivity, and external stimulus injection.
+  - `monitor/`: Telemetry, UI WebSocket streaming, and visualization exporters.
+  - `runner/`: Execution modes (benchmarks, UI tests, specific scenarios).
   - `main.rs` — CLI parser and entry point.
   - `modes.rs` — Simulation routines (benchmark, standard, visualization modes).
   - `graph.rs` — The `NetworkGraph` struct representing the brain, and High-Level services (Astrocytes, Microglia).
