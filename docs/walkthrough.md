@@ -232,3 +232,10 @@ To secure the biological integrity and hardware stability of the engine, a compl
   - `src/network/`: Graph, Stimulus
   - `src/monitor/`: Telemetry, Streamer, Visualization
   - `src/runner/`: Simulation Modes
+
+## Phase 47: UI HUD & Stable Snapshot (MMN v1.1)
+
+**Summary:** 
+- **Homeostasis HUD:** Exposed `global_oxygen` and `global_glucose` in the JSON Streamer payload. Added dynamic progress bars to the frontend Visualizer (`index.html`) to observe the network "breathing" in real-time.
+- **Save File State-Leak Fix:** Fixed a bug where a residual `brain_save.bin` or default `parsed_neurons` values would cause the CLI to generate a tiny 2-neuron test network instead of respecting `--neurons` parameters.
+- **Snapshot Backup:** Created the `monolith-microchip-neuron-v1.1` Git branch as a pristine backup snapshot of the fully stabilized, domain-driven, cyber-biological MMN engine before moving forward.
