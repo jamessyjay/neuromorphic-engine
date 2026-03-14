@@ -52,3 +52,45 @@ fn test_regulator_chronic_lag() {
     assert_eq!(env.global_oxygen_level, 0.0, "Oxygen remains at 0.0 under continuous lag");
     assert!(env.global_glucose_level < 0.1, "Glucose should be nearly depleted after 500 ticks of chronic lag. Was {}", env.global_glucose_level);
 }
+
+#[tokio::test]
+async fn test_homeostasis_loop_integration() {
+    use neuromorphic_engine::environment::EnvironmentRegulator;
+    use neuromorphic_engine::ffi::{Environment, NeuronType};
+    use neuromorphic_engine::graph::NetworkGraph;
+    use std::time::Instant;
+
+    let mut graph = NetworkGraph::new();
+    let src = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    graph.connect(src, tgt, 5.0, 0, false, false);
+    
+    let mut regulator = EnvironmentRegulator::new();
+    let mut current_env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 1.0,
+        stdp_learning_rate: 1.0,
+    };
+    
+    let use_dynamic_homeostasis = true;
+
+    for tick in 1..=5 {
+        let tick_start = Instant::now();
+        
+        // Mock heavy hardware lag
+        std::thread::sleep(std::time::Duration::from_millis(11));
+        
+        graph.tick(tick, current_env.clone());
+        
+        let elapsed_ms = tick_start.elapsed().as_secs_f32() * 1000.0;
+        if use_dynamic_homeostasis {
+            current_env = regulator.update_and_get(elapsed_ms, &current_env);
+        }
+    }
+    
+    assert!(current_env.global_oxygen_level < 0.1, "Oxygen should have dropped significantly due to sleep lag!");
+    println!("Loop integration test passed. Final Oxygen: {}", current_env.global_oxygen_level);
+}

@@ -1,3 +1,4 @@
+use crate::environment::EnvironmentRegulator;
 use std::sync::{Arc, Mutex};
 // src/modes.rs
 use std::time::Instant;
@@ -115,7 +116,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     graph
 }
 
-pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>, _shared_env: Arc<Mutex<crate::ffi::Environment>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
+pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>, _shared_env: Arc<Mutex<crate::ffi::Environment>>, use_dynamic_homeostasis: bool) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
     let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         if loaded_graph.neurons.len() == neurons_count {
             println!("Awakening network from brain_save.bin...");
@@ -153,8 +154,10 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
     let mut total_rust_time = std::time::Duration::new(0, 0);
     let mut telemetry = Telemetry::new();
     let mut accumulated_spikes = 0;
+    let mut regulator = EnvironmentRegulator::new();
 
     for tick in 1..=total_ticks {
+        let tick_start = Instant::now();
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
 
         // Accumulate spikes from all neurons that spiked in THIS tick
@@ -254,6 +257,11 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         }
 
         telemetry.update(tick);
+
+        let elapsed_ms = tick_start.elapsed().as_secs_f32() * 1000.0;
+        if use_dynamic_homeostasis {
+            current_env = regulator.update_and_get(elapsed_ms, &current_env);
+        }
         if tick % TELEMETRY_PRINT_INTERVAL == 0 {
             let dead_count = graph.neurons.iter().filter(|n| !n.is_alive).count();
             telemetry.print_report(graph.neurons.len(), graph.synapses.len(), dead_count);
@@ -294,7 +302,7 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
             light_level: 0.0,
             stdp_learning_rate: 0.1,
         }));
-        let _ = run_benchmark_mode(n, s, 500, None, dummy_env).await?;
+        let _ = run_benchmark_mode(n, s, 500, None, dummy_env, false).await?;
         let elapsed = start.elapsed().as_secs_f64();
         let tps = 500.0 / elapsed;
         
@@ -320,7 +328,7 @@ pub fn setup_simulation() -> NetworkGraph {
     graph
 }
 
-pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> SimulationData {
+pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<broadcast::Sender<String>>, use_dynamic_homeostasis: bool) -> SimulationData {
     let mut data = SimulationData {
         ticks: Vec::with_capacity(total_ticks as usize),
         source_v: Vec::with_capacity(total_ticks as usize),
@@ -339,8 +347,10 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
     };
     
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    let mut regulator = EnvironmentRegulator::new();
 
     for tick in 1..=total_ticks {
+        let tick_start = Instant::now();
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         graph.tick(tick, current_env);
         
@@ -415,6 +425,11 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
         data.source_v.push(graph.neurons[0].current_voltage);
         data.target_v.push(graph.neurons[1].current_voltage);
         data.synapse_w.push(graph.synapses[0].neurotransmitter_buffer);
+        
+        let elapsed_ms = tick_start.elapsed().as_secs_f32() * 1000.0;
+        if use_dynamic_homeostasis {
+            current_env = regulator.update_and_get(elapsed_ms, &current_env);
+        }
     }
 
     let mut telemetry = Telemetry::new();

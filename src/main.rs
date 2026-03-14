@@ -1,3 +1,4 @@
+pub mod environment;
 pub mod streamer;
 pub mod ffi;
 pub mod graph;
@@ -113,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
 
-        let data = run_benchmark_mode(parsed_neurons, parsed_synapses, parsed_ticks, tx_option, shared_env.clone()).await?;
+        let data = run_benchmark_mode(parsed_neurons, parsed_synapses, parsed_ticks, tx_option, shared_env.clone(), true).await?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
         return Ok(());
     }
@@ -183,7 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 
-    let data = run_simulation(graph, parsed_ticks, tx_option.clone()).await;
+    let data = run_simulation(graph, parsed_ticks, tx_option.clone(), true).await;
     render_chart(&data, "graphs/phase8_sensors.png")?;
 
     if is_ui_enabled || is_ui_test {
