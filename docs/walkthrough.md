@@ -239,3 +239,13 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Homeostasis HUD:** Exposed `global_oxygen` and `global_glucose` in the JSON Streamer payload. Added dynamic progress bars to the frontend Visualizer (`index.html`) to observe the network "breathing" in real-time.
 - **Save File State-Leak Fix:** Fixed a bug where a residual `brain_save.bin` or default `parsed_neurons` values would cause the CLI to generate a tiny 2-neuron test network instead of respecting `--neurons` parameters.
 - **Snapshot Backup:** Created the `monolith-microchip-neuron-v1.1` Git branch as a pristine backup snapshot of the fully stabilized, domain-driven, cyber-biological MMN engine before moving forward.
+
+## Phase 48: True Snapshots, Performance Profiling & Network Vitality
+
+**Summary:** 
+- **True Brain Snapshot (`src/engine/snapshot.rs`):** Refactored network serialization. The old `save_to_disk` only saved topology, causing "Amnesia" regarding global tick (phase resonance) and environment levels upon load. Created `BrainSnapshot` wrapper to serialize `current_tick`, `Environment`, and `NetworkGraph` together, allowing seamless resuming of homeostasis and phase dynamics.
+- **TPS Performance Benchmark:** Implemented `test_performance_scaling_tps` inside `hardware_tests.rs`. This automatically benchmarks Tick Per Second (TPS) across various network sizes (from 2 neurons/20 synapses up to 100k neurons/1M synapses), guaranteeing we don't accidentally merge extremely slow operations.
+- **Network Vitality (Biological Immersion):** 
+  - *Startup Grace Period & Circadian Drive:* The Environment Regulator gives the network 500 ticks of immunity against lag-induced hypoxia during startup. A `wakefulness_multiplier` boosts ATP recovery during the early phase and decays.
+  - *Thermal Noise:* Implemented a fast, stateless PCG32-lite pseudo-random generator directly in the CUDA and CPU kernels to perturb `current_voltage` every tick by `[-1.0, 1.5] mV`. This promotes spontaneous network exploration and helps prevent the network from getting permanently "frozen" under threshold.
+  - *The Phoenix Loop:* Replaced a 16-bit padding field in `BaseNeuron` with `dead_ticks`. When a neuron dies (e.g., from Calcium Overdose or Hypoxia), it doesn't stay dead forever. Instead, it enters a 1000-tick coma and then resurrects with full ATP and reset parameters, giving the brain a chance to heal dynamically.

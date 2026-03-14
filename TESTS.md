@@ -103,3 +103,13 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 - `test_regulator_sudden_lag`: Feeds a single massive latency spike (10.0ms) and verifies Oxygen drops to 0.0 instantly, while Glucose remains high due to EMA smoothing.
 - `test_regulator_chronic_lag`: Simulates 500 ticks of chronic lag and verifies both Oxygen and Glucose hit rock bottom.
 - `test_homeostasis_loop_integration`: Integrates the regulator into a live simulation loop, mocks hardware lag, and verifies the environment state dynamically updates based on actual execution time.
+
+## Block 8: Network Vitality & Diagnostics
+
+*Goal: Ensure the network stays dynamic, biological, and performs optimally.*
+
+- **65. Test "True Snapshot Integrity":** Creates a specific network topology and specific `Environment` levels (e.g. Oxygen 0.42). Serializes via `BrainSnapshot` and deserializes. Asserts that exact `current_tick` and `Environment` levels are perfectly preserved to prevent "Amnesia".
+- **66. Test "Performance Scaling TPS":** Runs network loads of varying sizes (up to 100k neurons / 1M synapses) for a small tick count. Verifies the Ticks Per Second (TPS) metric dynamically, preventing accidental inclusion of extremely slow logic in hot paths.
+- **67. Test "Circadian Startup Grace":** Simulates extreme hardware latency during the first 100 ticks. Asserts that the Environment Regulator maintains 1.0 oxygen (Grace Period). Fast-forwards to tick 600 with the same latency and asserts that hypoxia correctly triggers.
+- **68. Test "Thermal Noise Prevents Freezing":** Isolates a single Pyramidal neuron. Runs ticks without stimuli. Asserts `current_voltage` does not stagnate perfectly at `resting_voltage` but fluctuates due to biological thermal noise.
+- **69. Test "Phoenix Resurrection":** Artificially kills a neuron. Verifies it remains completely inactive for exactly 999 ticks. On tick 1000, asserts that the neuron revives, restores its ATP, and resumes `is_alive = true`.
