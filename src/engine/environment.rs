@@ -19,15 +19,29 @@ impl EnvironmentRegulator {
         }
     }
 
-    pub fn update_and_get(&mut self, last_tick_duration_ms: f32, base_env: &Environment) -> Environment {
-        // Calculate Oxygen (Fast Response)
-        let penalty = (last_tick_duration_ms - TARGET_TICK_MS) / (CRITICAL_TICK_MS - TARGET_TICK_MS);
-        self.current_oxygen = 1.0 - penalty.clamp(0.0, 1.0);
+    pub fn update_and_get(&mut self, last_tick_duration_ms: f32, current_tick: u32, base_env: &Environment) -> Environment {
+        if current_tick <= 500 {
+            // Grace period: prevent "birth asphyxia" during initial heavy load
+            self.current_oxygen = 1.0;
+            self.current_glucose = 1.0;
+            self.ema_tick_ms = TARGET_TICK_MS;
+        } else {
+            // Calculate Oxygen (Fast Response)
+            let penalty = (last_tick_duration_ms - TARGET_TICK_MS) / (CRITICAL_TICK_MS - TARGET_TICK_MS);
+            self.current_oxygen = 1.0 - penalty.clamp(0.0, 1.0);
 
-        // Calculate Glucose (Slow Response)
-        self.ema_tick_ms = (last_tick_duration_ms * EMA_ALPHA) + (self.ema_tick_ms * (1.0 - EMA_ALPHA));
-        let gluc_penalty = (self.ema_tick_ms - TARGET_TICK_MS) / (CRITICAL_TICK_MS - TARGET_TICK_MS);
-        self.current_glucose = 1.0 - gluc_penalty.clamp(0.0, 1.0);
+            // Calculate Glucose (Slow Response)
+            self.ema_tick_ms = (last_tick_duration_ms * EMA_ALPHA) + (self.ema_tick_ms * (1.0 - EMA_ALPHA));
+            let gluc_penalty = (self.ema_tick_ms - TARGET_TICK_MS) / (CRITICAL_TICK_MS - TARGET_TICK_MS);
+            self.current_glucose = 1.0 - gluc_penalty.clamp(0.0, 1.0);
+        }
+
+        // Circadian Drive: Wakefulness multiplier decays from 1.5 to 1.0 over the first 5000 ticks
+        let wakefulness_multiplier = if current_tick <= 5000 {
+            1.5 - ((current_tick as f32) / 5000.0) * 0.5
+        } else {
+            1.0
+        };
 
         // Return new environment state
         Environment {
@@ -37,6 +51,7 @@ impl EnvironmentRegulator {
             toxin_levels: base_env.toxin_levels,
             light_level: base_env.light_level,
             stdp_learning_rate: base_env.stdp_learning_rate,
+            wakefulness_multiplier,
         }
     }
 }

@@ -9,6 +9,7 @@ fn default_env() -> Environment {
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.1,
+            wakefulness_multiplier: 1.0,
     }
 }
 

@@ -47,6 +47,17 @@ static inline __device__ __host__ float unpack_voltage(uint16_t v) {
     return ((float)v / VOLTAGE_SCALE) - VOLTAGE_SHIFT;
 }
 
+
+// Fast stateless PRNG (PCG32-lite) for Thermal Noise
+static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t current_tick) {
+    uint32_t state = (neuron_id ^ current_tick) * 747796405u + 2891336453u;
+    uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    uint32_t rand_int = (word >> 22u) ^ word;
+    // Map to [-1.0, 1.5]
+    float normalized = (float)(rand_int % 10000) / 10000.0f; 
+    return (normalized * 2.5f) - 1.0f;
+}
+
 // Atomic function: Apoptosis / Death Handler
 static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
     n->is_alive = false;
@@ -60,14 +71,28 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
 
 // Atomic function: metabolism
 static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) {
-    if (!n->is_alive) return;
+
+    if (!n->is_alive) {
+        n->dead_ticks += 1;
+        if (n->dead_ticks >= 1000) {
+            // Phoenix Resurrection
+            n->is_alive = true;
+            n->calcium_level = 0.0f;
+            n->energy_ATP = n->max_atp;
+            n->current_voltage = n->resting_voltage;
+            n->dead_ticks = 0;
+            n->death_reason = 0;
+        }
+        return;
+    }
+
     n->internal_phase = (n->internal_phase + 1) % 256;
 
     // Phase 40: Recovery (Asymptotic to max_atp)
     float atp_gap = n->max_atp - n->energy_ATP;
     if (atp_gap > 0.0f) {
         // Recovery slows down as it reaches max_atp
-        n->energy_ATP += ATP_RECOVERY_RATE * (atp_gap / (n->max_atp * 0.5f));
+        n->energy_ATP += (ATP_RECOVERY_RATE * env.wakefulness_multiplier) * (atp_gap / (n->max_atp * 0.5f));
     }
     
     if (n->energy_ATP > n->max_atp) {
@@ -373,15 +398,32 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     if (idx >= count) return;
     
     // Trace Cleanup: Ensure spike_trace is properly decayed or zeroed
+
     if (!neurons[idx].is_alive) {
         neurons[idx].spike_trace = 0.0f;
+        neurons[idx].dead_ticks += 1;
+        if (neurons[idx].dead_ticks >= 1000) {
+            // Phoenix Resurrection
+            neurons[idx].is_alive = true;
+            neurons[idx].calcium_level = 0.0f;
+            neurons[idx].energy_ATP = neurons[idx].max_atp;
+            neurons[idx].current_voltage = neurons[idx].resting_voltage;
+            neurons[idx].dead_ticks = 0;
+            neurons[idx].death_reason = 0;
+        }
         return;
     }
+
     
+
     update_metabolism(&neurons[idx], env);
     update_calcium(&neurons[idx]);
     evaluate_branches(&neurons[idx]);
     process_spike(&neurons[idx], env, current_tick);
+    
+    // Thermal Noise (Phase 48)
+    neurons[idx].current_voltage += get_thermal_noise(neurons[idx].id, current_tick);
+
 }
 
 // Optimized Kernel 2: Parallel Synapse Processing (Axon delivery & binding)
@@ -420,16 +462,33 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 
 #ifndef USE_CUDA
 extern "C" {
+
     void tick_neuron_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
         if (!neuron->is_alive) {
             neuron->spike_trace = 0.0f;
+            neuron->dead_ticks += 1;
+            if (neuron->dead_ticks >= 1000) {
+                // Phoenix Resurrection
+                neuron->is_alive = true;
+                neuron->calcium_level = 0.0f;
+                neuron->energy_ATP = neuron->max_atp;
+                neuron->current_voltage = neuron->resting_voltage;
+                neuron->dead_ticks = 0;
+                neuron->death_reason = 0;
+            }
             return;
         }
+
         
+
         update_metabolism(neuron, env);
         update_calcium(neuron);
         evaluate_branches(neuron);
         process_spike(neuron, env, current_tick);
+        
+        // Thermal Noise (Phase 48)
+        neuron->current_voltage += get_thermal_noise(neuron->id, current_tick);
+
     }
 
     void tick_synapse_cpu(Synapse* synapse, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
@@ -499,7 +558,7 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->is_alive = true;
     neuron->death_reason = DEATH_NONE;
     neuron->internal_phase = 0;
-    neuron->_pad2 = 0;
+    neuron->dead_ticks = 0;
     
     float x_f = get_gaussian(&local_seed, DEFAULT_COORD_CENTER, DEFAULT_COORD_VAR);
     float y_f = get_gaussian(&local_seed, DEFAULT_COORD_CENTER, DEFAULT_COORD_VAR);

@@ -211,7 +211,7 @@ typedef struct alignas(64) {
     uint16_t metabolic_wear; // Packed 0.0-1.0 to 0-65535
 
     uint16_t x, y, z;        // Packed 0.0-100.0 to 0-65535
-    uint16_t _pad2;          // Align to 8 bytes for the base struct before branches
+    uint16_t dead_ticks;     // Replaces _pad2 for Phoenix loop
     
     // Dendritic Tree (Phase 33)
     Compartment branches[8]; // 8 * 8 = 64 bytes
@@ -224,7 +224,8 @@ typedef struct {
     float dopamine_multiplier;    // > 1.0 boosts signal
     float toxin_levels;           
     float light_level;            
-    float stdp_learning_rate;                
+    float stdp_learning_rate;
+    float wakefulness_multiplier;                
 } Environment;
 
 // Synaptic buffer representation (Packed: 24 bytes)

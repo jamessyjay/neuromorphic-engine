@@ -12,6 +12,8 @@ pub struct NetworkGraph {
     pub synapses: Vec<Synapse>,
 }
 
+
+
 impl NetworkGraph {
     pub fn new() -> Self {
         NetworkGraph {
@@ -151,7 +153,7 @@ impl NetworkGraph {
             x: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             y: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             z: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
-            _pad2: 0,
+            dead_ticks: 0,
             branches: [crate::engine::ffi::Compartment {
                 branch_type: 0,
                 refractory_timer: 0,

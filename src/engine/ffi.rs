@@ -58,7 +58,7 @@ pub struct BaseNeuron {
     pub x: u16,
     pub y: u16,
     pub z: u16,
-    pub _pad2: u16,
+    pub dead_ticks: u16,
     
     pub branches: [Compartment; 8],
 }
@@ -86,6 +86,7 @@ pub struct Environment {
     pub toxin_levels: f32,
     pub light_level: f32,
     pub stdp_learning_rate: f32,
+    pub wakefulness_multiplier: f32,
 }
 
 #[link(name = "neuron_kernels", kind = "static")]

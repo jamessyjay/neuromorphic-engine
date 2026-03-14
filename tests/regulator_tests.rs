@@ -9,6 +9,7 @@ fn mock_base_env() -> Environment {
         toxin_levels: 0.0,
         light_level: 1.0,
         stdp_learning_rate: 1.0,
+        wakefulness_multiplier: 1.0
     }
 }
 
@@ -19,7 +20,7 @@ fn test_regulator_perfect_conditions() {
     
     let mut env = base.clone();
     for _ in 0..10 {
-        env = regulator.update_and_get(1.0, &base); // 1.0ms is faster than TARGET_TICK_MS (2.0)
+        env = regulator.update_and_get(1.0, 1000, &base); // 1.0ms is faster than TARGET_TICK_MS (2.0)
     }
     
     assert_eq!(env.global_oxygen_level, 1.0, "Oxygen should remain at 100% under perfect conditions");
@@ -32,7 +33,7 @@ fn test_regulator_sudden_lag() {
     let base = mock_base_env();
     
     // One massive spike
-    let env = regulator.update_and_get(10.0, &base); // 10.0ms hits CRITICAL_TICK_MS
+    let env = regulator.update_and_get(10.0, 1000, &base); // 10.0ms hits CRITICAL_TICK_MS
     
     assert_eq!(env.global_oxygen_level, 0.0, "Oxygen must drop to 0.0 instantly on critical lag");
     assert!(env.global_glucose_level > 0.9, "Glucose should barely drop from a single spike due to EMA smoothing. Was {}", env.global_glucose_level);
@@ -46,7 +47,7 @@ fn test_regulator_chronic_lag() {
     let mut env = base.clone();
     // 500 ticks of chronic lag
     for _ in 0..500 {
-        env = regulator.update_and_get(10.0, &base);
+        env = regulator.update_and_get(10.0, 1000, &base);
     }
     
     assert_eq!(env.global_oxygen_level, 0.0, "Oxygen remains at 0.0 under continuous lag");
@@ -73,6 +74,7 @@ async fn test_homeostasis_loop_integration() {
         toxin_levels: 0.0,
         light_level: 1.0,
         stdp_learning_rate: 1.0,
+        wakefulness_multiplier: 1.0
     };
     
     let use_dynamic_homeostasis = true;
@@ -87,7 +89,7 @@ async fn test_homeostasis_loop_integration() {
         
         let elapsed_ms = tick_start.elapsed().as_secs_f32() * 1000.0;
         if use_dynamic_homeostasis {
-            current_env = regulator.update_and_get(elapsed_ms, &current_env);
+            current_env = regulator.update_and_get(elapsed_ms, tick, &current_env);
         }
     }
     

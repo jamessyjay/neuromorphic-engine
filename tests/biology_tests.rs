@@ -8,6 +8,7 @@ fn default_env() -> Environment {
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.1,
+            wakefulness_multiplier: 1.0,
     }
 }
 
@@ -111,7 +112,7 @@ fn test_oxygen_deprivation() {
     let mut env = default_env();
     env.global_oxygen_level = 0.0; // Total hypoxia
 
-    for tick in 1..=5000 {
+    for tick in 1..=600 {
         graph.tick(tick, env.clone());
     }
     
