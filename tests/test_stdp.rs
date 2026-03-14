@@ -448,9 +448,7 @@ fn test_stdp_associative_persistence_under_noise() {
     }
     assert!(quiet_spikes < 10, "Network should return to a quiet state, but had {} spikes (Epilepsy check failed)", quiet_spikes);
 
-    for b in 10..=15 {
-        // assert!(graph.neurons[b as usize].energy_atp > 0.0, "Target neuron starved!"); // Allowed to starve temporarily due to thermal noise load
-    }
+    // Starvation assertions removed to allow temporary thermal noise load
 
     for a in 0..=7 {
         let trace = graph.neurons[a as usize].spike_trace;
