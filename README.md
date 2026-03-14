@@ -43,7 +43,6 @@ For a deep dive into the architecture and logic of the project, visit the [docs/
 - **Strict Biological Proportions:** Automated network generation adhering to standard cortex ratios (75% Pyramidal, 15% Interneurons, 4% Sensors, 4% Motors, 2% Pacemakers).
 - **Inhibitory Logic:** Automatic negative weight enforcement for GABAergic interneuron connections.
 
-
 ---
 
 ## Architecture

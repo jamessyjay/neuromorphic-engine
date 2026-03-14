@@ -1,6 +1,6 @@
-use neuromorphic_engine::graph::NetworkGraph;
-use neuromorphic_engine::ffi::{Environment, NeuronType, Synapse, Compartment};
-use neuromorphic_engine::constants::*;
+use neuromorphic_engine::network::graph::NetworkGraph;
+use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse, Compartment};
+use neuromorphic_engine::engine::constants::*;
 
 fn default_env() -> Environment {
     Environment {
@@ -104,7 +104,7 @@ fn test_neurogenesis_rate() {
 
 #[test]
 fn test_dopamine_decay() {
-    use neuromorphic_engine::stimulus::StimulusService;
+    use neuromorphic_engine::network::stimulus::StimulusService;
     let mut env = default_env();
     let mut graph = NetworkGraph::new();
     graph.add_neuron(NeuronType::Pyramidal);

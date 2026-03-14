@@ -1,5 +1,5 @@
-use neuromorphic_engine::ffi::{BaseNeuron, Synapse, Environment, NeuronType};
-use neuromorphic_engine::ffi::{tick_neuron_cpu, tick_synapse_cpu, init_neuron};
+use neuromorphic_engine::engine::ffi::{BaseNeuron, Synapse, Environment, NeuronType};
+use neuromorphic_engine::engine::ffi::{tick_neuron_cpu, tick_synapse_cpu, init_neuron};
 use std::fs::File;
 use std::io::{Write, Read};
 use serde::{Serialize, Deserialize};

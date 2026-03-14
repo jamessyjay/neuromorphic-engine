@@ -1,5 +1,5 @@
-use neuromorphic_engine::modes::setup_benchmark;
-use neuromorphic_engine::ffi::NeuronType;
+use neuromorphic_engine::runner::modes::setup_benchmark;
+use neuromorphic_engine::engine::ffi::NeuronType;
 
 #[test]
 fn test_network_generation_proportions() {

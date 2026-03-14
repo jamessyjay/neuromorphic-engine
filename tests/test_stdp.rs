@@ -1,5 +1,5 @@
-use neuromorphic_engine::graph::NetworkGraph;
-use neuromorphic_engine::ffi::{Environment, NeuronType, Synapse, BaseNeuron};
+use neuromorphic_engine::network::graph::NetworkGraph;
+use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse, BaseNeuron};
 use std::mem;
 use std::time::Instant;
 

@@ -170,6 +170,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         println!("Awakening network from brain_save.bin for simulation...");
         loaded_graph
+    } else if parsed_neurons > 2 {
+        setup_benchmark(parsed_neurons, parsed_synapses)
     } else {
         setup_simulation()
     };

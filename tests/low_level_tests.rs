@@ -1,5 +1,5 @@
-use neuromorphic_engine::graph::NetworkGraph;
-use neuromorphic_engine::ffi::{Environment, NeuronType, Synapse};
+use neuromorphic_engine::network::graph::NetworkGraph;
+use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse};
 use std::time::Instant;
 
 fn default_env() -> Environment {
@@ -148,7 +148,7 @@ fn test_dendritic_branching_stress() {
 // 39. Test "Serialization Backpressure"
 #[test]
 fn test_serialization_backpressure() {
-    use neuromorphic_engine::streamer;
+    use neuromorphic_engine::monitor::streamer;
     let size = 1000;
     let syn_count = 5000;
     let intervals = [100, 50, 10, 1];

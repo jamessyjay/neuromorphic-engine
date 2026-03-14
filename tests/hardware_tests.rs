@@ -1,6 +1,6 @@
-use neuromorphic_engine::graph::NetworkGraph;
-use neuromorphic_engine::ffi::{Environment, NeuronType, Synapse};
-use neuromorphic_engine::streamer;
+use neuromorphic_engine::network::graph::NetworkGraph;
+use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse};
+use neuromorphic_engine::monitor::streamer;
 use std::time::Instant;
 
 fn default_env() -> Environment {

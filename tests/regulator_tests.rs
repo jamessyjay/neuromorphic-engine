@@ -1,5 +1,5 @@
-use neuromorphic_engine::environment::EnvironmentRegulator;
-use neuromorphic_engine::ffi::Environment;
+use neuromorphic_engine::engine::environment::EnvironmentRegulator;
+use neuromorphic_engine::engine::ffi::Environment;
 
 fn mock_base_env() -> Environment {
     Environment {
@@ -55,9 +55,9 @@ fn test_regulator_chronic_lag() {
 
 #[tokio::test]
 async fn test_homeostasis_loop_integration() {
-    use neuromorphic_engine::environment::EnvironmentRegulator;
-    use neuromorphic_engine::ffi::{Environment, NeuronType};
-    use neuromorphic_engine::graph::NetworkGraph;
+    use neuromorphic_engine::engine::environment::EnvironmentRegulator;
+    use neuromorphic_engine::engine::ffi::{Environment, NeuronType};
+    use neuromorphic_engine::network::graph::NetworkGraph;
     use std::time::Instant;
 
     let mut graph = NetworkGraph::new();
