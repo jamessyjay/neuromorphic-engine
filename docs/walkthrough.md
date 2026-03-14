@@ -271,3 +271,11 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Memory Coalescing (O(N^2) Thrashing Prevention):** Enforced a mandatory sorting step `optimize_memory_layout()` on the `synapses` vector. Synapses are now strictly sorted by `target_id` (and then `source_id`). This ensures GPU warps process neighboring memory addresses, drastically reducing cache misses and VRAM thrashing.
 - **Snapshot Integrity & GPU Sync:** Hardened the simulation pausing mechanism. Before saving a snapshot, the host explicitly calls `cudaDeviceSynchronize()` to ensure all VRAM states are resolved before serialization begins.
 - **FFI Hardening:** Replaced ambiguous `bool is_alive` with an explicit `u8 is_alive` (1=true, 0=false) to ensure perfect 1-byte struct alignment across all C++ and Rust compilation targets.
+
+## Phase 51: Titanic Foundation (Stimulus Hardening & Safety)
+
+**Summary:** 
+- **Dynamic Sensor Discovery:** Refactored `StimulusService` to dynamically discover sensors via `n.type_ == NeuronType::Photoreceptor || Nociceptor` rather than relying on hardcoded group sizes. This ensures stimuli are routed to actual sensing neurons regardless of network generation parameters.
+- **Pre-computed Partitioning:** Sensor IDs are split into `bell_group` and `meat_group` during initialization instead of allocating and parsing vectors dynamically on every tick.
+- **Zombie Protection:** Added `graph.neurons[idx].is_alive == 1` checks to the `StimulusService`. The engine no longer wastes forced spikes on dead neurons.
+- **Consistent Causality:** Moved the `training_mode` test toggle to the start of `process_tick` to ensure that a single tick doesn't experience "half-training, half-test" states.
