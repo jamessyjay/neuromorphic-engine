@@ -2,13 +2,11 @@ use crate::engine::ffi::{BaseNeuron, Synapse, NeuronType, init_neuron};
 use crate::engine::constants::*;
 use rand::RngExt;
 use serde::{Serialize, Deserialize};
-use std::fs::File;
-use std::io::{BufReader, BufWriter};
 use std::collections::HashMap;
 use sha2::{Sha256, Digest};
 use rayon::prelude::*; // For massive parallelism over CPU
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct NetworkGraph {
     pub neurons: Vec<BaseNeuron>,
     pub synapses: Vec<Synapse>,
@@ -57,28 +55,7 @@ impl NetworkGraph {
         println!("  -> Neurons fully recovered.");
     }
 
-    pub fn save_to_disk(&self) {
-        println!("  -> Saving network to disk (brain_save.bin)...");
-        let file = File::create("brain_save.bin").expect("Failed to create brain_save.bin");
-        let writer = BufWriter::new(file);
-        bincode::serialize_into(writer, &self).expect("Failed to serialize network");
-    }
 
-    pub fn load_from_disk() -> Option<Self> {
-        if std::path::Path::new("brain_save.bin").exists() {
-            let file = File::open("brain_save.bin").expect("Failed to open brain_save.bin");
-            let reader = BufReader::new(file);
-            match bincode::deserialize_from(reader) {
-                Ok(graph) => Some(graph),
-                Err(e) => {
-                    eprintln!("Failed to deserialize brain_save.bin: {}", e);
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    }
 
     pub fn generate_fingerprint(&self) -> String {
         let mut hasher = Sha256::new();

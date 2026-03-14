@@ -3,7 +3,8 @@
 use neuromorphic_engine::engine::constants::*;
 use neuromorphic_engine::runner::modes::*;
 use neuromorphic_engine::monitor::visualization::*;
-use neuromorphic_engine::network::graph::NetworkGraph;
+
+use neuromorphic_engine::engine::snapshot::BrainSnapshot;
 use tokio::sync::broadcast;
 use std::env;
 use std::sync::{Arc, Mutex};
@@ -167,11 +168,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = std::fs::remove_file("brain_save.bin");
     }
 
-    let graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
-        println!("Awakening network from brain_save.bin for simulation...");
-        loaded_graph
+    let (graph, start_tick, env) = if let Some(snapshot) = BrainSnapshot::load_from_disk("brain_save.bin") {
+        println!("Awakening network from brain_save.bin for simulation (Tick {})...", snapshot.current_tick);
+        (snapshot.graph, snapshot.current_tick, Some(snapshot.environment))
     } else {
-        setup_benchmark(parsed_neurons, parsed_synapses)
+        (setup_benchmark(parsed_neurons, parsed_synapses), 0, None)
     };
     
     if tx_option.is_some() {
@@ -182,7 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 
-    let data = run_simulation(graph, parsed_ticks, tx_option.clone(), true).await;
+    let data = run_simulation(graph, start_tick, env, parsed_ticks, tx_option.clone(), true).await;
     render_chart(&data, "graphs/phase8_sensors.png")?;
 
     if is_ui_enabled || is_ui_test {

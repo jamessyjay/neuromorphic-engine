@@ -217,3 +217,39 @@ fn test_double_buffer_sync() {
     // Since tick_synapses runs after tick_neurons, it should see the spike and add neurotransmitters
     assert!(graph.synapses[0].neurotransmitter_buffer > 0.0, "Synapse should pick up the spike in the same tick cycle");
 }
+
+use neuromorphic_engine::engine::snapshot::BrainSnapshot;
+#[test]
+fn test_true_snapshot_integrity() {
+    let mut graph = NetworkGraph::new();
+    for _ in 0..10 {
+        graph.add_neuron(NeuronType::Pyramidal);
+    }
+    
+    let env = Environment {
+        global_oxygen_level: 0.4242,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        stdp_learning_rate: 0.1,
+    };
+    
+    let tick = 1337;
+    
+    let snapshot = BrainSnapshot {
+        current_tick: tick,
+        environment: env,
+        graph,
+    };
+    
+    // Serialize to memory buffer
+    let buffer = bincode::serialize(&snapshot).expect("Failed to serialize true snapshot");
+    
+    // Deserialize from memory buffer
+    let loaded_snapshot: BrainSnapshot = bincode::deserialize(&buffer).expect("Failed to deserialize true snapshot");
+    
+    assert_eq!(loaded_snapshot.current_tick, 1337, "Tick should be preserved to maintain phase resonance");
+    assert!((loaded_snapshot.environment.global_oxygen_level - 0.4242).abs() < 0.0001, "Environment state must be preserved for homeostasis");
+    assert_eq!(loaded_snapshot.graph.neurons.len(), 10, "Neurons count should match");
+}
