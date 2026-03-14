@@ -249,3 +249,16 @@ To secure the biological integrity and hardware stability of the engine, a compl
   - *Startup Grace Period & Circadian Drive:* The Environment Regulator gives the network 500 ticks of immunity against lag-induced hypoxia during startup. A `wakefulness_multiplier` boosts ATP recovery during the early phase and decays.
   - *Thermal Noise:* Implemented a fast, stateless PCG32-lite pseudo-random generator directly in the CUDA and CPU kernels to perturb `current_voltage` every tick by `[-1.0, 1.5] mV`. This promotes spontaneous network exploration and helps prevent the network from getting permanently "frozen" under threshold.
   - *The Phoenix Loop:* Replaced a 16-bit padding field in `BaseNeuron` with `dead_ticks`. When a neuron dies (e.g., from Calcium Overdose or Hypoxia), it doesn't stay dead forever. Instead, it enters a 1000-tick coma and then resurrects with full ATP and reset parameters, giving the brain a chance to heal dynamically.
+
+## Phase 49: HTM Active Dendrites & Predictive State
+
+**Summary:** 
+- **Predictive State Architecture:** Modified the non-linear summation logic inside `evaluate_branches`. We separated the biological role of dendrites into two distinct functional classes, bringing us closer to Jeff Hawkins' Thousand Brains Theory:
+  - **Proximal Dendrites (Branch 0):** Act as direct feedforward inputs. If an NMDA threshold is crossed here, it causes massive somatic depolarization (can directly trigger an action potential).
+  - **Basal/Apical Dendrites (Branches 1-7):** Act as contextual predictors. If an NMDA threshold is crossed here, it *does not* depolarize the soma to the threshold. Instead, it places the neuron into a **Predictive State** for 20 ticks.
+- **Memory Layout:** Packed the new `predictive_ticks` variable into the main `BaseNeuron` struct as a `u8` (byte). To maintain exactly 128-byte cache line alignment, `spikes_in_last_window` was downsized from `u16` to `u8`.
+- **Coincidence Detection:** During the physics loop (`process_spike`), if `predictive_ticks > 0`, the neuron temporarily receives a `+15.0 mV` virtual offset. This means any incoming feedforward proximal signal requires significantly less strength to trigger a spike (classic Coincidence Detection).
+- **Testing:** Fixed old spatial summation tests to respect the new non-proximal passiveness. Wrote a rigorous `test_htm_predictive_state_coincidence` that validates the 3 phases: 
+  1. Context sets predictive state. 
+  2. Weak signal triggers spike while predictive. 
+  3. Weak signal fails to trigger spike after predictive state decays.
