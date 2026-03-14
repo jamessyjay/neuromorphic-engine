@@ -262,3 +262,12 @@ To secure the biological integrity and hardware stability of the engine, a compl
   1. Context sets predictive state. 
   2. Weak signal triggers spike while predictive. 
   3. Weak signal fails to trigger spike after predictive state decays.
+
+## Phase 50: Zero-Tolerance Refactor (Data Integrity & Concurrency)
+
+**Summary:** 
+- **CUDA/CPU Atomic Voltage Update:** Eliminated severe data races during dendritic voltage summation. Implemented `atomic_add_packed_voltage` using a hardware-level `atomicCAS` loop in CUDA and `std::atomic` compare-exchange for the CPU fallback. Multiple synapses hitting the same target branch simultaneously now perfectly integrate their payload.
+- **STDP Causality Paradox Fix:** Tightened the STDP Potentiation logic. Long-Term Potentiation (LTP) now strictly requires `source->last_spike_tick < target->last_spike_tick`. Simultaneous spiking on the same tick no longer triggers an impossible instant feedback loop.
+- **Memory Coalescing (O(N^2) Thrashing Prevention):** Enforced a mandatory sorting step `optimize_memory_layout()` on the `synapses` vector. Synapses are now strictly sorted by `target_id` (and then `source_id`). This ensures GPU warps process neighboring memory addresses, drastically reducing cache misses and VRAM thrashing.
+- **Snapshot Integrity & GPU Sync:** Hardened the simulation pausing mechanism. Before saving a snapshot, the host explicitly calls `cudaDeviceSynchronize()` to ensure all VRAM states are resolved before serialization begins.
+- **FFI Hardening:** Replaced ambiguous `bool is_alive` with an explicit `u8 is_alive` (1=true, 0=false) to ensure perfect 1-byte struct alignment across all C++ and Rust compilation targets.
