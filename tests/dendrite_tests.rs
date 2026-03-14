@@ -64,8 +64,8 @@ fn test_nmda_spike_trigger() {
     graph.neurons[id as usize].current_voltage = -70.0;
     let initial_voltage = -70.0;
 
-    graph.neurons[id as usize].branches[1] = Compartment {
-        branch_type: 1,
+    graph.neurons[id as usize].branches[0] = Compartment {
+        branch_type: 1, // Any branch type > 0 works
         refractory_timer: 0,
         voltage: pack_voltage(0.0),
         nmda_threshold: pack_voltage(20.0), // Threshold = 20
@@ -73,8 +73,8 @@ fn test_nmda_spike_trigger() {
             _pad: 0,
     };
     
-    // Send a signal above threshold
-    graph.neurons[id as usize].branches[1].voltage = pack_voltage(25.0);
+    // Send a signal above threshold to Proximal branch (0) so it triggers massive somatic voltage
+    graph.neurons[id as usize].branches[0].voltage = pack_voltage(25.0);
     graph.tick(1, env.clone());
     
     assert!(graph.neurons[id as usize].current_voltage > initial_voltage + 50.0, "NMDA spike should inject massive voltage into soma");
