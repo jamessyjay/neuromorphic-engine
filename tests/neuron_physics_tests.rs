@@ -173,14 +173,18 @@ fn test_precise_stdp_targeted_dendritic_learning() {
     let mut env = default_env();
     env.stdp_learning_rate = 0.5; // High learning rate to see effect
     
-    // Target spikes right now
-    target.last_spike_tick = 1;
+    // Source spiked earlier to satisfy causality (tick 1)
+    source1.last_spike_tick = 1;
+    source2.last_spike_tick = 1;
+    
+    // Target spikes right now (tick 2)
+    target.last_spike_tick = 2;
     
     let mut neurons = vec![source1, source2, target];
     
     unsafe {
-        tick_synapse_cpu(&mut syn1, neurons.as_mut_ptr(), env.clone(), 1);
-        tick_synapse_cpu(&mut syn2, neurons.as_mut_ptr(), env.clone(), 1);
+        tick_synapse_cpu(&mut syn1, neurons.as_mut_ptr(), env.clone(), 2);
+        tick_synapse_cpu(&mut syn2, neurons.as_mut_ptr(), env.clone(), 2);
     }
     
     let weight1 = syn1.weight;

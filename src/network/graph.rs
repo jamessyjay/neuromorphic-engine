@@ -22,6 +22,12 @@ impl NetworkGraph {
         }
     }
 
+    pub fn optimize_memory_layout(&mut self) {
+        self.synapses.sort_unstable_by(|a, b| {
+            a.target_id.cmp(&b.target_id).then(a.source_id.cmp(&b.source_id))
+        });
+    }
+
     pub fn is_sleep_needed(&self) -> bool {
         let mut total_wear = 0.0;
         let mut alive_count = 0;

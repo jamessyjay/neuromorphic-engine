@@ -43,9 +43,39 @@ static inline __device__ __host__ uint16_t pack_voltage(float v) {
     return (uint16_t)(shifted * VOLTAGE_SCALE);
 }
 
+
+
+
 static inline __device__ __host__ float unpack_voltage(uint16_t v) {
     return ((float)v / VOLTAGE_SCALE) - VOLTAGE_SHIFT;
 }
+
+#ifdef USE_CUDA
+__device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impact) {
+    uint16_t assumed, old = *address;
+    do {
+        assumed = old;
+        float current_v = unpack_voltage(assumed);
+        current_v += voltage_impact;
+        uint16_t new_val = pack_voltage(current_v);
+        old = atomicCAS(address, assumed, new_val);
+    } while (assumed != old);
+}
+#else
+#include <atomic>
+static inline void atomic_add_packed_voltage(uint16_t* address, float voltage_impact) {
+    std::atomic<uint16_t>* atomic_addr = reinterpret_cast<std::atomic<uint16_t>*>(address);
+    uint16_t old = atomic_addr->load(std::memory_order_relaxed);
+    while (true) {
+        float current_v = unpack_voltage(old);
+        current_v += voltage_impact;
+        uint16_t new_val = pack_voltage(current_v);
+        if (atomic_addr->compare_exchange_weak(old, new_val, std::memory_order_relaxed)) {
+            break;
+        }
+    }
+}
+#endif
 
 
 // Fast stateless PRNG (PCG32-lite) for Thermal Noise
@@ -306,7 +336,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     
     // Trace-based LTP (Potentiation)
     // If target just spiked, apply LTP based on source's existing trace
-    if (!is_inhibitory && target->last_spike_tick == current_tick) {
+    if (!is_inhibitory && target->last_spike_tick == current_tick && source->last_spike_tick > 0 && source->last_spike_tick < target->last_spike_tick) {
         int branch_id = s->flags & 0x07;
         float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
         float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
