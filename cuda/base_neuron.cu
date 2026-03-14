@@ -156,8 +156,17 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         // NMDA Spike Logic (Non-linear Summation)
         float soma_impact = 0.0f;
         if (v > threshold) {
-            b[i].local_trace = 255;
-            soma_impact = v * NMDA_SPIKE_GAIN;
+            b->local_trace = 255;
+            
+            if (i == 0) {
+                // Proximal Branch (Branch 0): Massive feedforward depolarization (can trigger spike)
+                soma_impact = v * NMDA_SPIKE_GAIN;
+            } else {
+                // Basal/Apical Branch (Branches 1-7): Contextual prediction! No massive somatic spike.
+                // Instead, enter Predictive State for 20 ticks.
+                n->predictive_ticks = 20;
+            }
+            
             v = 0.0f; // Reset branch after spike
             b->refractory_timer = BRANCH_REFRACTORY_TICKS; // Block for N ticks
         } else {
@@ -174,7 +183,15 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
                 soma_impact = v * TUFT_MULTIPLIER;
             }
         }
-        n->current_voltage += soma_impact;
+        
+        // Attenuation for somatic impact
+        if (i == 0) {
+            float attenuation = 0.8f; // Proximal is strong
+            n->current_voltage += soma_impact * attenuation;
+        } else {
+            // Non-proximal branches apply normal passive transfer (which is already scaled by BASAL_SOMA_GAIN etc)
+            n->current_voltage += soma_impact;
+        }
         b->voltage = pack_voltage(v);
     }
 }
@@ -186,7 +203,16 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     if (n->refractory_time_left > 0.0f) {
         n->refractory_time_left -= 1.0f; 
         n->current_voltage = n->resting_voltage - HYPERPOLARIZATION_OFFSET; // Hyperpolarization
+        if (n->predictive_ticks > 0) n->predictive_ticks--;
         return; 
+    }
+
+    // HTM Predictive State: Temporary depolarization offset (Phase 49)
+    if (n->predictive_ticks > 0) {
+        // Boost voltage but only virtually or temporarily to trigger easier
+        // Actually, let's just add the voltage and decrement
+        n->current_voltage += 15.0f;
+        n->predictive_ticks--;
     }
 
     // EMERGENCY GUARD 2.0: Explicit ATP check
@@ -466,6 +492,7 @@ extern "C" {
     void tick_neuron_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
         if (!neuron->is_alive) {
             neuron->spike_trace = 0.0f;
+            neuron->predictive_ticks = 0;
             neuron->dead_ticks += 1;
             if (neuron->dead_ticks >= 1000) {
                 // Phoenix Resurrection
@@ -500,7 +527,8 @@ extern "C" {
 void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed) {
     neuron->id = id;
     neuron->type = type;
-    neuron->spike_trace = 0.0f; 
+    neuron->spike_trace = 0.0f;
+    neuron->predictive_ticks = 0; 
     
     uint32_t local_seed = seed + id;
 
@@ -545,6 +573,7 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     
     // Randomized structural properties
     neuron->spike_trace = 0.0f;
+    neuron->predictive_ticks = 0;
     neuron->vesicles_pool = get_gaussian(&local_seed, MAX_VESICLES, DEFAULT_VESICLES_VAR);
 
     neuron->energy_ATP = neuron->max_atp;

@@ -207,7 +207,8 @@ typedef struct alignas(64) {
     
     // Evolution & Adaptation
     uint32_t last_spike_tick;
-    uint16_t spikes_in_last_window;
+    uint8_t spikes_in_last_window;
+    uint8_t predictive_ticks;
     uint16_t metabolic_wear; // Packed 0.0-1.0 to 0-65535
 
     uint16_t x, y, z;        // Packed 0.0-100.0 to 0-65535

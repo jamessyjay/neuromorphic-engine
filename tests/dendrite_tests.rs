@@ -51,6 +51,7 @@ fn test_spatial_summation_basal() {
     }
     
     let final_voltage = graph.neurons[id as usize].current_voltage;
+    println!("initial: {}, final: {}", initial_voltage, final_voltage);
     assert!(final_voltage > initial_voltage, "Soma voltage should increase due to spatial summation");
 }
 

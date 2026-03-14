@@ -52,7 +52,8 @@ pub struct BaseNeuron {
     
     // Evolution & Adaptation
     pub last_spike_tick: u32,
-    pub spikes_in_last_window: u16,
+    pub spikes_in_last_window: u8,
+    pub predictive_ticks: u8,
     pub metabolic_wear: u16,
 
     pub x: u16,

@@ -149,6 +149,7 @@ impl NetworkGraph {
             refractory_time_left: 0.0,
             last_spike_tick: 0,
             spikes_in_last_window: 0,
+            predictive_ticks: 0,
             metabolic_wear: 0,
             x: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             y: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,

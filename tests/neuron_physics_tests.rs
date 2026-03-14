@@ -330,3 +330,58 @@ fn test_the_matrix_golden_master_snapshot() {
         println!("Golden master snapshot created at {}", golden_file_path);
     }
 }
+
+#[test]
+fn test_htm_predictive_state_coincidence() {
+    let mut neuron = unsafe { std::mem::zeroed::<BaseNeuron>() };
+    unsafe {
+        init_neuron(&mut neuron, 1, NeuronType::Pyramidal, 42);
+    }
+    
+    let env = default_env();
+    
+    // Set up branch 3 (Basal/Context) and branch 0 (Proximal/Trigger)
+    neuron.branches[3].branch_type = 1;
+    neuron.branches[0].branch_type = 1;
+
+    // Phase 1: Context arrives on Basal branch 3
+    neuron.branches[3].voltage = pack_voltage(15.0); // Over NMDA threshold
+    
+    unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 1); }
+    
+    println!("predictive_ticks: {}, current_voltage: {}, resting: {}, threshold: {}", neuron.predictive_ticks, neuron.current_voltage, neuron.resting_voltage, neuron.activation_threshold);
+    assert_eq!(neuron.predictive_ticks, 19, "Neuron should enter Predictive State for 20 ticks");
+    assert!(neuron.current_voltage < neuron.activation_threshold, "Context alone MUST NOT trigger a spike");
+    
+    // Phase 2: Weak signal arrives on Proximal branch 0 while in Predictive State
+    // A weak signal of 5.0 is below NMDA threshold, so it just leaks or we give a direct somatic bump.
+    // Actually, let's just trigger an NMDA spike on Proximal with a weaker input that normally wouldn't spike,
+    // OR we just set the voltage below activation but within 15mV of it.
+    // Wait, the test says: "send a weak signal to Branch 0 - one that normally wouldn't cause a spike."
+    // Let's set current_voltage = resting_voltage + 10.0 manually to simulate a weak proximal input.
+    // Since activation is ~ -40mV and resting is ~ -70mV, a 10mV bump goes to -60mV. 
+    // Wait, activation is -40, resting -70. Gap is 30mV.
+    // The predictive state adds 15mV offset.
+    // So we need a weak signal of 20mV (resting + 20 = -50mV).
+    // With predictive boost (+15mV), it becomes -35mV > -40mV (SPIKE!).
+    
+    neuron.current_voltage = neuron.resting_voltage + 20.0;
+    
+    unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 2); }
+    
+    assert_eq!(neuron.last_spike_tick, 2, "Neuron MUST SPIKE due to coincidence of weak signal + Predictive State");
+    
+    // Reset and wait for predictive state to wear off
+    neuron.current_voltage = neuron.resting_voltage;
+    for tick in 3..=60 {
+        unsafe { tick_neuron_cpu(&mut neuron, env.clone(), tick); }
+    }
+    
+    assert_eq!(neuron.predictive_ticks, 0, "Predictive state should have worn off");
+    
+    // Phase 3: Send the exact same weak signal (20mV) without predictive state
+    neuron.current_voltage = neuron.resting_voltage + 20.0;
+    unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 61); }
+    
+    assert_ne!(neuron.last_spike_tick, 61, "Neuron MUST NOT SPIKE from weak signal without predictive context");
+}
