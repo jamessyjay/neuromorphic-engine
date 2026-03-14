@@ -322,14 +322,6 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-pub fn setup_simulation() -> NetworkGraph {
-    let mut graph = NetworkGraph::new();
-    let photo_source = graph.add_neuron(NeuronType::Photoreceptor);
-    let pyr_target = graph.add_neuron(NeuronType::Pyramidal);
-    graph.connect(photo_source, pyr_target, DEFAULT_WEIGHT + 3.0, 0, false, true);       
-    graph
-}
-
 pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Option<broadcast::Sender<String>>, use_dynamic_homeostasis: bool) -> SimulationData {
     let mut data = SimulationData {
         ticks: Vec::with_capacity(total_ticks as usize),
