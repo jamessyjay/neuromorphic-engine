@@ -126,3 +126,31 @@ pub const MAX_COORD: f32 = 100.0; // Spatial boundary size (100x100x100)
 pub const COORD_SCALE: f32 = 655.35; // 65535.0 / 100.0 (maps 0.0..100.0 to 0..65535)
 pub const ZERO_VOLTAGE_PACKED: u16 = 10000; // (0.0 + 100.0) * 100.0
 pub const NMDA_THRESHOLD_PACKED: u16 = 10500; // (5.0 + 100.0) * 100.0
+// --- Modes & UI Testing Constants ---
+
+/// Number of ticks to wait before ending the UI visualizer test (300 seconds * 10 ticks/sec roughly)
+pub const UI_TEST_DURATION_SECS: u64 = 300;
+/// Center coordinate for testing UI topologies (maps to 50 in world space)
+pub const UI_COORD_CENTER: u16 = 32768;
+/// Right edge coordinate for testing UI topologies (maps to 91 in world space)
+pub const UI_COORD_RIGHT: u16 = 60000;
+/// Left edge coordinate for testing UI topologies (maps to 7 in world space)
+pub const UI_COORD_LEFT: u16 = 5000;
+/// Synapse weight for the UI test mode
+pub const UI_TEST_SYNAPSE_WEIGHT: f32 = 50.0;
+/// Voltage level for artificially forcing a neuron to spike
+pub const FORCED_SPIKE_VOLTAGE: f32 = 40.0;
+/// Base ATP level to set when artificially resetting a neuron
+pub const FULL_ATP_LEVEL: f32 = 100.0;
+
+// --- Stimulus & Conditioning Constants ---
+/// Percentage of the network dedicated to sensory input (Bell + Meat)
+pub const SENSOR_GROUP_PERCENTAGE: f32 = 0.04;
+/// The ideal time window (in ticks/ms) between stimulus A (Bell) and B (Meat) for optimal STDP learning
+pub const STDP_IDEAL_WINDOW_TICKS: u32 = 30;
+/// Multiplier applied to dopamine when the reward (Meat) is presented
+pub const REWARD_DOPAMINE_MULTIPLIER: f32 = 5.0;
+/// Rate at which dopamine decays back to the baseline of 1.0
+pub const DOPAMINE_DECAY_RATE: f32 = 0.1;
+/// Number of training cycles before doing a test cycle (only bell, no meat)
+pub const TRAINING_CYCLES_BEFORE_TEST: u32 = 5;

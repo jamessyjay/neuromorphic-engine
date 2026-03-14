@@ -1018,11 +1018,11 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
     graph.add_neuron(NeuronType::Interneuron); // Left (4)
     
     // Set explicit coordinates for visual debugging
-    graph.neurons[0].x = 32768; graph.neurons[0].y = 32768; graph.neurons[0].z = 32768;
-    graph.neurons[1].x = 32768; graph.neurons[1].y = 60000; graph.neurons[1].z = 32768;
-    graph.neurons[2].x = 60000; graph.neurons[2].y = 32768; graph.neurons[2].z = 32768;
-    graph.neurons[3].x = 32768; graph.neurons[3].y = 5000;  graph.neurons[3].z = 32768;
-    graph.neurons[4].x = 5000;  graph.neurons[4].y = 32768; graph.neurons[4].z = 32768;
+    graph.neurons[0].x = UI_COORD_CENTER; graph.neurons[0].y = UI_COORD_CENTER; graph.neurons[0].z = UI_COORD_CENTER;
+    graph.neurons[1].x = UI_COORD_CENTER; graph.neurons[1].y = UI_COORD_RIGHT; graph.neurons[1].z = UI_COORD_CENTER;
+    graph.neurons[2].x = UI_COORD_RIGHT; graph.neurons[2].y = UI_COORD_CENTER; graph.neurons[2].z = UI_COORD_CENTER;
+    graph.neurons[3].x = UI_COORD_CENTER; graph.neurons[3].y = UI_COORD_LEFT;  graph.neurons[3].z = UI_COORD_CENTER;
+    graph.neurons[4].x = UI_COORD_LEFT;  graph.neurons[4].y = UI_COORD_CENTER; graph.neurons[4].z = UI_COORD_CENTER;
     
     // Add synapses flowing from sensors to center to motor
     let edges = [(1, 0), (2, 0), (0, 3), (4, 0)];
@@ -1030,7 +1030,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         graph.synapses.push(Synapse {
             source_id: src as u32,
             target_id: tgt as u32,
-            weight: 50.0,
+            weight: UI_TEST_SYNAPSE_WEIGHT,
             neurotransmitter_buffer: 0.0,
             last_activation_tick: 0,
             ticks_below_threshold: 0,
@@ -1056,10 +1056,10 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         // Send a stimulus wave every 50 ticks
         if tick % 50 == 0 {
             println!("Tick {}: Flashing sensors...", tick);
-            graph.neurons[1].current_voltage = 40.0;
-            graph.neurons[1].energy_atp = 100.0;
-            graph.neurons[2].current_voltage = 40.0;
-            graph.neurons[2].energy_atp = 100.0;
+            graph.neurons[1].current_voltage = FORCED_SPIKE_VOLTAGE;
+            graph.neurons[1].energy_atp = FULL_ATP_LEVEL;
+            graph.neurons[2].current_voltage = FORCED_SPIKE_VOLTAGE;
+            graph.neurons[2].energy_atp = FULL_ATP_LEVEL;
         }
 
         let current_env = {
@@ -1112,7 +1112,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         // Super slow loop so user can watch UI
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        if start_time.elapsed().as_secs() >= 300 {
+        if start_time.elapsed().as_secs() >= UI_TEST_DURATION_SECS {
             println!("UI Test limit reached (5 minutes). Exiting.");
             break;
         }

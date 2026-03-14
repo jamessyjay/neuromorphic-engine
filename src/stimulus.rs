@@ -1,6 +1,7 @@
 // src/stimulus.rs
 use crate::graph::NetworkGraph;
 use crate::ffi::Environment;
+use crate::constants::*;
 
 pub struct StimulusService {
     pub interval: u32,
@@ -13,7 +14,7 @@ impl StimulusService {
     pub fn new(interval: u32) -> Self {
         Self {
             interval,
-            delay_between_stimuli: 30, // 30ms - ideal window for STDP
+            delay_between_stimuli: STDP_IDEAL_WINDOW_TICKS, // 30ms - ideal window for STDP // 30ms - ideal window for STDP
             last_tick: 0,
             training_mode: true,
         }
@@ -24,7 +25,7 @@ impl StimulusService {
         if num_neurons == 0 { return; }
 
         // Take 4% of neurons for sensors (to fit two groups)
-        let total_sensors = (num_neurons as f32 * 0.04) as usize;
+        let total_sensors = (num_neurons as f32 * SENSOR_GROUP_PERCENTAGE) as usize;
         let group_size = total_sensors / 2;
         
         let bell_sensors = 0..group_size;
@@ -36,7 +37,7 @@ impl StimulusService {
             println!("[STIMULUS] BELL (Stimulus A)");
             for i in bell_sensors {
                 if i < graph.neurons.len() {
-                    graph.neurons[i].current_voltage = 40.0; // Forced spike
+                    graph.neurons[i].current_voltage = FORCED_SPIKE_VOLTAGE; // Forced spike
                 }
             }
         }
@@ -47,16 +48,16 @@ impl StimulusService {
             println!("[STIMULUS] MEAT (Stimulus B) + Dopamine");
             for i in meat_sensors {
                 if i < graph.neurons.len() {
-                    graph.neurons[i].current_voltage = 40.0;
+                    graph.neurons[i].current_voltage = FORCED_SPIKE_VOLTAGE;
                 }
             }
             // Meat itself causes pleasure
-            env.dopamine_multiplier = 5.0; 
+            env.dopamine_multiplier = REWARD_DOPAMINE_MULTIPLIER; 
         }
 
         // --- PHASE 3: TEST (Testing for stupidity) ---
         // Every 5 training cycles disable meat and watch the reaction
-        if current_tick > 0 && current_tick % (self.interval * 5) == 0 {
+        if current_tick > 0 && current_tick % (self.interval * TRAINING_CYCLES_BEFORE_TEST) == 0 {
             self.training_mode = !self.training_mode;
             if !self.training_mode {
                 println!("\n--- TEST: GIVING ONLY BELL, NO MEAT ---");
@@ -68,7 +69,7 @@ impl StimulusService {
 
         // Gradual dopamine decay to not keep the network in eternal ecstasy
         if env.dopamine_multiplier > 1.0 {
-            env.dopamine_multiplier -= 0.1;
+            env.dopamine_multiplier -= DOPAMINE_DECAY_RATE;
         }
     }
 }
