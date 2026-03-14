@@ -210,7 +210,9 @@ fn test_double_buffer_sync() {
     
     // Force spike on source
     graph.neurons[src as usize].current_voltage = 40.0;
-    graph.neurons[src as usize].last_spike_tick = 1;
+    graph.neurons[src as usize].last_spike_tick = 0;
+    graph.neurons[src as usize].energy_atp = 100.0;
+    graph.neurons[src as usize].refractory_time_left = 0.0;
     
     // Tick 1
     graph.tick(1, env.clone());

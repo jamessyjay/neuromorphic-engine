@@ -267,7 +267,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
         }
     } else {
-        if (source->last_spike_tick == current_tick && source->current_voltage == ACTION_POTENTIAL_PEAK) {
+        if (source->last_spike_tick == current_tick) {
             // Bulk release on spike
             s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
             uint8_t is_myelinated = (s->flags & 0x10) != 0;

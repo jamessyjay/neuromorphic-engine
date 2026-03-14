@@ -1,7 +1,7 @@
 [
   {
     "tick": 1,
-    "soma_v": -69.78522,
+    "soma_v": -68.78471,
     "dyn_thresh": -52.140892,
     "atp": 106.07418,
     "internal_phase": 1,
@@ -10,7 +10,7 @@
   },
   {
     "tick": 2,
-    "soma_v": -69.78522,
+    "soma_v": -68.00971,
     "dyn_thresh": -52.138435,
     "atp": 106.064186,
     "internal_phase": 2,
@@ -19,7 +19,7 @@
   },
   {
     "tick": 3,
-    "soma_v": -69.78522,
+    "soma_v": -68.947716,
     "dyn_thresh": -52.13598,
     "atp": 106.0542,
     "internal_phase": 3,
@@ -28,7 +28,7 @@
   },
   {
     "tick": 4,
-    "soma_v": -69.78522,
+    "soma_v": -69.90196,
     "dyn_thresh": -52.133526,
     "atp": 106.04423,
     "internal_phase": 4,
@@ -37,7 +37,7 @@
   },
   {
     "tick": 5,
-    "soma_v": -69.78522,
+    "soma_v": -69.62496,
     "dyn_thresh": -52.131077,
     "atp": 106.03426,
     "internal_phase": 5,
@@ -46,7 +46,7 @@
   },
   {
     "tick": 6,
-    "soma_v": -69.78522,
+    "soma_v": -69.60996,
     "dyn_thresh": -52.128635,
     "atp": 106.02431,
     "internal_phase": 6,
@@ -55,7 +55,7 @@
   },
   {
     "tick": 7,
-    "soma_v": -69.78522,
+    "soma_v": -68.756966,
     "dyn_thresh": -52.126186,
     "atp": 106.01436,
     "internal_phase": 7,
@@ -64,7 +64,7 @@
   },
   {
     "tick": 8,
-    "soma_v": -69.78522,
+    "soma_v": -68.08797,
     "dyn_thresh": -52.123745,
     "atp": 106.004425,
     "internal_phase": 8,
@@ -73,7 +73,7 @@
   },
   {
     "tick": 9,
-    "soma_v": -69.78522,
+    "soma_v": -68.73472,
     "dyn_thresh": -52.121307,
     "atp": 105.9945,
     "internal_phase": 9,
@@ -82,7 +82,7 @@
   },
   {
     "tick": 10,
-    "soma_v": -69.78522,
+    "soma_v": -69.13272,
     "dyn_thresh": -52.11887,
     "atp": 105.98458,
     "internal_phase": 10,
@@ -91,7 +91,7 @@
   },
   {
     "tick": 11,
-    "soma_v": -69.78522,
+    "soma_v": -68.51647,
     "dyn_thresh": -52.116432,
     "atp": 105.97467,
     "internal_phase": 11,
@@ -100,7 +100,7 @@
   },
   {
     "tick": 12,
-    "soma_v": -69.78522,
+    "soma_v": -68.68947,
     "dyn_thresh": -52.114002,
     "atp": 105.964775,
     "internal_phase": 12,
@@ -109,7 +109,7 @@
   },
   {
     "tick": 13,
-    "soma_v": -69.78522,
+    "soma_v": -67.83622,
     "dyn_thresh": -52.111572,
     "atp": 105.95489,
     "internal_phase": 13,
@@ -118,7 +118,7 @@
   },
   {
     "tick": 14,
-    "soma_v": -69.78522,
+    "soma_v": -68.58022,
     "dyn_thresh": -52.109142,
     "atp": 105.94501,
     "internal_phase": 14,
@@ -127,7 +127,7 @@
   },
   {
     "tick": 15,
-    "soma_v": -69.78522,
+    "soma_v": -67.30122,
     "dyn_thresh": -52.106716,
     "atp": 105.935135,
     "internal_phase": 15,
@@ -136,7 +136,7 @@
   },
   {
     "tick": 16,
-    "soma_v": -69.78522,
+    "soma_v": -66.695724,
     "dyn_thresh": -52.104294,
     "atp": 105.92527,
     "internal_phase": 16,
@@ -145,7 +145,7 @@
   },
   {
     "tick": 17,
-    "soma_v": -69.78522,
+    "soma_v": -67.584724,
     "dyn_thresh": -52.10187,
     "atp": 105.91542,
     "internal_phase": 17,
@@ -154,7 +154,7 @@
   },
   {
     "tick": 18,
-    "soma_v": -69.78522,
+    "soma_v": -66.22098,
     "dyn_thresh": -52.099453,
     "atp": 105.90558,
     "internal_phase": 18,
@@ -163,7 +163,7 @@
   },
   {
     "tick": 19,
-    "soma_v": -69.78522,
+    "soma_v": -65.89773,
     "dyn_thresh": -52.09704,
     "atp": 105.895744,
     "internal_phase": 19,
@@ -172,7 +172,7 @@
   },
   {
     "tick": 20,
-    "soma_v": -69.78522,
+    "soma_v": -65.38623,
     "dyn_thresh": -52.094624,
     "atp": 105.88592,
     "internal_phase": 20,
@@ -181,7 +181,7 @@
   },
   {
     "tick": 21,
-    "soma_v": -69.78522,
+    "soma_v": -66.174484,
     "dyn_thresh": -52.09221,
     "atp": 105.8761,
     "internal_phase": 21,
@@ -190,7 +190,7 @@
   },
   {
     "tick": 22,
-    "soma_v": -69.78522,
+    "soma_v": -66.646736,
     "dyn_thresh": -52.089798,
     "atp": 105.866295,
     "internal_phase": 22,
@@ -199,7 +199,7 @@
   },
   {
     "tick": 23,
-    "soma_v": -69.78522,
+    "soma_v": -67.25574,
     "dyn_thresh": -52.08739,
     "atp": 105.8565,
     "internal_phase": 23,
@@ -208,7 +208,7 @@
   },
   {
     "tick": 24,
-    "soma_v": -69.78522,
+    "soma_v": -66.842735,
     "dyn_thresh": -52.084988,
     "atp": 105.84671,
     "internal_phase": 24,
@@ -217,7 +217,7 @@
   },
   {
     "tick": 25,
-    "soma_v": -69.78522,
+    "soma_v": -67.24724,
     "dyn_thresh": -52.08258,
     "atp": 105.83693,
     "internal_phase": 25,
@@ -226,7 +226,7 @@
   },
   {
     "tick": 26,
-    "soma_v": -69.78522,
+    "soma_v": -68.23549,
     "dyn_thresh": -52.08018,
     "atp": 105.82716,
     "internal_phase": 26,
@@ -235,7 +235,7 @@
   },
   {
     "tick": 27,
-    "soma_v": -69.78522,
+    "soma_v": -67.89149,
     "dyn_thresh": -52.07778,
     "atp": 105.817406,
     "internal_phase": 27,
@@ -244,7 +244,7 @@
   },
   {
     "tick": 28,
-    "soma_v": -69.78522,
+    "soma_v": -67.09024,
     "dyn_thresh": -52.07539,
     "atp": 105.807655,
     "internal_phase": 28,
@@ -253,7 +253,7 @@
   },
   {
     "tick": 29,
-    "soma_v": -69.78522,
+    "soma_v": -65.82874,
     "dyn_thresh": -52.072994,
     "atp": 105.79791,
     "internal_phase": 29,
@@ -262,7 +262,7 @@
   },
   {
     "tick": 30,
-    "soma_v": -69.78522,
+    "soma_v": -64.893745,
     "dyn_thresh": -52.070602,
     "atp": 105.78818,
     "internal_phase": 30,
@@ -271,7 +271,7 @@
   },
   {
     "tick": 31,
-    "soma_v": -69.78522,
+    "soma_v": -63.646744,
     "dyn_thresh": -52.068214,
     "atp": 105.77846,
     "internal_phase": 31,
@@ -280,7 +280,7 @@
   },
   {
     "tick": 32,
-    "soma_v": -69.78522,
+    "soma_v": -64.46224,
     "dyn_thresh": -52.065826,
     "atp": 105.768745,
     "internal_phase": 32,
@@ -289,7 +289,7 @@
   },
   {
     "tick": 33,
-    "soma_v": -69.78522,
+    "soma_v": -64.77924,
     "dyn_thresh": -52.063442,
     "atp": 105.75904,
     "internal_phase": 33,
@@ -298,7 +298,7 @@
   },
   {
     "tick": 34,
-    "soma_v": -69.78522,
+    "soma_v": -64.85999,
     "dyn_thresh": -52.061054,
     "atp": 105.749344,
     "internal_phase": 34,
@@ -307,7 +307,7 @@
   },
   {
     "tick": 35,
-    "soma_v": -69.78522,
+    "soma_v": -64.019745,
     "dyn_thresh": -52.058674,
     "atp": 105.739655,
     "internal_phase": 35,
@@ -316,7 +316,7 @@
   },
   {
     "tick": 36,
-    "soma_v": -69.78522,
+    "soma_v": -64.578995,
     "dyn_thresh": -52.0563,
     "atp": 105.72998,
     "internal_phase": 36,
@@ -325,7 +325,7 @@
   },
   {
     "tick": 37,
-    "soma_v": -69.78522,
+    "soma_v": -64.32099,
     "dyn_thresh": -52.05392,
     "atp": 105.720314,
     "internal_phase": 37,
@@ -334,7 +334,7 @@
   },
   {
     "tick": 38,
-    "soma_v": -69.78522,
+    "soma_v": -62.96974,
     "dyn_thresh": -52.05155,
     "atp": 105.710655,
     "internal_phase": 38,
@@ -343,7 +343,7 @@
   },
   {
     "tick": 39,
-    "soma_v": -69.78522,
+    "soma_v": -61.47174,
     "dyn_thresh": -52.049175,
     "atp": 105.701004,
     "internal_phase": 39,
@@ -352,7 +352,7 @@
   },
   {
     "tick": 40,
-    "soma_v": -69.78522,
+    "soma_v": -62.16024,
     "dyn_thresh": -52.04681,
     "atp": 105.69136,
     "internal_phase": 40,
@@ -361,7 +361,7 @@
   },
   {
     "tick": 41,
-    "soma_v": -69.78522,
+    "soma_v": -62.12449,
     "dyn_thresh": -52.04444,
     "atp": 105.68173,
     "internal_phase": 41,
@@ -370,7 +370,7 @@
   },
   {
     "tick": 42,
-    "soma_v": -69.78522,
+    "soma_v": -61.31374,
     "dyn_thresh": -52.04208,
     "atp": 105.67211,
     "internal_phase": 42,
@@ -379,7 +379,7 @@
   },
   {
     "tick": 43,
-    "soma_v": -69.78522,
+    "soma_v": -61.46599,
     "dyn_thresh": -52.039715,
     "atp": 105.6625,
     "internal_phase": 43,
@@ -388,7 +388,7 @@
   },
   {
     "tick": 44,
-    "soma_v": -69.78522,
+    "soma_v": -61.54099,
     "dyn_thresh": -52.037354,
     "atp": 105.65289,
     "internal_phase": 44,
@@ -397,7 +397,7 @@
   },
   {
     "tick": 45,
-    "soma_v": -69.78522,
+    "soma_v": -60.77124,
     "dyn_thresh": -52.034996,
     "atp": 105.643295,
     "internal_phase": 45,
@@ -406,7 +406,7 @@
   },
   {
     "tick": 46,
-    "soma_v": -69.78522,
+    "soma_v": -59.78649,
     "dyn_thresh": -52.032635,
     "atp": 105.633705,
     "internal_phase": 46,
@@ -415,7 +415,7 @@
   },
   {
     "tick": 47,
-    "soma_v": -69.78522,
+    "soma_v": -60.12974,
     "dyn_thresh": -52.030285,
     "atp": 105.62413,
     "internal_phase": 47,
@@ -424,7 +424,7 @@
   },
   {
     "tick": 48,
-    "soma_v": -69.78522,
+    "soma_v": -60.37524,
     "dyn_thresh": -52.027935,
     "atp": 105.61456,
     "internal_phase": 48,
@@ -433,7 +433,7 @@
   },
   {
     "tick": 49,
-    "soma_v": -69.78522,
+    "soma_v": -60.83349,
     "dyn_thresh": -52.025585,
     "atp": 105.605,
     "internal_phase": 49,
@@ -442,7 +442,7 @@
   },
   {
     "tick": 50,
-    "soma_v": -69.78522,
+    "soma_v": -61.438488,
     "dyn_thresh": -52.02324,
     "atp": 105.59545,
     "internal_phase": 50,
@@ -451,7 +451,7 @@
   },
   {
     "tick": 51,
-    "soma_v": -69.78522,
+    "soma_v": -59.994488,
     "dyn_thresh": -52.02089,
     "atp": 105.58591,
     "internal_phase": 51,
@@ -460,7 +460,7 @@
   },
   {
     "tick": 52,
-    "soma_v": -69.78522,
+    "soma_v": -60.630238,
     "dyn_thresh": -52.01855,
     "atp": 105.57638,
     "internal_phase": 52,
@@ -469,7 +469,7 @@
   },
   {
     "tick": 53,
-    "soma_v": -69.78522,
+    "soma_v": -59.563736,
     "dyn_thresh": -52.01621,
     "atp": 105.56686,
     "internal_phase": 53,
@@ -478,7 +478,7 @@
   },
   {
     "tick": 54,
-    "soma_v": -69.78522,
+    "soma_v": -59.403736,
     "dyn_thresh": -52.01387,
     "atp": 105.55734,
     "internal_phase": 54,
@@ -487,7 +487,7 @@
   },
   {
     "tick": 55,
-    "soma_v": -69.78522,
+    "soma_v": -58.161236,
     "dyn_thresh": -52.01153,
     "atp": 105.54784,
     "internal_phase": 55,
@@ -496,7 +496,7 @@
   },
   {
     "tick": 56,
-    "soma_v": -69.78522,
+    "soma_v": -58.187737,
     "dyn_thresh": -52.0092,
     "atp": 105.53834,
     "internal_phase": 56,
@@ -505,7 +505,7 @@
   },
   {
     "tick": 57,
-    "soma_v": -69.78522,
+    "soma_v": -58.44124,
     "dyn_thresh": -52.006866,
     "atp": 105.52885,
     "internal_phase": 57,
@@ -514,7 +514,7 @@
   },
   {
     "tick": 58,
-    "soma_v": -69.78522,
+    "soma_v": -57.158737,
     "dyn_thresh": -52.00454,
     "atp": 105.51937,
     "internal_phase": 58,
@@ -523,7 +523,7 @@
   },
   {
     "tick": 59,
-    "soma_v": -69.78522,
+    "soma_v": -55.989986,
     "dyn_thresh": -52.002213,
     "atp": 105.5099,
     "internal_phase": 59,
@@ -532,7 +532,7 @@
   },
   {
     "tick": 60,
-    "soma_v": -69.78522,
+    "soma_v": -55.088737,
     "dyn_thresh": -51.999886,
     "atp": 105.50044,
     "internal_phase": 60,
@@ -541,7 +541,7 @@
   },
   {
     "tick": 61,
-    "soma_v": -69.78522,
+    "soma_v": -55.822487,
     "dyn_thresh": -51.997566,
     "atp": 105.49099,
     "internal_phase": 61,
@@ -550,7 +550,7 @@
   },
   {
     "tick": 62,
-    "soma_v": -69.78522,
+    "soma_v": -54.672237,
     "dyn_thresh": -51.99524,
     "atp": 105.481544,
     "internal_phase": 62,
@@ -559,7 +559,7 @@
   },
   {
     "tick": 63,
-    "soma_v": -69.78522,
+    "soma_v": -55.22949,
     "dyn_thresh": -51.992924,
     "atp": 105.47211,
     "internal_phase": 63,
@@ -568,7 +568,7 @@
   },
   {
     "tick": 64,
-    "soma_v": -69.78522,
+    "soma_v": -54.46124,
     "dyn_thresh": -51.99061,
     "atp": 105.462685,
     "internal_phase": 64,
@@ -577,7 +577,7 @@
   },
   {
     "tick": 65,
-    "soma_v": -69.78522,
+    "soma_v": -54.28524,
     "dyn_thresh": -51.988293,
     "atp": 105.45327,
     "internal_phase": 65,
@@ -586,7 +586,7 @@
   },
   {
     "tick": 66,
-    "soma_v": -69.78522,
+    "soma_v": -54.89999,
     "dyn_thresh": -51.985977,
     "atp": 105.44386,
     "internal_phase": 66,
@@ -595,7 +595,7 @@
   },
   {
     "tick": 67,
-    "soma_v": -69.78522,
+    "soma_v": -53.98349,
     "dyn_thresh": -51.983673,
     "atp": 105.43446,
     "internal_phase": 67,
@@ -604,7 +604,7 @@
   },
   {
     "tick": 68,
-    "soma_v": -69.78522,
+    "soma_v": -53.71099,
     "dyn_thresh": -51.981365,
     "atp": 105.42507,
     "internal_phase": 68,
@@ -613,7 +613,7 @@
   },
   {
     "tick": 69,
-    "soma_v": -69.78522,
+    "soma_v": -52.46374,
     "dyn_thresh": -51.979053,
     "atp": 105.41569,
     "internal_phase": 69,
@@ -622,7 +622,7 @@
   },
   {
     "tick": 70,
-    "soma_v": -69.78522,
+    "soma_v": -51.333492,
     "dyn_thresh": -51.976753,
     "atp": 105.40632,
     "internal_phase": 70,
@@ -631,270 +631,270 @@
   },
   {
     "tick": 71,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.974453,
-    "atp": 105.39696,
+    "soma_v": 40.10325,
+    "dyn_thresh": -45.830353,
+    "atp": 80.39696,
     "internal_phase": 71,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 72,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.972157,
-    "atp": 105.3876,
+    "soma_v": -80.497215,
+    "dyn_thresh": -45.833847,
+    "atp": 80.41117,
     "internal_phase": 72,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 73,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.969856,
-    "atp": 105.37826,
+    "soma_v": -78.29722,
+    "dyn_thresh": -45.837337,
+    "atp": 80.42537,
     "internal_phase": 73,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 74,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.96756,
-    "atp": 105.36892,
+    "soma_v": -78.90272,
+    "dyn_thresh": -45.84082,
+    "atp": 80.43955,
     "internal_phase": 74,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 75,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.965267,
-    "atp": 105.35959,
+    "soma_v": -79.075966,
+    "dyn_thresh": -45.844307,
+    "atp": 80.45373,
     "internal_phase": 75,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 76,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.96298,
-    "atp": 105.35027,
+    "soma_v": -79.25847,
+    "dyn_thresh": -45.847786,
+    "atp": 80.46789,
     "internal_phase": 76,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 77,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.960693,
-    "atp": 105.340965,
+    "soma_v": -79.26472,
+    "dyn_thresh": -45.85126,
+    "atp": 80.48203,
     "internal_phase": 77,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 78,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.958405,
-    "atp": 105.331665,
+    "soma_v": -77.91697,
+    "dyn_thresh": -45.854733,
+    "atp": 80.49616,
     "internal_phase": 78,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 79,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.956123,
-    "atp": 105.32237,
+    "soma_v": -77.32622,
+    "dyn_thresh": -45.858208,
+    "atp": 80.510284,
     "internal_phase": 79,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 80,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.953842,
-    "atp": 105.31309,
+    "soma_v": -77.27572,
+    "dyn_thresh": -45.86167,
+    "atp": 80.52439,
     "internal_phase": 80,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 81,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.95156,
-    "atp": 105.30381,
+    "soma_v": -76.97947,
+    "dyn_thresh": -45.865135,
+    "atp": 80.53848,
     "internal_phase": 81,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 82,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.949284,
-    "atp": 105.29454,
+    "soma_v": -76.78872,
+    "dyn_thresh": -45.86859,
+    "atp": 80.55256,
     "internal_phase": 82,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 83,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.947006,
-    "atp": 105.285286,
+    "soma_v": -76.71272,
+    "dyn_thresh": -45.87205,
+    "atp": 80.56663,
     "internal_phase": 83,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 84,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.944736,
-    "atp": 105.27604,
+    "soma_v": -76.12547,
+    "dyn_thresh": -45.875504,
+    "atp": 80.58068,
     "internal_phase": 84,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 85,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.942467,
-    "atp": 105.2668,
+    "soma_v": -76.14772,
+    "dyn_thresh": -45.878956,
+    "atp": 80.59472,
     "internal_phase": 85,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 86,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.940197,
-    "atp": 105.25757,
+    "soma_v": -74.73522,
+    "dyn_thresh": -45.8824,
+    "atp": 80.60874,
     "internal_phase": 86,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 87,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.93793,
-    "atp": 105.248344,
+    "soma_v": -74.91597,
+    "dyn_thresh": -45.88585,
+    "atp": 80.62276,
     "internal_phase": 87,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 88,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.935665,
-    "atp": 105.23913,
+    "soma_v": -73.75747,
+    "dyn_thresh": -45.889286,
+    "atp": 80.63676,
     "internal_phase": 88,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 89,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.933403,
-    "atp": 105.22992,
+    "soma_v": -73.81747,
+    "dyn_thresh": -45.892723,
+    "atp": 80.65074,
     "internal_phase": 89,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 90,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.93114,
-    "atp": 105.220726,
+    "soma_v": -74.10547,
+    "dyn_thresh": -45.896156,
+    "atp": 80.66471,
     "internal_phase": 90,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 91,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.928886,
-    "atp": 105.21154,
+    "soma_v": -73.41397,
+    "dyn_thresh": -45.89959,
+    "atp": 80.67867,
     "internal_phase": 91,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 92,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.92663,
-    "atp": 105.20236,
+    "soma_v": -72.09197,
+    "dyn_thresh": -45.903015,
+    "atp": 80.69262,
     "internal_phase": 92,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 93,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.924377,
-    "atp": 105.19319,
+    "soma_v": -72.800476,
+    "dyn_thresh": -45.90644,
+    "atp": 80.70655,
     "internal_phase": 93,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 94,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.922123,
-    "atp": 105.18403,
+    "soma_v": -71.69523,
+    "dyn_thresh": -45.90986,
+    "atp": 80.720474,
     "internal_phase": 94,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 95,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.919872,
-    "atp": 105.17487,
+    "soma_v": -71.719475,
+    "dyn_thresh": -45.91328,
+    "atp": 80.73438,
     "internal_phase": 95,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 96,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.917625,
-    "atp": 105.165726,
+    "soma_v": -72.02373,
+    "dyn_thresh": -45.916695,
+    "atp": 80.748276,
     "internal_phase": 96,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 97,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.91538,
-    "atp": 105.156586,
+    "soma_v": -70.816475,
+    "dyn_thresh": -45.920105,
+    "atp": 80.76215,
     "internal_phase": 97,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 98,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.913136,
-    "atp": 105.14746,
+    "soma_v": -70.362724,
+    "dyn_thresh": -45.923515,
+    "atp": 80.776024,
     "internal_phase": 98,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 99,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.910896,
-    "atp": 105.13834,
+    "soma_v": -69.053474,
+    "dyn_thresh": -45.926918,
+    "atp": 80.78988,
     "internal_phase": 99,
     "port0_v": 15.0,
     "trace0": 0
   },
   {
     "tick": 100,
-    "soma_v": -69.78522,
-    "dyn_thresh": -51.908657,
-    "atp": 105.129234,
+    "soma_v": -69.192726,
+    "dyn_thresh": -45.93032,
+    "atp": 80.80372,
     "internal_phase": 100,
     "port0_v": 15.0,
     "trace0": 0

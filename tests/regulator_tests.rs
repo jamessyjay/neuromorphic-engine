@@ -79,7 +79,7 @@ async fn test_homeostasis_loop_integration() {
     
     let use_dynamic_homeostasis = true;
 
-    for tick in 1..=5 {
+    for tick in 501..=505 {
         let tick_start = Instant::now();
         
         // Mock heavy hardware lag
