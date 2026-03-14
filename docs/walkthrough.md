@@ -205,3 +205,20 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Stress & TPS Protection (`bench_stdp_overhead`):**
   - Added a benchmark scaling 10,000 neurons and 100,000 synapses forcing continuous spikes.
   - Measured engine overhead by comparing a network running at 0.0 learning rate vs 0.01 learning rate. The new trace-based implementation showed 0.0% statistically significant TPS drop, easily staying under the 15% strict overhead limit.
+
+## Phase 47: Associative Persistence & Internationalization
+
+- **Hardcore Pavlovian STDP Stress Test:**
+  - Implemented `test_stdp_associative_persistence_under_noise` to simulate classical conditioning.
+  - Demonstrated that the network can form a strong associative memory (Bell -> Meat) and retain it even under a massive storm of 1,000 noise ticks (competing spontaneous spikes), proving the robustness of the new Trace-based STDP.
+- **Architectural Cleanup & Refactoring:**
+  - Eradicated all magic numbers from `src/modes.rs` and `src/stimulus.rs`, centralizing them into `src/constants.rs`.
+  - Thoroughly documented all constants with clear English descriptions.
+  - Eliminated all Cyrillic text across the entire repository (including Markdown docs, AI agent reports, and source code comments) to achieve 100% internationalization.
+- **Strict Biological Network Topology:**
+  - Enforced precise cellular proportions during network generation in benchmark mode: `75% Pyramidal, 15% Interneurons, 4% Sensors, 4% Motors, 2% Pacemakers`.
+  - Implemented automatic inhibitory logic: any synapse originating from an Interneuron (Type 2) is automatically created with a negative weight and the inhibitory flag active.
+  - Added the `test_network_generation_proportions` test to verify strict adherence to these biological metrics.
+- **Live Environment Controls (WebSockets):**
+  - Upgraded the Rust backend (`main.rs`, `streamer.rs`) to process incoming `UpdateEnvironment` JSON messages from the WebGL frontend.
+  - Enabled thread-safe live tweaking of simulation parameters (Dopamine levels, STDP Learning Rate) using an `Arc<Mutex<Environment>>` without blocking the core CUDA execution thread.

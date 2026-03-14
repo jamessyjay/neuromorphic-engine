@@ -76,3 +76,15 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 - **38. Test "Dendritic Branching Stress":** Measures engine TPS with 1, 4, and 8 active dendritic branches per neuron. Verifies non-linear summation does not cause massive Warp Divergence.
 - **39. Test "Serialization Backpressure":** Aggressive UI streaming test tracking TPS drops as JSON payloads scale.
 - **40. Test "Idle Drift":** Establishes the absolute baseline TPS for 10,000 empty neurons, isolating the fixed engine orchestration cost.
+
+### STDP Tests (`test_stdp.rs`)
+- `test_stdp_trace_decay`: Проверка корректного затухания `spike_trace`.
+- `test_stdp_ltp_causal_firing`: Проверка Long-Term Potentiation при правильной причинности (Source -> Target).
+- `test_stdp_ltd_acausal_firing`: Проверка Long-Term Depression при обратной причинности (Target -> Source).
+- `test_stdp_dopamine_scaling`: Проверка масштабирования скорости обучения при высоком уровне дофамина.
+- `test_stdp_weight_clamping`: Убедиться, что веса синапсов не превышают `MAX_SYNAPSE_WEIGHT` и не падают ниже 0.01.
+- `test_stdp_associative_persistence_under_noise`: Хардкорный стресс-тест на собаку Павлова (associative persistence) в условиях сильного нейронного шума.
+- `bench_stdp_overhead`: Измерение накладных расходов на вычисление STDP в симуляции.
+
+### Network Generation Tests (`network_generation_tests.rs`)
+- `test_network_generation_proportions`: Проверка строгих пропорций типов нейронов (Pyramidal 75%, Interneurons 15%, Sensors 4%, Motors 4%, Pacemakers 2%) и генерации ингибиторных (отрицательных) весов для интернейронов.

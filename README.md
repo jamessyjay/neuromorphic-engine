@@ -38,6 +38,12 @@ For a deep dive into the architecture and logic of the project, visit the [docs/
 - **Microglia service:** Automated pruning of dead connections and garbage collection.
 - **Environment:** Global simulation parameters (Oxygen, Dopamine, Toxins).
 
+- **Real-Time 3D Visualization:** Live monitoring of network topology, spikes, and cellular death via a WebGL/Three.js WebSocket stream.
+- **Interactive Environment Control:** Modify global Dopamine and STDP learning rates on the fly through the visualizer UI.
+- **Strict Biological Proportions:** Automated network generation adhering to standard cortex ratios (75% Pyramidal, 15% Interneurons, 4% Sensors, 4% Motors, 2% Pacemakers).
+- **Inhibitory Logic:** Automatic negative weight enforcement for GABAergic interneuron connections.
+
+
 ---
 
 ## Architecture

@@ -38,8 +38,15 @@ cargo run --release -- --benchmark --neurons 1000 --synapses 5000 --ticks 100000
 
 ### 2. Open the visualizer file in your browser (Chrome / Safari)
 
+### 2. Open the visualizer file in your browser (Chrome / Safari)
+
 Simply double-click the `visualizer/index.html` file or open it via Live Server.
 It will automatically connect to `ws://127.0.0.1:3030` and start rendering the network.
+
+**Visualizer Interactive Controls:**
+The WebGL interface now supports interactive controls on the right side of the screen:
+- **Dopamine Multiplier:** Tweak global reward/stress levels on the fly.
+- **Learning Rate:** Adjust STDP plasticity speed without stopping the simulation.
 
 ---
 
