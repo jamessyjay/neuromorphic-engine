@@ -3,110 +3,196 @@
 #![allow(dead_code)]
 
 // --- Simulation Timing & Intervals ---
+/// Interval (in ticks) between periodic maintenance tasks (e.g., global syncs)
 pub const SERVICE_TICK_INTERVAL: u32 = 10;
+/// Interval (in ticks) at which neurogenesis (spawning new neurons/synapses) is evaluated
 pub const NEUROGENESIS_INTERVAL: u32 = 500;
+/// Interval (in ticks) for printing telemetry/status updates to the console
 pub const TELEMETRY_PRINT_INTERVAL: u32 = 500;
+/// Interval (in ticks) for collecting internal metrics (for graphs and analytics)
 pub const METRICS_COLLECTION_INTERVAL: u32 = 50;
+/// Sliding window size (in ticks) used for calculating moving averages (e.g., spike rates)
 pub const WINDOW_SIZE: u32 = 20;
 
+/// Ticks between WebSocket frame broadcasts during fast benchmark modes
 pub const WS_SNAPSHOT_INTERVAL_BENCHMARK: u32 = 15;
+/// Ticks between WebSocket frame broadcasts during normal simulation mode
 pub const WS_SNAPSHOT_INTERVAL_SIMULATION: u32 = 15;
+/// How many ticks a spike visually lingers on the UI before fading out completely
 pub const VISUAL_SPIKE_PERSISTENCE_TICKS: u32 = 25;
 
+/// Default number of ticks to run a standard headless simulation if not specified
 pub const DEFAULT_SIMULATION_TICKS: u32 = 5000;
+/// Default number of ticks for the benchmark mode if not overridden
 pub const DEFAULT_BENCHMARK_TICKS: u32 = 50_000;
+/// Default network size (neurons) for benchmarks
 pub const DEFAULT_BENCHMARK_NEURONS: usize = 1000;
+/// Default network size (synapses) for benchmarks
 pub const DEFAULT_BENCHMARK_SYNAPSES: usize = 25_000;
 
 // --- Stimulus & Pavlovian Conditioning ---
+/// Default tick interval between automated stimulus injections
 pub const STIMULUS_DEFAULT_INTERVAL: u32 = 1000;
+/// Default window size (in ticks) during which a stimulus remains active
 pub const STIMULUS_DEFAULT_WINDOW: u32 = 50;
 
 // --- Network Defaults ---
+/// Maximum squared spatial distance for preferred local synapse connections
 pub const CLUSTERING_RADIUS_SQ: f32 = 400.0; // Distance sq < 20.0^2
+/// Probability of random spontaneous synapse formation during neurogenesis
 pub const STOCHASTIC_GROWTH_PROB: f64 = 0.01;
+/// Default starting weight for a newly spawned synapse
 pub const DEFAULT_WEIGHT: f32 = 2.0;
+/// Standard deviation for Gaussian randomization of starting synapse weights
 pub const WEIGHT_SIGMA: f32 = 1.0;
+/// Baseline structural weight given to seed/initial connections
 pub const SEED_WEIGHT: f32 = 0.5;
 
+/// Probability of a synapse ignoring spatial clustering and forming a long-range connection
 pub const LONG_RANGE_PROB: f64 = 0.02;
+/// Probability that a newly created neuron will be inhibitory (GABAergic)
 pub const INHIBITORY_PROB: f64 = 0.1;
+/// Probability that a new axon/synapse will be myelinated (faster transmission)
 pub const MYELIN_PROB: f64 = 0.2;
+/// Probability that a newly created excitatory neuron will be Pyramidal type
 pub const PYRAMIDAL_PROB: f64 = 0.7;
 
 // --- Biological Thresholds & Limits (СИНХРОНИЗИРОВАНО С base_neuron.h) ---
+/// If a synapse's weight falls below this during sleep/cleanup, it gets pruned
 pub const PRUNING_WEIGHT_THRESHOLD: f32 = 0.1;
+/// If a synapse hasn't been active for this many ticks, it becomes a candidate for pruning
 pub const PRUNING_TICK_THRESHOLD: u32 = 2000;
+/// Absolute maximum weight any synapse can reach (Hard limit)
 pub const MAX_SYNAPSE_WEIGHT: f32 = 50.0; // ПОФИКСЕНО (было 30.0)
+/// Engine hard limit on total number of synapses across the whole graph
 pub const MAX_SYNAPSES_TOTAL: usize = 1_000_000;
+/// Engine hard limit on maximum outgoing synapses from a single neuron
 pub const MAX_SYNAPSES_PER_NEURON: usize = 2000;
+/// Maximum synapse weight specifically enforced during certain benchmark tests
 pub const MAX_SYNAPSE_WEIGHT_BENCHMARK: f32 = 10.0;
+/// Minimum synapse weight specifically enforced during certain benchmark tests
 pub const MIN_SYNAPSE_WEIGHT_BENCHMARK: f32 = 0.5;
 
+/// Maximum metabolic energy (ATP) capacity for a healthy neuron
 pub const MAX_ATP: f32 = 100.0;
+/// ATP level below which a neuron enters a quiet 'sleep' state to recover
 pub const EMERGENCY_ATP_THRESHOLD: f32 = 20.0; // Порог засыпания (Silence)
+/// ATP level below which a neuron permanently dies (apoptosis)
 pub const EMERGENCY_ATP_DEATH_THRESHOLD: f32 = 0.01; // Порог смерти
 
+/// Amount of ATP provided by an astrocyte to a neuron per recovery cycle
 pub const ASTROCYTE_ATP_SUPPLY: f32 = 10.0;
+/// Toxicity level at which astrocytes actively begin cleaning the local environment
 pub const ASTROCYTE_CLEAN_THRESHOLD: f32 = 50.0;
+/// Amount of toxicity removed by astrocytes per cleaning cycle
 pub const ASTROCYTE_CLEAN_AMOUNT: f32 = 10.0;
 
 // --- Physics (Mirrored from CUDA for initialization) ---
+/// Voltage multiplier/gain applied when an NMDA dendritic spike triggers
 pub const NMDA_SPIKE_GAIN: f32 = 5.0; // ПЕРЕИМЕНОВАНО (было NMDA_SPIKE_THRESHOLD)
+/// Baseline resting membrane potential (mV) of a standard neuron
 pub const RESTING_VOLTAGE: f32 = -70.0;
+/// Membrane potential (mV) required to trigger an Action Potential
 pub const THRESHOLD_VOLTAGE: f32 = -55.0;
+/// Peak voltage (mV) reached during an Action Potential
 pub const SPIKE_VOLTAGE: f32 = 40.0;
+/// Voltage threshold used by the UI/Metrics to register that a spike occurred
 pub const SPIKE_DETECTION_VOLTAGE: f32 = 39.0;
+/// High depolarization state just below firing (used for logic branching)
 pub const SUBTHRESHOLD_VOLTAGE: f32 = -40.0;
+/// Rate of voltage decay/leak back toward resting potential per tick
 pub const VOLTAGE_STEP: f32 = 0.7;
+/// Peak voltage generated by Photoreceptor neurons in bright light
 pub const EYE_VOLTAGE_HIGH: f32 = -30.0;
+/// Baseline voltage for Photoreceptor neurons in total darkness
 pub const EYE_VOLTAGE_LOW: f32 = -70.0;
+/// Absolute minimum hyperpolarization limit for the soma
 pub const SOMA_VOLTAGE_MIN: f32 = -90.0;
+/// Absolute maximum depolarization limit for the soma
 pub const SOMA_VOLTAGE_MAX: f32 = 60.0;
 
 // --- Environment Defaults ---
+/// Baseline global oxygen level in the simulation environment
 pub const DEFAULT_OXYGEN: f32 = 1.0;
+/// Oxygen level considered critical hypoxia, triggering massive cellular shutdown
 pub const HYPOXIC_OXYGEN: f32 = 0.01;
+/// Baseline global glucose (energy source) level
 pub const DEFAULT_GLUCOSE: f32 = 1.0;
+/// Baseline dopamine multiplier (1.0 = neutral STDP learning rate)
 pub const DEFAULT_DOPAMINE: f32 = 1.0;
+/// Depressed dopamine state (suppresses learning and plasticity)
 pub const LOW_DOPAMINE: f32 = 0.1;
+/// Highly elevated dopamine state (accelerates STDP and reinforcement)
 pub const HIGH_DOPAMINE: f32 = 5.0;
+/// Moderately elevated dopamine for specific reward events
 pub const BOOSTED_DOPAMINE: f32 = 4.0;
+/// Specific dopamine level injected during Emergence tests
 pub const EMERGENCE_DOPAMINE: f32 = 5.0;
+/// Dopamine level required to encourage structural morphology changes
 pub const MORPHOLOGY_DOPAMINE: f32 = 2.0;
+/// Baseline environmental toxicity (starts clean)
 pub const DEFAULT_TOXINS: f32 = 0.0;
+/// Baseline ambient light level (darkness)
 pub const DEFAULT_LIGHT: f32 = 0.0;
+/// High ambient light level (triggers photoreceptors strongly)
 pub const LIGHT_HIGH: f32 = 0.8;
+/// Dim ambient light level
 pub const LIGHT_LOW: f32 = 0.1;
 
 // --- Visualization Defaults ---
+/// Default width for rendered metric charts
 pub const CANVAS_WIDTH: u32 = 1200;
+/// Extra large height for complex multi-panel charts
 pub const CANVAS_HEIGHT_XL: u32 = 1000;
+/// Large height for standard multi-panel charts
 pub const CANVAS_HEIGHT_LG: u32 = 800;
+/// Outer margin in pixels for rendered charts
 pub const CHART_MARGIN: u32 = 10;
+/// Space reserved for X/Y axis labels in charts
 pub const LABEL_AREA_SIZE: u32 = 40;
+/// Font size for main chart titles
 pub const CAPTION_FONT_SIZE: u32 = 20;
+/// Maximum ticks displayed on the X-axis for short timescale charts
 pub const TICK_LIMIT_CHART: f32 = 1000.0;
+/// Universal minimum Y-axis bound for percentage metrics (e.g., ATP)
 pub const METRIC_MIN_F32: f32 = 0.0;
+/// Universal maximum Y-axis bound for percentage metrics (e.g., ATP)
 pub const METRIC_MAX_F32: f32 = 100.0;
+/// Y-axis minimum bound for plotting membrane voltage
 pub const VOLTAGE_MIN_F32: f32 = -90.0;
+/// Y-axis maximum bound for plotting membrane voltage
 pub const VOLTAGE_MAX_F32: f32 = 60.0; // ПОФИКСЕНО (чтобы графики не обрезали пики)
+/// Y-axis bound for plotting neurotransmitter buffer levels
 pub const BUFFER_MAX_F32: f32 = 20.0;
+/// Y-axis bound for plotting synaptic weights
 pub const WEIGHT_MAX_F32: f32 = 50.0; // ПОФИКСЕНО (совпадает с MAX_SYNAPSE_WEIGHT)
+/// Y-axis bound for plotting global dopamine levels
 pub const DOPAMINE_MAX_F32: f32 = 8.0; // ПОФИКСЕНО (под твой хардкорный буст из stimulus.rs)
+/// Time limit for testing emergent behaviors
 pub const EMERGENCE_TIME_LIMIT: f32 = 2000.0;
+/// Time limit for testing structural morphology changes
 pub const MORPHOLOGY_TIME_LIMIT: f32 = 3000.0;
+/// Time limit for testing reflex arcs
 pub const REFLEX_TIME_LIMIT: f32 = 1000.0;
+/// Time limit for testing inhibitory network effects
 pub const INHIBITION_TIME_LIMIT: f32 = 1000.0;
+/// Time limit for testing synaptic plasticity (STDP)
 pub const PLASTICITY_TIME_LIMIT: f32 = 1000.0;
 
 // --- Random Seeds (Phase 39 Cleanup) ---
+/// RNG seed used for reproducible benchmarks
 pub const SEED_BENCHMARK: u64 = 42;
+/// RNG seed used for standard predictable simulations
 pub const SEED_SIMULATION: u64 = 1337;
+/// RNG seed used for inhibition tests
 pub const SEED_INHIBITION: u64 = 999;
+/// RNG seed used for reflex tests
 pub const SEED_REFLEX: u64 = 888;
+/// RNG seed used for network stress tests
 pub const SEED_STRESS: u64 = 666;
+/// RNG seed used for dopamine modulation tests
 pub const SEED_DOPAMINE: u64 = 777;
+/// RNG seed used for emergence complexity tests
 pub const SEED_EMERGENCE: u64 = 1234;
 
 // --- Telemetry & Analytics ---
