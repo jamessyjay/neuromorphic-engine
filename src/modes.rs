@@ -469,7 +469,8 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
         refractory_timer: 0,
         voltage: ZERO_VOLTAGE_PACKED,
         nmda_threshold: NMDA_THRESHOLD_PACKED,
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     for i in 0..8usize {
         if i != 1 { graph.neurons[target as usize].branches[i].voltage = ZERO_VOLTAGE_PACKED; }
@@ -506,7 +507,8 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         refractory_timer: 0,
         voltage: ZERO_VOLTAGE_PACKED,
         nmda_threshold: VOLTAGE_50_PACKED,
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
 
     let env = Environment {

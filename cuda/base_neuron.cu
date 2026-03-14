@@ -61,6 +61,7 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
 // Atomic function: metabolism
 static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) {
     if (!n->is_alive) return;
+    n->internal_phase = (n->internal_phase + 1) % 256;
 
     // Phase 40: Recovery (Asymptotic to max_atp)
     float atp_gap = n->max_atp - n->energy_ATP;
@@ -130,6 +131,7 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         // NMDA Spike Logic (Non-linear Summation)
         float soma_impact = 0.0f;
         if (v > threshold) {
+            b[i].local_trace = 255;
             soma_impact = v * NMDA_SPIKE_GAIN;
             v = 0.0f; // Reset branch after spike
             b->refractory_timer = BRANCH_REFRACTORY_TICKS; // Block for N ticks
@@ -182,7 +184,10 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         n->current_voltage += (target_v - n->current_voltage) * PHOTO_ACTIVATION_SPEED;
     }
 
-    if (n->current_voltage > n->activation_threshold) {
+    float energy_ratio = fmaxf(0.01f, n->energy_ATP / n->max_atp);
+    float dynamic_threshold = n->activation_threshold * (1.0f + ATP_HUNGER_BETA * (1.0f - energy_ratio));
+
+    if (n->current_voltage > dynamic_threshold) {
         if (n->energy_ATP >= ATP_SPIKE_COST) {
             // Check refractory
             if (current_tick - n->last_spike_tick < (uint32_t)n->refractory_time_left) {
@@ -251,8 +256,10 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     // Trace-based LTP (Potentiation)
     // If target just spiked, apply LTP based on source's existing trace
     if (!is_inhibitory && target->last_spike_tick == current_tick) {
+        int branch_id = s->flags & 0x07;
+        float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
         float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
-        s->weight += delta_w * env.dopamine_multiplier;
+        s->weight += delta_w * env.dopamine_multiplier * branch_activity;
     }
     
     // Legacy LTP/LTD updates commented out to rely on pure STDP
@@ -328,6 +335,11 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             
             s->last_activation_tick = current_tick;
             s->neurotransmitter_buffer -= (effective_signal / env.dopamine_multiplier); 
+            
+            int phase_diff = abs((int)source->internal_phase - (int)target->internal_phase);
+            if (phase_diff > 128) phase_diff = 256 - phase_diff; // Shortest circular distance
+            float phase_multiplier = 1.0f - ((float)phase_diff / 128.0f); // 1.0 if perfectly aligned, 0.0 if opposite
+            effective_signal *= phase_multiplier;
             
             float voltage_impact = effective_signal * RECEPTOR_SCALE_CONSTANT; 
             
@@ -486,7 +498,7 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->metabolic_wear = 0; // 0.0f packed
     neuron->is_alive = true;
     neuron->death_reason = DEATH_NONE;
-    neuron->_pad1 = 0;
+    neuron->internal_phase = 0;
     neuron->_pad2 = 0;
     
     float x_f = get_gaussian(&local_seed, DEFAULT_COORD_CENTER, DEFAULT_COORD_VAR);
@@ -502,8 +514,8 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
         neuron->branches[i].refractory_timer = 0;
         neuron->branches[i].voltage = pack_voltage(0.0f);
         neuron->branches[i].nmda_threshold = pack_voltage(0.0f);
-        neuron->branches[i]._padding[0] = 0;
-        neuron->branches[i]._padding[1] = 0;
+        neuron->branches[i].local_trace = 0;
+        neuron->branches[i]._pad = 0;
     }
 }
 

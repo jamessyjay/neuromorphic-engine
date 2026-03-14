@@ -157,7 +157,7 @@ impl NetworkGraph {
             type_: type_ as u8,
             death_reason: 0,
             is_alive: true,
-            _pad1: 0,
+            internal_phase: 0,
             spike_trace: 0.0,
             current_voltage: 0.0,
             activation_threshold: 0.0,
@@ -180,7 +180,8 @@ impl NetworkGraph {
                 refractory_timer: 0,
                 voltage: 0,
                 nmda_threshold: 0,
-                _padding: [0; 2],
+                local_trace: 0,
+            _pad: 0,
             }; 8],
         };
         

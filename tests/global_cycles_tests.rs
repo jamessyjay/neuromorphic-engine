@@ -159,7 +159,8 @@ fn test_pavlovian_success_rate() {
         refractory_timer: 0,
         voltage: pack_voltage(0.0),
         nmda_threshold: pack_voltage(20.0),
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     graph.neurons[motor as usize].branches[1] = Compartment {
@@ -167,7 +168,8 @@ fn test_pavlovian_success_rate() {
         refractory_timer: 0,
         voltage: pack_voltage(0.0),
         nmda_threshold: pack_voltage(20.0),
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     // Train the network

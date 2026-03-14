@@ -35,7 +35,8 @@ fn test_spatial_summation_basal() {
         refractory_timer: 0,
         voltage: pack_voltage(0.0),
         nmda_threshold: pack_voltage(50.0), // High threshold to avoid NMDA spike
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     let initial_voltage = graph.neurons[id as usize].current_voltage;
@@ -66,7 +67,8 @@ fn test_nmda_spike_trigger() {
         refractory_timer: 0,
         voltage: pack_voltage(0.0),
         nmda_threshold: pack_voltage(20.0), // Threshold = 20
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     // Send a signal above threshold
@@ -87,7 +89,8 @@ fn test_branch_isolation() {
         refractory_timer: 0,
         voltage: pack_voltage(50.0),
         nmda_threshold: pack_voltage(100.0),
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     graph.neurons[id as usize].branches[2] = Compartment {
@@ -95,7 +98,8 @@ fn test_branch_isolation() {
         refractory_timer: 0,
         voltage: pack_voltage(0.0),
         nmda_threshold: pack_voltage(100.0),
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     graph.tick(1, env.clone());
@@ -120,7 +124,8 @@ fn test_trunk_vs_tuft_penalty() {
         refractory_timer: 0,
         voltage: pack_voltage(10.0),
         nmda_threshold: pack_voltage(100.0),
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     graph_tuft.neurons[id_tuft as usize].branches[1] = Compartment {
@@ -128,7 +133,8 @@ fn test_trunk_vs_tuft_penalty() {
         refractory_timer: 0,
         voltage: pack_voltage(10.0),
         nmda_threshold: pack_voltage(100.0),
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     graph_trunk.tick(1, env.clone());
@@ -151,7 +157,8 @@ fn test_branch_refractory_period() {
         refractory_timer: 0,
         voltage: pack_voltage(30.0),
         nmda_threshold: pack_voltage(20.0), // Force NMDA spike
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     graph.tick(1, env.clone()); // NMDA spike happens here
@@ -180,7 +187,8 @@ fn test_passive_leak_diffusion() {
         refractory_timer: 0,
         voltage: pack_voltage(10.0), 
         nmda_threshold: pack_voltage(100.0),
-        _padding: [0; 2],
+        local_trace: 0,
+            _pad: 0,
     };
     
     graph.tick(1, env.clone());

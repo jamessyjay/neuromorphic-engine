@@ -77,6 +77,7 @@ extern "C" {
 #define BASELINE_LEAK_RATE 0.01f
 #define LOW_ATP_LEAK_MULTIPLIER 1.1f
 #define ATP_STRESS_THRESHOLD 30.0f
+#define ATP_HUNGER_BETA 0.5f
 #define EMERGENCY_ATP_THRESHOLD 0.01f
 #define EMERGENCY_SILENCE_THRESHOLD 0.0f // Achievable mV, but high (sleep)
 #define CALCIUM_RECOVERY_RATE 0.5f
@@ -175,7 +176,8 @@ typedef struct {
     uint8_t refractory_timer; // 1 byte: Cooldown ticks for the branch
     uint16_t voltage;         // 2 bytes: Fixed-point (-100 to +100 mV)
     uint16_t nmda_threshold;  // 2 bytes: Fixed-point
-    uint8_t _padding[2];      // 2 bytes: Align to 8 bytes total
+    uint8_t local_trace;      // 1 byte: Dendritic STDP trace
+    uint8_t _pad;             // 1 byte: Align to 8 bytes total
 } Compartment;
 
 typedef struct alignas(64) {
@@ -183,7 +185,7 @@ typedef struct alignas(64) {
     uint8_t type;             // 1 byte: NeuronType
     uint8_t death_reason;     // 1 byte
     bool is_alive;            // 1 byte
-    uint8_t _pad1;            // 1 byte
+    uint8_t internal_phase;   // 1 byte: Internal clock for phase resonance
     
     float spike_trace;
     float current_voltage;

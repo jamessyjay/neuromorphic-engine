@@ -1,0 +1,10 @@
+--- tests/biology_tests.rs
++++ tests/biology_tests.rs
+@@ -54,6 +54,8 @@
+         recovery_rates.push(rate);
+     }
+     
++    println!("Rate 0: {}, Rate 150: {}", recovery_rates[0], recovery_rates[150]);
++    
+     assert!(recovery_rates[0] > recovery_rates[150], "Recovery should slow down logarithmically as it approaches max_atp");
+ }

@@ -22,7 +22,8 @@ pub struct Compartment {
     pub refractory_timer: u8,
     pub voltage: u16,         // Fixed-point
     pub nmda_threshold: u16,  // Fixed-point
-    pub _padding: [u8; 2],
+    pub local_trace: u8,
+    pub _pad: u8,
 }
 
 #[repr(C, align(64))]
@@ -32,7 +33,7 @@ pub struct BaseNeuron {
     pub type_: u8,            // NeuronType
     pub death_reason: u8,
     pub is_alive: bool,
-    pub _pad1: u8,
+    pub internal_phase: u8,
     
     pub spike_trace: f32, // Replaces `size` to keep strict 128-byte layout
     pub current_voltage: f32,
