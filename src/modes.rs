@@ -40,19 +40,23 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
 
     println!("Generating Benchmark Network (Gaussian weights): {} neurons, {} synapses...", neurons_count, synapses_count);
 
-    let num_sensors = (neurons_count as f32 * 0.02) as usize;
-    let num_motors = (neurons_count as f32 * 0.02) as usize;
+    let num_sensors = (neurons_count as f32 * 0.04) as usize;
+    let num_motors = (neurons_count as f32 * 0.04) as usize;
+    let num_pacemakers = (neurons_count as f32 * 0.02) as usize;
+    let num_interneurons = (neurons_count as f32 * 0.15) as usize;
     let motor_start_idx = neurons_count.saturating_sub(num_motors);
 
     for i in 0..neurons_count {
         let n_type = if i < num_sensors {
-            NeuronType::Photoreceptor
+            NeuronType::Photoreceptor // Type 5
         } else if i >= motor_start_idx {
-            NeuronType::Purkinje
-        } else if i >= num_sensors && i < num_sensors + 20 {
-            NeuronType::Pacemaker
+            NeuronType::Purkinje // Type 4 (Motor)
+        } else if i >= num_sensors && i < num_sensors + num_pacemakers {
+            NeuronType::Pacemaker // Type 3
+        } else if i >= num_sensors + num_pacemakers && i < num_sensors + num_pacemakers + num_interneurons {
+            NeuronType::Interneuron // Type 2
         } else {
-            if rand::RngExt::random_bool(&mut rng, PYRAMIDAL_PROB) { NeuronType::Pyramidal } else { NeuronType::Interneuron }
+            NeuronType::Pyramidal // Type 0 (Remaining ~75%)
         };
 
         graph.add_neuron(n_type);
@@ -85,8 +89,15 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
         let dist_sq = dx*dx + dy*dy + dz*dz;
 
         if dist_sq < local_radius_sq || rand::RngExt::random_bool(&mut rng, LONG_RANGE_PROB) {
-            let weight = get_gaussian(DEFAULT_WEIGHT * 2.0, WEIGHT_SIGMA).max(0.5).min(10.0);
-            let is_inhib = rand::RngExt::random_bool(&mut rng, INHIBITORY_PROB); 
+            let base_weight = get_gaussian(DEFAULT_WEIGHT * 2.0, WEIGHT_SIGMA).max(0.5).min(10.0);
+            let is_interneuron = n_source.type_ == NeuronType::Interneuron as u8;
+            
+            let (weight, is_inhib) = if is_interneuron {
+                (-base_weight, true) // Interneurons strictly create inhibitory (negative weight) synapses
+            } else {
+                (base_weight, false) // Other types create excitatory (positive weight) synapses
+            };
+
             let is_myelin = rand::RngExt::random_bool(&mut rng, MYELIN_PROB); 
             let branch_id = rand::RngExt::random_range(&mut rng, 0..8) as u8;
             graph.connect(source_idx as u32, target_idx as u32, weight, branch_id, is_inhib, is_myelin);
