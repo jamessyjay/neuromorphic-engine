@@ -42,9 +42,12 @@ fn test_classic_ltp() {
     
     graph.neurons[tgt as usize].current_voltage = 40.0;
     graph.neurons[tgt as usize].last_spike_tick = 6;
+    graph.neurons[tgt as usize].branches[0].local_trace = 255;
     graph.tick(6, env.clone());
     
-    assert!(graph.synapses[0].weight > 2.5, "Weight should increase due to LTP");
+    let final_weight = graph.synapses[0].weight;
+    println!("[STDP-LTP] Trace: {} | Weight delta: 2.500 -> {:.3}", graph.neurons[tgt as usize].branches[0].local_trace, final_weight);
+    assert!(final_weight > 2.5, "Weight should increase due to LTP");
 }
 
 #[test]
@@ -69,6 +72,7 @@ fn test_classic_ltd() {
     
     graph.neurons[tgt as usize].current_voltage = 40.0;
     graph.neurons[tgt as usize].last_spike_tick = 1;
+    graph.neurons[tgt as usize].branches[0].local_trace = 255;
     graph.tick(1, env.clone());
     
     graph.neurons[src as usize].current_voltage = 40.0;
@@ -77,7 +81,9 @@ fn test_classic_ltd() {
     
     for tick in 11..=30 { graph.tick(tick, env.clone()); }
     
-    assert!(graph.synapses[0].weight < 2.5, "Weight should decrease due to LTD");
+    let final_weight = graph.synapses[0].weight;
+    println!("[STDP-LTD] Trace: {} | Weight delta: 2.500 -> {:.3}", graph.neurons[tgt as usize].branches[0].local_trace, final_weight);
+    assert!(final_weight < 2.5, "Weight should decrease due to LTD");
 }
 
 #[test]
@@ -202,5 +208,6 @@ fn test_receptor_saturation() {
     graph.tick(10, env.clone());
     
     let remaining_buffer = graph.synapses[0].neurotransmitter_buffer;
+    println!("[SATURATION] Vesicles requested: 200.0 | Clamped max: 100.0 | Delivered: {:.1} | Remaining buffer: {:.1}", 100.0 - remaining_buffer, remaining_buffer);
     assert!(remaining_buffer >= 97.9 && remaining_buffer <= 98.1, "Receptor saturation should limit neurotransmitter consumption AND max capacity should clamp to MAX_VESICLES (100.0)");
 }

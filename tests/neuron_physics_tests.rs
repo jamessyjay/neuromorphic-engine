@@ -54,6 +54,8 @@ fn test_atp_gating_starvation_filter() {
     // Assert physiological correctness:
     // Starving threshold must be greater (closer to zero) than fed threshold!
     assert!(starving_dyn_thresh > fed_dyn_thresh, "Starving threshold must be greater (closer to zero) than fed threshold");
+    
+    println!("[ATP-GATING] Fed threshold: {:.2} mV | Starving threshold: {:.2} mV", fed_dyn_thresh, starving_dyn_thresh);
 
     
     // Inject stimulus to soma directly to clearly test the threshold gate
@@ -299,6 +301,11 @@ fn test_the_matrix_golden_master_snapshot() {
         let golden_metrics: Vec<SnapshotMetric> = serde_json::from_str(&data).unwrap();
         
         assert_eq!(metrics.len(), golden_metrics.len());
+        
+        let mut peak_v = -100.0f32;
+        let mut min_atp = 1000.0f32;
+        let mut max_trace = 0u8;
+        
         for (i, (current, golden)) in metrics.iter().zip(golden_metrics.iter()).enumerate() {
             assert_eq!(current.tick, golden.tick, "Tick mismatch at idx {}", i);
             assert_eq!(current.internal_phase, golden.internal_phase, "Phase mismatch at idx {}", i);
@@ -308,8 +315,13 @@ fn test_the_matrix_golden_master_snapshot() {
             assert!((current.dyn_thresh - golden.dyn_thresh).abs() < 0.01, "Dynamic threshold mismatch at idx {}: {} vs {}", i, current.dyn_thresh, golden.dyn_thresh);
             assert!((current.atp - golden.atp).abs() < 0.01, "ATP mismatch at idx {}: {} vs {}", i, current.atp, golden.atp);
             assert!((current.port0_v - golden.port0_v).abs() < 0.01, "Port 0 voltage mismatch at idx {}: {} vs {}", i, current.port0_v, golden.port0_v);
+            
+            if current.soma_v > peak_v { peak_v = current.soma_v; }
+            if current.atp < min_atp { min_atp = current.atp; }
+            if current.trace0 > max_trace { max_trace = current.trace0; }
         }
-        println!("Golden master snapshot verified perfectly!");
+        println!("[MATRIX] Verified 100 ticks perfectly. Peak Soma V: {:.1} | Min ATP: {:.1} | Max Trace: {}", peak_v, min_atp, max_trace);
+
     } else {
         let mut file = File::create(golden_file_path).unwrap();
         let json = serde_json::to_string_pretty(&metrics).unwrap();

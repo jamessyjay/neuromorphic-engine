@@ -238,5 +238,6 @@ fn test_pavlovian_success_rate() {
         graph.tick(tick, env.clone());
     }
     
+    println!("[PAVLOV] Association BELL -> MEAT formed! Final Synapse Weight: {:.2} / 5.0", w2);
     assert!(graph.neurons[motor as usize].last_spike_tick > 60, "Motor should fire automatically after training when sensor is activated");
 }
