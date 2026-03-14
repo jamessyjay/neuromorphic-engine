@@ -161,6 +161,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    let is_fresh = args.contains(&String::from("--fresh"));
+    if is_fresh && std::path::Path::new("brain_save.bin").exists() {
+        println!("Deleting old brain_save.bin for a fresh start...");
+        let _ = std::fs::remove_file("brain_save.bin");
+    }
+
     let graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         println!("Awakening network from brain_save.bin for simulation...");
         loaded_graph

@@ -73,6 +73,17 @@
 
         <div class="panel">
             <div class="control-group">
+                <label style="color: #0ff;">OXYGEN: <span id="v-oxygen" class="val-display">1.00</span></label>
+                <progress id="prog-oxygen" value="1" max="1" style="width: 100%; height: 10px; accent-color: #0ff;"></progress>
+            </div>
+            <div class="control-group">
+                <label style="color: #4ade80;">GLUCOSE: <span id="v-glucose" class="val-display">1.00</span></label>
+                <progress id="prog-glucose" value="1" max="1" style="width: 100%; height: 10px; accent-color: #4ade80;"></progress>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="control-group">
                 <label>DOPAMINE: <span id="v-dopamine" class="val-display">1.0</span></label>
                 <input type="range" id="inp-dopamine" min="0.1" max="10.0" step="0.1" value="1.0">
             </div>
@@ -216,9 +227,21 @@
             ws = new WebSocket(`ws://${window.location.host}/stream`);
             ws.onmessage = (e) => {
                 const msg = JSON.parse(e.data);
-                if (msg.type === 'InitialState') initNetwork(msg.payload);
+                if (msg.type === 'InitialState') {
+                    initNetwork(msg.payload);
+                    document.getElementById('status').innerText = 'STATUS: ACTIVE';
+                    document.getElementById('status').style.color = '#4ade80';
+                }
                 else if (msg.type === 'TickUpdate') {
                     const data = msg.payload;
+                    if (data.global_oxygen !== undefined) {
+                        document.getElementById('v-oxygen').innerText = data.global_oxygen.toFixed(2);
+                        document.getElementById('prog-oxygen').value = data.global_oxygen;
+                    }
+                    if (data.global_glucose !== undefined) {
+                        document.getElementById('v-glucose').innerText = data.global_glucose.toFixed(2);
+                        document.getElementById('prog-glucose').value = data.global_glucose;
+                    }
                     let spikesToday = 0, deadToday = 0;
                     data.neurons.forEach(n => {
                         const nData = nodeMap.get(n[0]);
