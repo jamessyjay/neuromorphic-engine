@@ -270,7 +270,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
             current_env = regulator.update_and_get(elapsed_ms, tick, &current_env);
         }
         if tick % TELEMETRY_PRINT_INTERVAL == 0 {
-            let dead_count = graph.neurons.iter().filter(|n| !n.is_alive).count();
+            let dead_count = graph.neurons.iter().filter(|n| n.is_alive == 0).count();
             telemetry.print_report(graph.neurons.len(), graph.synapses.len(), dead_count);
         }
 
@@ -588,7 +588,7 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
         graph.tick(tick, current_env);
         
         for n in &mut graph.neurons {
-            if n.is_alive {
+            if n.is_alive == 1 {
                 n.metabolic_wear = n.metabolic_wear.saturating_add(50);
             }
         }
@@ -737,7 +737,7 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         for n in &graph.neurons {
             total_atp += n.energy_atp;
             avg_wear += n.metabolic_wear as f32 / 65535.0;
-            if !n.is_alive { dead_count += 1; }
+            if !n.is_alive == 1 { dead_count += 1; }
         }
 
         results.push((tick as u32, total_atp / graph.neurons.len() as f32, dead_count, avg_wear / graph.neurons.len() as f32));

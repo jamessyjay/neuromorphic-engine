@@ -94,7 +94,7 @@ impl Telemetry {
         let mut low_atp_count = 0;
         let atp_bin_size = (MAX_ATP / ATP_BINS_COUNT as f32) as usize;
         for n in neurons {
-            if n.is_alive {
+            if n.is_alive == 1 {
                 let _wear_f = n.metabolic_wear as f32 / MAX_U16_AS_F32;
                 let a_idx = (n.energy_atp as usize / atp_bin_size).min(ATP_BINS_COUNT - 1);
                 atp_bins[a_idx] += 1;

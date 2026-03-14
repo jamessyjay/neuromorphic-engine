@@ -24,14 +24,14 @@ fn test_metabolic_sink() {
 
     for tick in 1..=200 {
         for n in &mut graph.neurons {
-            if n.is_alive {
+            if n.is_alive == 1 {
                 n.current_voltage = 100.0; 
             }
         }
         graph.tick(tick, env.clone());
     }
     
-    let alive_count = graph.neurons.iter().filter(|n| n.is_alive).count();
+    let alive_count = graph.neurons.iter().filter(|n| n.is_alive == 1).count();
     assert_eq!(alive_count, 0, "All neurons should be dead due to metabolic sink (hypoxia + forced spiking).");
     assert_eq!(graph.neurons[0].death_reason, 1 /* DEATH_ATP_LOW */);
 }
@@ -73,7 +73,7 @@ fn test_mitochondrial_failure() {
         // Minimal activity to burn ATP slowly
         if tick % 10 == 0 {
             for n in &mut graph.neurons {
-                if n.is_alive {
+                if n.is_alive == 1 {
                     n.current_voltage = 100.0; 
                 }
             }
@@ -81,7 +81,7 @@ fn test_mitochondrial_failure() {
         graph.tick(tick, env.clone());
     }
     
-    let alive_count = graph.neurons.iter().filter(|n| n.is_alive).count();
+    let alive_count = graph.neurons.iter().filter(|n| n.is_alive == 1).count();
     assert_eq!(alive_count, 0, "Neurons should die from starvation with low glucose.");
 }
 
@@ -98,7 +98,7 @@ fn test_metabolic_floor_leak() {
         graph.tick(tick, env.clone());
     }
     
-    let alive_count = graph.neurons.iter().filter(|n| n.is_alive).count();
+    let alive_count = graph.neurons.iter().filter(|n| n.is_alive == 1).count();
     assert_eq!(alive_count, 100, "Neurons should survive on idle due to glucose processing and recovery compensating for passive drain.");
 }
 
@@ -116,7 +116,7 @@ fn test_oxygen_deprivation() {
         graph.tick(tick, env.clone());
     }
     
-    let alive_count = graph.neurons.iter().filter(|n| n.is_alive).count();
+    let alive_count = graph.neurons.iter().filter(|n| n.is_alive == 1).count();
     println!("Alive after hypoxia: {}", alive_count);
     assert_eq!(alive_count, 0, "All neurons should die rapidly due to oxygen deprivation passive drain.");
 }

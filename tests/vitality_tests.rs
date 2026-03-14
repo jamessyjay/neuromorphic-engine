@@ -9,7 +9,7 @@ extern "C" {
 
 fn create_test_neuron(id: u32, type_: NeuronType) -> BaseNeuron {
     let mut n = BaseNeuron {
-        id: 0, type_: 0, death_reason: 0, is_alive: false, internal_phase: 0,
+        id: 0, type_: 0, death_reason: 0, is_alive: 0, internal_phase: 0,
         spike_trace: 0.0, current_voltage: 0.0, activation_threshold: 0.0, resting_voltage: 0.0,
         energy_atp: 0.0, max_atp: 0.0, leak_coeff: 0.0, calcium_level: 0.0, vesicles_pool: 0.0,
         refractory_time_left: 0.0, last_spike_tick: 0, spikes_in_last_window: 0, predictive_ticks: 0, metabolic_wear: 0,

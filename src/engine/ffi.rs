@@ -32,7 +32,7 @@ pub struct BaseNeuron {
     pub id: u32,
     pub type_: u8,            // NeuronType
     pub death_reason: u8,
-    pub is_alive: bool,
+    pub is_alive: u8,
     pub internal_phase: u8,
     
     pub spike_trace: f32, // Replaces `size` to keep strict 128-byte layout

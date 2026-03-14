@@ -33,7 +33,7 @@ impl NetworkGraph {
         let mut alive_count = 0;
         
         for n in &self.neurons {
-            if n.is_alive {
+            if n.is_alive == 1 {
                 total_wear += n.metabolic_wear as f32;
                 alive_count += 1;
             }
@@ -54,7 +54,7 @@ impl NetworkGraph {
 
         // Consolidation & Recovery
         for n in &mut self.neurons {
-            if n.is_alive {
+            if n.is_alive == 1 {
                 n.metabolic_wear = 0;
                 n.energy_atp = n.max_atp;
                 n.calcium_level = 0.0;
@@ -141,7 +141,7 @@ impl NetworkGraph {
             id,
             type_: type_ as u8,
             death_reason: 0,
-            is_alive: true,
+            is_alive: 1,
             internal_phase: 0,
             spike_trace: 0.0,
             current_voltage: 0.0,
@@ -248,7 +248,7 @@ impl NetworkGraph {
         
         // 2. Supply ATP to hard working neurons (Only if alive and low ATP)
         self.neurons.par_iter_mut().for_each(|neuron| {
-            if neuron.is_alive && neuron.energy_atp < ASTROCYTE_CLEAN_THRESHOLD {
+            if neuron.is_alive == 1 && neuron.energy_atp < ASTROCYTE_CLEAN_THRESHOLD {
                 neuron.energy_atp = f32::min(neuron.max_atp, neuron.energy_atp + ASTROCYTE_ATP_SUPPLY);
             }
             
@@ -269,7 +269,7 @@ impl NetworkGraph {
             unsafe {
                 let src_alive = (*neurons_ptr.add(s.source_id as usize)).is_alive;
                 let dst_alive = (*neurons_ptr.add(s.target_id as usize)).is_alive;
-                src_alive && dst_alive
+                src_alive == 1 && dst_alive == 1
             }
         });
     }
@@ -306,7 +306,7 @@ impl NetworkGraph {
             let n_target = &self.neurons[j];
 
             // 1. Metabolic Check: Can source afford to grow? (ATP > 40)
-            if !n_source.is_alive || !n_target.is_alive || n_source.energy_atp < 40.0 { continue; } 
+            if n_source.is_alive == 0 || n_target.is_alive == 0 || n_source.energy_atp < 40.0 { continue; } 
 
             // Hard Limit: Max outgoing synapses per neuron (Phase 37) using O(1) lookup
             if outgoing_counts[i] >= MAX_SYNAPSES_PER_NEURON { continue; }

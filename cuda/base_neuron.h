@@ -186,7 +186,7 @@ typedef struct alignas(64) {
     uint32_t id;
     uint8_t type;             // 1 byte: NeuronType
     uint8_t death_reason;     // 1 byte
-    bool is_alive;            // 1 byte
+    uint8_t is_alive;         // 1 byte (1=true, 0=false)            // 1 byte
     uint8_t internal_phase;   // 1 byte: Internal clock for phase resonance
     
     float spike_trace;

@@ -90,7 +90,7 @@ static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t cu
 
 // Atomic function: Apoptosis / Death Handler
 static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
-    n->is_alive = false;
+    n->is_alive = 0;
     n->death_reason = reason;
     n->current_voltage = 0.0f;
     n->energy_ATP = 0.0f;
@@ -106,7 +106,7 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) 
         n->dead_ticks += 1;
         if (n->dead_ticks >= 1000) {
             // Phoenix Resurrection
-            n->is_alive = true;
+            n->is_alive = 1;
             n->calcium_level = 0.0f;
             n->energy_ATP = n->max_atp;
             n->current_voltage = n->resting_voltage;
@@ -526,7 +526,7 @@ extern "C" {
             neuron->dead_ticks += 1;
             if (neuron->dead_ticks >= 1000) {
                 // Phoenix Resurrection
-                neuron->is_alive = true;
+                neuron->is_alive = 1;
                 neuron->calcium_level = 0.0f;
                 neuron->energy_ATP = neuron->max_atp;
                 neuron->current_voltage = neuron->resting_voltage;
@@ -614,7 +614,7 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->last_spike_tick = 0;
     neuron->spikes_in_last_window = 0;
     neuron->metabolic_wear = 0; // 0.0f packed
-    neuron->is_alive = true;
+    neuron->is_alive = 1;
     neuron->death_reason = DEATH_NONE;
     neuron->internal_phase = 0;
     neuron->dead_ticks = 0;
