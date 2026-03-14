@@ -12,24 +12,18 @@
         }
         canvas { display: block; }
 
-        /* Контейнер для всех панелей */
         #ui-layer {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            width: 280px;
-            pointer-events: none; /* Пропускает клики сквозь пустые места */
-            display: flex;
-            flex-direction: column;
-            gap: 10px; /* Отступ между блоками */
+            top: 10px; left: 10px; width: 280px;
+            pointer-events: none; display: flex;
+            flex-direction: column; gap: 10px;
         }
 
-        /* Общий стиль для всех панелей */
         .panel {
             background: rgba(0, 15, 0, 0.9);
             border: 1px solid #4ade80;
             padding: 12px;
-            pointer-events: auto; /* ВКЛЮЧАЕМ КЛИКИ ДЛЯ ПАНЕЛЕЙ */
+            pointer-events: auto;
             box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);
             font-size: 12px;
             text-transform: uppercase;
@@ -38,20 +32,30 @@
         .label { font-weight: bold; color: #86efac; }
         #status { font-weight: bold; color: #4ade80; }
 
-        /* Стили для контролов */
         .control-group { margin-top: 10px; }
         .control-group label { display: block; font-size: 10px; margin-bottom: 4px; }
         .val-display { float: right; color: #fff; font-weight: bold; }
         input[type=range] { width: 100%; cursor: pointer; accent-color: #4ade80; }
 
-        /* Стили для логов */
         #log-container {
-            max-height: 150px;
-            overflow-y: auto;
-            font-size: 10px;
-            border-color: rgba(74, 222, 128, 0.4);
+            max-height: 120px; overflow-y: auto; font-size: 10px;
         }
-        #logs div { margin-bottom: 2px; border-bottom: 1px solid rgba(0,255,0,0.05); }
+
+        #legend-panel {
+            position: absolute;
+            bottom: 10px; left: 10px; width: 260px;
+            background: rgba(0, 10, 0, 0.9);
+            border: 1px solid #4ade80;
+            padding: 10px;
+            pointer-events: auto;
+            z-index: 100;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        .legend-item { display: flex; align-items: center; margin-bottom: 4px; color: #ccc; }
+        .color-dot { width: 10px; height: 10px; margin-right: 8px; border-radius: 2px; }
+        .desc { color: #666; margin-left: 5px; text-transform: none; }
+        .pop-count { color: #4ade80; font-weight: bold; margin-left: auto; }
     </style>
 </head>
 <body>
@@ -60,31 +64,36 @@
             <div><span class="label">ENGINE:</span> NEUROMORPHIC v0.3.7</div>
             <div id="status">Status: CONNECTING...</div>
             <div id="tick">Tick: 0</div>
-            <div id="neurons">Neurons: 0</div>
-            <div id="synapses">Synapses: 0</div>
+            <hr style="border: 0; border-top: 1px solid rgba(74, 222, 128, 0.2); margin: 5px 0;">
+            <div><span class="label">NEURONS:</span> <span id="neurons">0</span></div>
+            <div><span class="label">SYNAPSES:</span> <span id="synapses">0</span></div>
+            <div><span class="label" style="color: #ff4444;">DECEASED:</span> <span id="dead-count">0</span></div>
+            <div><span class="label" style="color: #fff;">SPIKE RATE:</span> <span id="spike-rate">0</span></div>
         </div>
 
         <div class="panel">
-            <div style="color: #aaa; margin-bottom: 8px; font-size: 10px;">-- CHEMICAL MODULATION --</div>
-            
             <div class="control-group">
                 <label>DOPAMINE: <span id="v-dopamine" class="val-display">1.0</span></label>
                 <input type="range" id="inp-dopamine" min="0.1" max="10.0" step="0.1" value="1.0">
             </div>
-
             <div class="control-group">
                 <label>LEARNING RATE: <span id="v-lr" class="val-display">0.1</span></label>
                 <input type="range" id="inp-lr" min="0.0" max="1.0" step="0.01" value="0.1">
             </div>
-
-            <div style="margin-top: 10px; color: #666; font-size: 9px;">
-                [LMB] ROTATE | [RMB] PAN | [WHEEL] ZOOM
-            </div>
         </div>
 
         <div class="panel" id="log-container">
-            <div style="color: #aaa; margin-bottom: 4px;">-- SYSTEM LOGS --</div>
             <div id="logs"></div>
+        </div>
+    </div>
+
+    <div id="legend-panel">
+        <div style="color: #4ade80; margin-bottom: 8px; border-bottom: 1px solid #4ade80; padding-bottom: 3px;">
+            -- NEURAL ENTITY LEGEND --
+        </div>
+        <div id="legend-content"></div>
+        <div style="margin-top: 5px; color: #ffaa00; font-size: 9px; border-top: 1px solid #333; padding-top: 3px;">
+            WHITE FLASH: ACTION POTENTIAL (SPIKE)
         </div>
     </div>
 
@@ -92,32 +101,21 @@
     <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        // --- Глобальные переменные и WebSocket ---
         let ws;
-        let currentEnv = {
-            dopamine: 1.0,
-            lr: 0.1
-        };
+        let currentEnv = { dopamine: 1.0, lr: 0.1 };
         const nodeMap = new Map();
         let neuronMeshes = [];
         let synapseLines, pulseSystem;
         const activePulses = [];
 
-        // Цветовая палитра по типам
         const TYPE_COLORS = {
-            0: new THREE.Color(0x00aaff), // Pyramidal - Голубой
-            1: new THREE.Color(0x44ff44), // Bipolar - Зеленый
-            2: new THREE.Color(0xffaa00), // Interneuron - Оранжевый
-            3: new THREE.Color(0xff00ff), // Pacemaker - Маджента
-            4: new THREE.Color(0xff4444), // Purkinje - Красный
-            5: new THREE.Color(0xffff00), // Photoreceptor - Золотой
-            6: new THREE.Color(0x00ffff), // Nociceptor - Циан
-            dead: new THREE.Color(0x220000) // Тёмно-красный (труп)
+            0: new THREE.Color(0x00aaff), 1: new THREE.Color(0x44ff44),
+            2: new THREE.Color(0xffaa00), 3: new THREE.Color(0xff00ff),
+            4: new THREE.Color(0xff4444), 5: new THREE.Color(0xffff00),
+            6: new THREE.Color(0x00ffff), dead: new THREE.Color(0x220000)
         };
 
-        const MAX_PULSES = 3000;      
-        const PULSE_SPEED = 0.015;     
-        const VISUAL_SAMPLING = 0.3;   
+        const MAX_PULSES = 3000, PULSE_SPEED = 0.015, VISUAL_SAMPLING = 0.3;
         const pulsePositions = new Float32Array(MAX_PULSES * 3);
         const pulseGeometry = new THREE.BufferGeometry();
         pulseGeometry.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3));
@@ -126,280 +124,187 @@
         const _tempColor = new THREE.Color();
         const _dummy = new THREE.Object3D();
 
-        function logMsg(msg) {
-            const logs = document.getElementById('logs');
-            if (!logs) return;
-            const div = document.createElement('div');
-            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logs.prepend(div);
-            while (logs.children.length > 20) logs.removeChild(logs.lastChild);
-        }
-
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 10000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         camera.position.set(0, 0, 200);
-        controls.enableDamping = true;
 
         function createGlowTexture() {
             const canvas = document.createElement('canvas');
             canvas.width = 64; canvas.height = 64;
             const ctx = canvas.getContext('2d');
             const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-            gradient.addColorStop(0, 'rgba(255,255,255,1)');
-            gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-            gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
-            gradient.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 64, 64);
+            gradient.addColorStop(0, 'white'); gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient; ctx.fillRect(0, 0, 64, 64);
             return new THREE.CanvasTexture(canvas);
         }
         const glowTexture = createGlowTexture();
 
         function initNetwork(data) {
-            neuronMeshes.forEach(m => {
-                scene.remove(m.mesh);
-                m.mesh.geometry.dispose();
-                m.mesh.material.dispose();
-            });
+            neuronMeshes.forEach(m => scene.remove(m.mesh));
             neuronMeshes = [];
-            if (synapseLines) {
-                scene.remove(synapseLines);
-                synapseLines.geometry.dispose();
-                synapseLines.material.dispose();
-            }
+            if (synapseLines) scene.remove(synapseLines);
             if (pulseSystem) scene.remove(pulseSystem);
-            
             nodeMap.clear();
             activePulses.length = 0;
 
             const counts = {};
-            data.neurons.forEach(n => {
-                const type = n[4];
-                counts[type] = (counts[type] || 0) + 1;
-            });
+            data.neurons.forEach(n => counts[n[4]] = (counts[n[4]] || 0) + 1);
 
-            const geometries = {
-                5: new THREE.TetrahedronGeometry(2),
-                4: new THREE.OctahedronGeometry(2),
-                3: new THREE.BoxGeometry(3, 3, 3),
-                default: new THREE.SphereGeometry(1.5, 8, 8)
-            };
-
-            Object.keys(counts).forEach(typeStr => {
-                const type = parseInt(typeStr);
-                const mesh = new THREE.InstancedMesh(
-                    geometries[type] || geometries.default, 
-                    new THREE.MeshBasicMaterial({ color: 0xffffff }), 
-                    counts[type]
-                );
-                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            const geometries = { 5: new THREE.TetrahedronGeometry(2), 4: new THREE.OctahedronGeometry(2), 3: new THREE.BoxGeometry(3,3,3), default: new THREE.SphereGeometry(1.5,8,8) };
+            
+            Object.keys(counts).forEach(t => {
+                const mesh = new THREE.InstancedMesh(geometries[t] || geometries.default, new THREE.MeshBasicMaterial({color: 0xffffff}), counts[t]);
                 scene.add(mesh);
-                neuronMeshes.push({ type, mesh, currentIndex: 0 });
+                neuronMeshes.push({ type: parseInt(t), mesh, currentIndex: 0 });
             });
 
             data.neurons.forEach(n => {
                 const id = n[0], type = n[4];
-                const SPACE = 100.0, HALF = 50.0;
-                let x = (n[1] / 65535.0) * SPACE - HALF;
-                let y = (n[2] / 65535.0) * SPACE - HALF;
-                let z = (n[3] / 65535.0) * SPACE - HALF;
-
-                if (type === 5) x = -75.0; 
-                else if (type === 4) x = 75.0;
-                else if (type === 0 || type === 3) x = -10.0 + (Math.random() * 20 - 10);
-
-                const meshData = neuronMeshes.find(m => m.type === type);
-                if (meshData) {
-                    _dummy.position.set(x, y, z);
-                    _dummy.updateMatrix();
-                    meshData.mesh.setMatrixAt(meshData.currentIndex, _dummy.matrix);
-                    
-                    const baseColor = TYPE_COLORS[type] || TYPE_COLORS[0];
-                    meshData.mesh.setColorAt(meshData.currentIndex, baseColor);
-                    
-                    nodeMap.set(id, { 
-                        x, y, z, type, 
-                        meshIdx: meshData.currentIndex, 
-                        outgoing: [],
-                        visualActivity: 0,
-                        isAlive: true 
-                    });
-                    meshData.currentIndex++;
+                let x = (n[1]/65535)*100-50, y = (n[2]/65535)*100-50, z = (n[3]/65535)*100-50;
+                if(type===5) x=-75; else if(type===4) x=75;
+                const mData = neuronMeshes.find(m => m.type === type);
+                if(mData) {
+                    _dummy.position.set(x,y,z); _dummy.updateMatrix();
+                    mData.mesh.setMatrixAt(mData.currentIndex, _dummy.matrix);
+                    mData.mesh.setColorAt(mData.currentIndex, TYPE_COLORS[type]);
+                    nodeMap.set(id, { x, y, z, type, meshIdx: mData.currentIndex, outgoing: [], visualActivity: 0, isAlive: true });
+                    mData.currentIndex++;
                 }
             });
             neuronMeshes.forEach(m => m.mesh.instanceMatrix.needsUpdate = true);
 
-            if (data.synapses && data.synapses.length > 0) {
+            if (data.synapses) {
                 const pos = new Float32Array(data.synapses.length * 6);
                 const col = new Float32Array(data.synapses.length * 6);
-                
                 data.synapses.forEach((syn, i) => {
-                    const src = nodeMap.get(syn[0]), tgt = nodeMap.get(syn[1]);
-                    const weight = syn[2] || 1.0;
-                    if (src && tgt) {
-                        const idx = i * 6;
-                        pos[idx] = src.x; pos[idx+1] = src.y; pos[idx+2] = src.z;
-                        pos[idx+3] = tgt.x; pos[idx+4] = tgt.y; pos[idx+5] = tgt.z;
-                        
-                        const intensity = Math.min(weight / 5.0, 1.0);
-                        _tempColor.setHSL(0.55, 0.8, 0.1 + intensity * 0.4);
-                        col[idx] = col[idx+3] = _tempColor.r;
-                        col[idx+1] = col[idx+4] = _tempColor.g;
-                        col[idx+2] = col[idx+5] = _tempColor.b;
-                        
-                        src.outgoing.push({ targetId: syn[1], weight: weight });
+                    const s = nodeMap.get(syn[0]), t = nodeMap.get(syn[1]);
+                    if (s && t) {
+                        const idx = i*6;
+                        pos[idx]=s.x; pos[idx+1]=s.y; pos[idx+2]=s.z; pos[idx+3]=t.x; pos[idx+4]=t.y; pos[idx+5]=t.z;
+                        _tempColor.setHSL(0.55, 0.8, 0.2);
+                        col[idx]=col[idx+3]=_tempColor.r; col[idx+1]=col[idx+4]=_tempColor.g; col[idx+2]=col[idx+5]=_tempColor.b;
+                        s.outgoing.push({ targetId: syn[1] });
                     }
                 });
-
                 const lineGeo = new THREE.BufferGeometry();
                 lineGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
                 lineGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-                synapseLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ 
-                    vertexColors: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending 
-                }));
+                synapseLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.2 }));
                 scene.add(synapseLines);
 
-                pulseSystem = new THREE.Points(pulseGeometry, new THREE.PointsMaterial({
-                    color: 0xccffef, size: 0.8, map: glowTexture, transparent: true, opacity: 0.9,
-                    blending: THREE.AdditiveBlending, depthWrite: false
-                }));
-                pulseSystem.frustumCulled = false;
+                pulseSystem = new THREE.Points(pulseGeometry, new THREE.PointsMaterial({ color: 0xccffef, size: 0.8, map: glowTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
                 scene.add(pulseSystem);
             }
+            buildLegend();
+        }
+
+        function updateLegendCounts() {
+            const counts = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, dead:0};
+            nodeMap.forEach(n => { if(!n.isAlive) counts.dead++; else counts[n.type]++; });
+            Object.keys(counts).forEach(t => {
+                const el = document.getElementById(`count-${t}`);
+                if(el) el.innerText = `[${counts[t]}]`;
+            });
         }
 
         function connect() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.host || '127.0.0.1';
-            ws = new WebSocket(`${protocol}//${host}/stream`);
-
-            ws.onopen = () => { 
-                logMsg("WebSocket Connected."); 
-                document.getElementById('status').innerText = "Status: ONLINE (STDP-READY)";
-                document.getElementById('status').style.color = "#4ade80";
-            };
-
-            ws.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
-                if (msg.type === 'InitialState') {
-                    initNetwork(msg.payload);
-                } else if (msg.type === 'TickUpdate') {
+            ws = new WebSocket(`ws://${window.location.host}/stream`);
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'InitialState') initNetwork(msg.payload);
+                else if (msg.type === 'TickUpdate') {
                     const data = msg.payload;
+                    let spikesToday = 0, deadToday = 0;
                     data.neurons.forEach(n => {
-                        const id = n[0], state = n[1], atp = n[2];
-                        const nData = nodeMap.get(id);
+                        const nData = nodeMap.get(n[0]);
                         if (nData) {
-                            if (atp <= 0) nData.isAlive = false;
-
-                            if (state === 2.0 && nData.isAlive) { 
-                                nData.visualActivity = 1.0; 
+                            if (n[2] <= 0 && nData.isAlive) { nData.isAlive = false; deadToday++; }
+                            if (n[1] === 2.0 && nData.isAlive) {
+                                spikesToday++; nData.visualActivity = 1.0;
                                 if (activePulses.length < MAX_PULSES) {
                                     nData.outgoing.forEach(syn => {
                                         if (Math.random() < VISUAL_SAMPLING && activePulses.length < MAX_PULSES) {
-                                            const tgt = nodeMap.get(syn.targetId);
-                                            if (tgt) activePulses.push({ s: nData, t: tgt, p: 0 });
+                                            const t = nodeMap.get(syn.targetId);
+                                            if (t) activePulses.push({ s: nData, t, p: 0 });
                                         }
                                     });
                                 }
                             }
                         }
                     });
+                    document.getElementById('spike-rate').innerText = spikesToday;
+                    document.getElementById('dead-count').innerText = parseInt(document.getElementById('dead-count').innerText) + deadToday;
                     document.getElementById('tick').innerText = `Tick: ${data.tick}`;
+                    document.getElementById('neurons').innerText = nodeMap.size;
+                    updateLegendCounts();
                 }
             };
-            ws.onclose = () => { setTimeout(connect, 2000); };
         }
 
         function animate() {
             requestAnimationFrame(animate);
-    
-            // Плавное остывание нейронов
             neuronMeshes.forEach(m => {
-                nodeMap.forEach((nData) => {
-                    const meshGroup = neuronMeshes.find(mesh => mesh.type === nData.type);
-                    if (meshGroup && meshGroup.mesh === m.mesh) {
-                        nData.visualActivity *= 0.94;
-                        
-                        if (!nData.isAlive) {
-                            _tempColor.copy(TYPE_COLORS.dead);
-                        } else {
-                            const baseColor = TYPE_COLORS[nData.type] || TYPE_COLORS[0];
-                            _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), nData.visualActivity);
-                        }
-                        m.mesh.setColorAt(nData.meshIdx, _tempColor);
+                nodeMap.forEach(n => {
+                    const mData = neuronMeshes.find(mesh => mesh.type === n.type);
+                    if (mData && mData.mesh === m.mesh) {
+                        n.visualActivity *= 0.94;
+                        if (!n.isAlive) _tempColor.copy(TYPE_COLORS.dead);
+                        else _tempColor.copy(TYPE_COLORS[n.type]).lerp(new THREE.Color(1,1,1), n.visualActivity);
+                        m.mesh.setColorAt(n.meshIdx, _tempColor);
                     }
                 });
                 m.mesh.instanceColor.needsUpdate = true;
             });
 
-            // Движение импульсов
             if (pulseSystem && activePulses.length > 0) {
-                const positions = pulseSystem.geometry.attributes.position.array;
+                const pos = pulseSystem.geometry.attributes.position.array;
                 for (let i = 0; i < MAX_PULSES; i++) {
-                    const idx = i * 3;
+                    const idx = i*3;
                     if (i < activePulses.length) {
-                        const pulse = activePulses[i];
-                        pulse.p += PULSE_SPEED;
-                        if (pulse.p >= 1.0) {
-                            activePulses.splice(i, 1);
-                            i--; continue;
-                        }
-                        positions[idx] = pulse.s.x + (pulse.t.x - pulse.s.x) * pulse.p;
-                        positions[idx+1] = pulse.s.y + (pulse.t.y - pulse.s.y) * pulse.p;
-                        positions[idx+2] = pulse.s.z + (pulse.t.z - pulse.s.z) * pulse.p;
-                    } else {
-                        positions[idx] = positions[idx+1] = positions[idx+2] = 10000;
-                    }
+                        const p = activePulses[i]; p.p += PULSE_SPEED;
+                        if (p.p >= 1.0) { activePulses.splice(i, 1); i--; continue; }
+                        pos[idx]=p.s.x+(p.t.x-p.s.x)*p.p; pos[idx+1]=p.s.y+(p.t.y-p.s.y)*p.p; pos[idx+2]=p.s.z+(p.t.z-p.s.z)*p.p;
+                    } else { pos[idx]=pos[idx+1]=pos[idx+2]=10000; }
                 }
                 pulseSystem.geometry.attributes.position.needsUpdate = true;
             }
-
             controls.update();
             renderer.render(scene, camera);
         }
 
-        connect();
-        animate();
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function buildLegend() {
+            const container = document.getElementById('legend-content');
+            container.innerHTML = '';
+            const names = {0:"PYRAMIDAL", 1:"BIPOLAR", 2:"INTERNEURON", 3:"PACEMAKER", 4:"PURKINJE", 5:"PHOTORECEPTOR", 6:"NOCICEPTOR", dead:"DEAD NEURON"};
+            Object.keys(TYPE_COLORS).forEach(k => {
+                const item = document.createElement('div'); item.className = 'legend-item';
+                item.innerHTML = `<div class="color-dot" style="background-color: #${TYPE_COLORS[k].getHexString()}"></div>
+                                  <span class="label">${names[k]}</span>
+                                  <span id="count-${k}" class="pop-count">[0]</span>`;
+                container.appendChild(item);
+            });
+        }
 
-        // Слушатель Дофамина
         document.getElementById('inp-dopamine').addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
             document.getElementById('v-dopamine').innerText = val.toFixed(1);
-            currentEnv.dopamine = val;
-            sendEnvUpdate();
+            if (ws) ws.send(JSON.stringify({ type: "UpdateEnvironment", payload: { dopamine_multiplier: val, stdp_learning_rate: currentEnv.lr } }));
         });
 
-        // Слушатель Скорости обучения
         document.getElementById('inp-lr').addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
             document.getElementById('v-lr').innerText = val.toFixed(2);
             currentEnv.lr = val;
-            sendEnvUpdate();
+            if (ws) ws.send(JSON.stringify({ type: "UpdateEnvironment", payload: { dopamine_multiplier: currentEnv.dopamine, stdp_learning_rate: val } }));
         });
 
-        // Функция отправки данных в движок
-        function sendEnvUpdate() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: "UpdateEnvironment",
-                    payload: {
-                        dopamine_multiplier: currentEnv.dopamine,
-                        stdp_learning_rate: currentEnv.lr
-                    }
-                }));
-            }
-        }
+        connect(); animate();
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
 </html>
