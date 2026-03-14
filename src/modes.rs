@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 // src/modes.rs
 use std::time::Instant;
 use tokio::sync::broadcast;
@@ -103,7 +104,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     graph
 }
 
-pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
+pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>, _shared_env: Arc<Mutex<crate::ffi::Environment>>) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
     let mut graph = if let Some(loaded_graph) = NetworkGraph::load_from_disk() {
         if loaded_graph.neurons.len() == neurons_count {
             println!("Awakening network from brain_save.bin...");
@@ -274,7 +275,15 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
         println!("\n>> Testing Scale: {} Neurons...", n);
         let s = n * 10;
         let start = Instant::now();
-        let _ = run_benchmark_mode(n, s, 500, None).await?;
+        let dummy_env = std::sync::Arc::new(std::sync::Mutex::new(crate::ffi::Environment {
+            global_oxygen_level: 100.0,
+            global_glucose_level: 100.0,
+            dopamine_multiplier: 1.0,
+            toxin_levels: 0.0,
+            light_level: 0.0,
+            stdp_learning_rate: 0.1,
+        }));
+        let _ = run_benchmark_mode(n, s, 500, None, dummy_env).await?;
         let elapsed = start.elapsed().as_secs_f64();
         let tps = 500.0 / elapsed;
         
@@ -993,7 +1002,7 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, shared_env: Arc<Mutex<crate::ffi::Environment>>) -> Result<(), Box<dyn std::error::Error>> {
     use crate::graph::NetworkGraph;
     use crate::ffi::{NeuronType, Environment, Synapse};
     
@@ -1053,7 +1062,15 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>) -> 
             graph.neurons[2].energy_atp = 100.0;
         }
 
-        graph.tick(tick, env.clone());
+        let current_env = {
+            if let Ok(env_guard) = shared_env.lock() {
+                env_guard.clone()
+            } else {
+                env.clone()
+            }
+        };
+        
+        graph.tick(tick, current_env);
         
         // Broadcast state
         if let Some(ref sender) = tx {

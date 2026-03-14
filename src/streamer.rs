@@ -1,8 +1,18 @@
-use serde::Serialize;
-use std::sync::Arc;
+use serde::{Serialize, Deserialize};
+use std::sync::{Arc, Mutex};
 use tokio::sync::{broadcast, RwLock};
 use warp::Filter;
 use futures_util::{StreamExt, SinkExt};
+
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type", content = "payload")]
+pub enum IncomingMsg {
+    UpdateEnvironment {
+        dopamine_multiplier: f32,
+        stdp_learning_rate: f32,
+    },
+}
 
 #[derive(Serialize, Clone)]
 #[serde(tag = "type", content = "payload")]
@@ -26,7 +36,7 @@ pub struct TickUpdatePayload {
     pub neurons: Vec<(u32, f32, f32)>, // id, visual_state, atp_pct
 }
 
-pub async fn start_server(tx: broadcast::Sender<String>) {
+pub async fn start_server(tx: broadcast::Sender<String>, shared_env: Arc<Mutex<crate::ffi::Environment>>) {
     let tx = Arc::new(tx);
     let tx_for_filter = tx.clone();
     let tx_for_bg = tx.clone();
@@ -48,13 +58,15 @@ pub async fn start_server(tx: broadcast::Sender<String>) {
     });
 
     let cache_filter = warp::any().map(move || Arc::clone(&initial_state_cache));
+    let env_filter = warp::any().map(move || Arc::clone(&shared_env));
 
     let stream_route = warp::path("stream")
         .and(warp::ws())
         .and(tx_filter)
         .and(cache_filter)
-        .map(|ws: warp::ws::Ws, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>| {
-            ws.on_upgrade(move |socket| handle_client(socket, tx, cache))
+        .and(env_filter)
+        .map(|ws: warp::ws::Ws, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>, shared_env: Arc<Mutex<crate::ffi::Environment>>| {
+            ws.on_upgrade(move |socket| handle_client(socket, tx, cache, shared_env))
         });
 
     let static_files = warp::fs::dir("visualizer");
@@ -66,9 +78,38 @@ pub async fn start_server(tx: broadcast::Sender<String>) {
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
 
-async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>) {
+async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String>>, cache: Arc<RwLock<Option<String>>>, shared_env: Arc<Mutex<crate::ffi::Environment>>) {
     let mut rx = tx.subscribe();
-    let (mut client_ws_sender, _) = ws.split();
+    let (mut client_ws_sender, mut client_ws_rcv) = ws.split();
+
+    
+    // Spawn task to receive messages from client
+    let env_for_rcv = shared_env.clone();
+    tokio::spawn(async move {
+        while let Some(result) = client_ws_rcv.next().await {
+            match result {
+                Ok(msg) => {
+                    if let Ok(text) = msg.to_str() {
+                        if let Ok(incoming) = serde_json::from_str::<IncomingMsg>(text) {
+                            match incoming {
+                                IncomingMsg::UpdateEnvironment { dopamine_multiplier, stdp_learning_rate } => {
+                                    if let Ok(mut env) = env_for_rcv.try_lock() {
+                                        env.dopamine_multiplier = dopamine_multiplier;
+                                        env.stdp_learning_rate = stdp_learning_rate;
+                                        println!("Chemistry updated: Dopamine x{}, LR: {}", dopamine_multiplier, stdp_learning_rate);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("Error receiving from websocket: {}", e);
+                    break;
+                }
+            }
+        }
+    });
 
     println!("New WebSocket client connected!");
 

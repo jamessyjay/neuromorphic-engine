@@ -13,6 +13,7 @@ use crate::visualization::*;
 use crate::graph::NetworkGraph;
 use tokio::sync::broadcast;
 use std::env;
+use std::sync::{Arc, Mutex};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,12 +54,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let (tx, _rx) = broadcast::channel(100);
+
+    // Shared Environment for UI updates
+    let default_env = crate::ffi::Environment {
+        global_oxygen_level: 100.0,
+        global_glucose_level: 100.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        stdp_learning_rate: 0.1,
+    };
+    let shared_env = Arc::new(Mutex::new(default_env));
+
     
     let tx_option = if is_ui_enabled || is_ui_test {
         println!("Spawning WebSocket server on port 3030...");
         let tx_clone = tx.clone();
+        let env_clone = shared_env.clone();
         tokio::spawn(async move {
-            crate::streamer::start_server(tx_clone).await;
+            crate::streamer::start_server(tx_clone, env_clone).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
         Some(tx)
@@ -72,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else if is_bench_io {
         modes::run_bench_io().await?;
     } else if is_ui_test {
-        modes::run_ui_test(tx_option.clone()).await?;
+        modes::run_ui_test(tx_option.clone(), shared_env.clone()).await?;
         println!("Simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
@@ -99,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
 
-        let data = run_benchmark_mode(parsed_neurons, parsed_synapses, parsed_ticks, tx_option).await?;
+        let data = run_benchmark_mode(parsed_neurons, parsed_synapses, parsed_ticks, tx_option, shared_env.clone()).await?;
         render_benchmark_chart(&data, "graphs/benchmark_load.png")?;
         return Ok(());
     }
