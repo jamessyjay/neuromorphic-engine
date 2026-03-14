@@ -53,25 +53,35 @@
 
     <script>
         // --- Глобальные переменные и WebSocket ---
-        let ws; // Вот он, родненький, теперь определён
+        let ws;
         const nodeMap = new Map();
         let neuronMeshes = [];
         let synapseLines, pulseSystem;
         const activePulses = [];
 
-        // --- Настройки производительности ---
-        const MAX_PULSES = 5000; 
-        const PULSE_SPEED = 0.04;
+        // Цветовая палитра по типам
+        const TYPE_COLORS = {
+            0: new THREE.Color(0x00aaff), // Pyramidal - Голубой
+            1: new THREE.Color(0x44ff44), // Bipolar - Зеленый
+            2: new THREE.Color(0xffaa00), // Interneuron - Оранжевый
+            3: new THREE.Color(0xff00ff), // Pacemaker - Маджента
+            4: new THREE.Color(0xff4444), // Purkinje - Красный
+            5: new THREE.Color(0xffff00), // Photoreceptor - Золотой
+            6: new THREE.Color(0x00ffff), // Nociceptor - Циан
+            dead: new THREE.Color(0x220000) // Тёмно-красный (труп)
+        };
+
+        const MAX_PULSES = 3000;      
+        const PULSE_SPEED = 0.015;     
+        const VISUAL_SAMPLING = 0.3;   
         const pulsePositions = new Float32Array(MAX_PULSES * 3);
         const pulseGeometry = new THREE.BufferGeometry();
         pulseGeometry.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3));
         pulseGeometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
 
-        // Вспомогательные объекты для расчётов (чтобы не плодить мусор)
         const _tempColor = new THREE.Color();
         const _dummy = new THREE.Object3D();
 
-        // Логгер
         function logMsg(msg) {
             const logs = document.getElementById('logs');
             if (!logs) return;
@@ -81,7 +91,6 @@
             while (logs.children.length > 20) logs.removeChild(logs.lastChild);
         }
 
-        // --- Three.js База ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -93,8 +102,22 @@
         camera.position.set(0, 0, 200);
         controls.enableDamping = true;
 
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
+            gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+        const glowTexture = createGlowTexture();
+
         function initNetwork(data) {
-            // Чистим старьё, освобождаем GPU
             neuronMeshes.forEach(m => {
                 scene.remove(m.mesh);
                 m.mesh.geometry.dispose();
@@ -112,7 +135,10 @@
             activePulses.length = 0;
 
             const counts = {};
-            data.neurons.forEach(n => { counts[n[4]] = (counts[n[4]] || 0) + 1; });
+            data.neurons.forEach(n => {
+                const type = n[4];
+                counts[type] = (counts[type] || 0) + 1;
+            });
 
             const geometries = {
                 5: new THREE.TetrahedronGeometry(2),
@@ -120,17 +146,19 @@
                 3: new THREE.BoxGeometry(3, 3, 3),
                 default: new THREE.SphereGeometry(1.5, 8, 8)
             };
-            const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
             Object.keys(counts).forEach(typeStr => {
                 const type = parseInt(typeStr);
-                const mesh = new THREE.InstancedMesh(geometries[type] || geometries.default, material.clone(), counts[type]);
+                const mesh = new THREE.InstancedMesh(
+                    geometries[type] || geometries.default, 
+                    new THREE.MeshBasicMaterial({ color: 0xffffff }), 
+                    counts[type]
+                );
                 mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
                 scene.add(mesh);
                 neuronMeshes.push({ type, mesh, currentIndex: 0 });
             });
 
-            // Твоя ювелирная расстановка слоёв
             data.neurons.forEach(n => {
                 const id = n[0], type = n[4];
                 const SPACE = 100.0, HALF = 50.0;
@@ -140,21 +168,29 @@
 
                 if (type === 5) x = -75.0; 
                 else if (type === 4) x = 75.0;
-                else if (type === 0 || type === 3) x = -10.0 + (Math.random() * 20 - 5);
+                else if (type === 0 || type === 3) x = -10.0 + (Math.random() * 20 - 10);
 
                 const meshData = neuronMeshes.find(m => m.type === type);
                 if (meshData) {
                     _dummy.position.set(x, y, z);
                     _dummy.updateMatrix();
                     meshData.mesh.setMatrixAt(meshData.currentIndex, _dummy.matrix);
-                    meshData.mesh.setColorAt(meshData.currentIndex, new THREE.Color(0x4ade80));
-                    nodeMap.set(id, { x, y, z, type, meshIdx: meshData.currentIndex, outgoing: [] });
+                    
+                    const baseColor = TYPE_COLORS[type] || TYPE_COLORS[0];
+                    meshData.mesh.setColorAt(meshData.currentIndex, baseColor);
+                    
+                    nodeMap.set(id, { 
+                        x, y, z, type, 
+                        meshIdx: meshData.currentIndex, 
+                        outgoing: [],
+                        visualActivity: 0,
+                        isAlive: true 
+                    });
                     meshData.currentIndex++;
                 }
             });
             neuronMeshes.forEach(m => m.mesh.instanceMatrix.needsUpdate = true);
 
-            // Синапсы с яркостью от веса
             if (data.synapses && data.synapses.length > 0) {
                 const pos = new Float32Array(data.synapses.length * 6);
                 const col = new Float32Array(data.synapses.length * 6);
@@ -168,9 +204,10 @@
                         pos[idx+3] = tgt.x; pos[idx+4] = tgt.y; pos[idx+5] = tgt.z;
                         
                         const intensity = Math.min(weight / 5.0, 1.0);
-                        _tempColor.setHSL(0.4, 0.8, 0.1 + intensity * 0.4);
-                        col[idx] = _tempColor.r; col[idx+1] = _tempColor.g; col[idx+2] = _tempColor.b;
-                        col[idx+3] = _tempColor.r; col[idx+4] = _tempColor.g; col[idx+5] = _tempColor.b;
+                        _tempColor.setHSL(0.55, 0.8, 0.1 + intensity * 0.4);
+                        col[idx] = col[idx+3] = _tempColor.r;
+                        col[idx+1] = col[idx+4] = _tempColor.g;
+                        col[idx+2] = col[idx+5] = _tempColor.b;
                         
                         src.outgoing.push({ targetId: syn[1], weight: weight });
                     }
@@ -180,13 +217,13 @@
                 lineGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
                 lineGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
                 synapseLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ 
-                    vertexColors: true, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending 
+                    vertexColors: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending 
                 }));
                 scene.add(synapseLines);
 
-                // Инициализируем систему импульсов
                 pulseSystem = new THREE.Points(pulseGeometry, new THREE.PointsMaterial({
-                    color: 0xffffff, size: 1.2, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending
+                    color: 0xccffef, size: 0.8, map: glowTexture, transparent: true, opacity: 0.9,
+                    blending: THREE.AdditiveBlending, depthWrite: false
                 }));
                 pulseSystem.frustumCulled = false;
                 scene.add(pulseSystem);
@@ -214,40 +251,50 @@
                         const id = n[0], state = n[1], atp = n[2];
                         const nData = nodeMap.get(id);
                         if (nData) {
-                            const mData = neuronMeshes.find(m => m.type === nData.type);
-                            if (state === 2.0) { // SPIKE!
-                                _tempColor.set(0xffffff);
-                                // Пускаем импульсы, если не превышен лимит
+                            if (atp <= 0) nData.isAlive = false;
+
+                            if (state === 2.0 && nData.isAlive) { 
+                                nData.visualActivity = 1.0; 
                                 if (activePulses.length < MAX_PULSES) {
                                     nData.outgoing.forEach(syn => {
-                                        if (activePulses.length < MAX_PULSES) {
+                                        if (Math.random() < VISUAL_SAMPLING && activePulses.length < MAX_PULSES) {
                                             const tgt = nodeMap.get(syn.targetId);
                                             if (tgt) activePulses.push({ s: nData, t: tgt, p: 0 });
                                         }
                                     });
                                 }
-                            } else {
-                                const h = atp / 100.0;
-                                _tempColor.setRGB((1-h)*0.8, h*0.6, h*0.4 + 0.2);
                             }
-                            mData.mesh.setColorAt(nData.meshIdx, _tempColor);
                         }
                     });
-                    neuronMeshes.forEach(m => m.mesh.instanceColor.needsUpdate = true);
                     document.getElementById('tick').innerText = `Tick: ${data.tick}`;
                 }
             };
-
-            ws.onclose = () => { 
-                logMsg("WS Closed. Reconnecting..."); 
-                document.getElementById('status').innerText = "Status: RECONNECTING...";
-                setTimeout(connect, 2000); 
-            };
+            ws.onclose = () => { setTimeout(connect, 2000); };
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            
+    
+            // Плавное остывание нейронов
+            neuronMeshes.forEach(m => {
+                nodeMap.forEach((nData) => {
+                    const meshGroup = neuronMeshes.find(mesh => mesh.type === nData.type);
+                    if (meshGroup && meshGroup.mesh === m.mesh) {
+                        nData.visualActivity *= 0.94;
+                        
+                        if (!nData.isAlive) {
+                            _tempColor.copy(TYPE_COLORS.dead);
+                        } else {
+                            const baseColor = TYPE_COLORS[nData.type] || TYPE_COLORS[0];
+                            _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), nData.visualActivity);
+                        }
+                        m.mesh.setColorAt(nData.meshIdx, _tempColor);
+                    }
+                });
+                m.mesh.instanceColor.needsUpdate = true;
+            });
+
+            // Движение импульсов
             if (pulseSystem && activePulses.length > 0) {
                 const positions = pulseSystem.geometry.attributes.position.array;
                 for (let i = 0; i < MAX_PULSES; i++) {
@@ -275,7 +322,6 @@
 
         connect();
         animate();
-
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
