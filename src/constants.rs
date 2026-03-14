@@ -57,13 +57,13 @@ pub const MYELIN_PROB: f64 = 0.2;
 /// Probability that a newly created excitatory neuron will be Pyramidal type
 pub const PYRAMIDAL_PROB: f64 = 0.7;
 
-// --- Biological Thresholds & Limits (СИНХРОНИЗИРОВАНО С base_neuron.h) ---
+// --- Biological Thresholds & Limits (SYNCHRONIZED WITH base_neuron.h) ---
 /// If a synapse's weight falls below this during sleep/cleanup, it gets pruned
 pub const PRUNING_WEIGHT_THRESHOLD: f32 = 0.1;
 /// If a synapse hasn't been active for this many ticks, it becomes a candidate for pruning
 pub const PRUNING_TICK_THRESHOLD: u32 = 2000;
 /// Absolute maximum weight any synapse can reach (Hard limit)
-pub const MAX_SYNAPSE_WEIGHT: f32 = 50.0; // ПОФИКСЕНО (было 30.0)
+pub const MAX_SYNAPSE_WEIGHT: f32 = 50.0; // FIXED (was 30.0)
 /// Engine hard limit on total number of synapses across the whole graph
 pub const MAX_SYNAPSES_TOTAL: usize = 1_000_000;
 /// Engine hard limit on maximum outgoing synapses from a single neuron
@@ -76,9 +76,9 @@ pub const MIN_SYNAPSE_WEIGHT_BENCHMARK: f32 = 0.5;
 /// Maximum metabolic energy (ATP) capacity for a healthy neuron
 pub const MAX_ATP: f32 = 100.0;
 /// ATP level below which a neuron enters a quiet 'sleep' state to recover
-pub const EMERGENCY_ATP_THRESHOLD: f32 = 20.0; // Порог засыпания (Silence)
+pub const EMERGENCY_ATP_THRESHOLD: f32 = 20.0; // Sleep threshold (Silence)
 /// ATP level below which a neuron permanently dies (apoptosis)
-pub const EMERGENCY_ATP_DEATH_THRESHOLD: f32 = 0.01; // Порог смерти
+pub const EMERGENCY_ATP_DEATH_THRESHOLD: f32 = 0.01; // Death threshold
 
 /// Amount of ATP provided by an astrocyte to a neuron per recovery cycle
 pub const ASTROCYTE_ATP_SUPPLY: f32 = 10.0;
@@ -89,7 +89,7 @@ pub const ASTROCYTE_CLEAN_AMOUNT: f32 = 10.0;
 
 // --- Physics (Mirrored from CUDA for initialization) ---
 /// Voltage multiplier/gain applied when an NMDA dendritic spike triggers
-pub const NMDA_SPIKE_GAIN: f32 = 5.0; // ПЕРЕИМЕНОВАНО (было NMDA_SPIKE_THRESHOLD)
+pub const NMDA_SPIKE_GAIN: f32 = 5.0; // RENAMED (was NMDA_SPIKE_THRESHOLD)
 /// Baseline resting membrane potential (mV) of a standard neuron
 pub const RESTING_VOLTAGE: f32 = -70.0;
 /// Membrane potential (mV) required to trigger an Action Potential
@@ -161,13 +161,13 @@ pub const METRIC_MAX_F32: f32 = 100.0;
 /// Y-axis minimum bound for plotting membrane voltage
 pub const VOLTAGE_MIN_F32: f32 = -90.0;
 /// Y-axis maximum bound for plotting membrane voltage
-pub const VOLTAGE_MAX_F32: f32 = 60.0; // ПОФИКСЕНО (чтобы графики не обрезали пики)
+pub const VOLTAGE_MAX_F32: f32 = 60.0; // FIXED (so charts don't clip peaks)
 /// Y-axis bound for plotting neurotransmitter buffer levels
 pub const BUFFER_MAX_F32: f32 = 20.0;
 /// Y-axis bound for plotting synaptic weights
-pub const WEIGHT_MAX_F32: f32 = 50.0; // ПОФИКСЕНО (совпадает с MAX_SYNAPSE_WEIGHT)
+pub const WEIGHT_MAX_F32: f32 = 50.0; // FIXED (matches MAX_SYNAPSE_WEIGHT)
 /// Y-axis bound for plotting global dopamine levels
-pub const DOPAMINE_MAX_F32: f32 = 8.0; // ПОФИКСЕНО (под твой хардкорный буст из stimulus.rs)
+pub const DOPAMINE_MAX_F32: f32 = 8.0; // FIXED (for hardcore boost from stimulus.rs)
 /// Time limit for testing emergent behaviors
 pub const EMERGENCE_TIME_LIMIT: f32 = 2000.0;
 /// Time limit for testing structural morphology changes
