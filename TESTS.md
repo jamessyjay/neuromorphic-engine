@@ -79,40 +79,41 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 
 ### STDP Tests (`test_stdp.rs`)
 
-- `test_stdp_trace_decay`: Validates correct decay of the `spike_trace` over time.
-- `test_stdp_ltp_causal_firing`: Tests Long-Term Potentiation (LTP) under causal firing conditions (Source -> Target).
-- `test_stdp_ltd_acausal_firing`: Tests Long-Term Depression (LTD) under acausal firing conditions (Target -> Source).
-- `test_stdp_dopamine_scaling`: Checks the scaling of the learning rate under high dopamine levels.
-- `test_stdp_weight_clamping`: Ensures synaptic weights do not exceed `MAX_SYNAPSE_WEIGHT` or drop below 0.01.
-- `test_stdp_associative_persistence_under_noise`: Hardcore stress test for Pavlovian associative persistence under heavy neural noise.
-- `bench_stdp_overhead`: Benchmarks the overhead of calculating STDP during simulation.
+- **41. Test "test_memory_layout_consistency":** Validates that CPU and GPU structs maintain identical memory alignment.
+- **42. Test "test_stdp_trace_decay":** Validates correct decay of the `spike_trace` over time.
+- **43. Test "test_stdp_ltp_causal_firing":** Tests Long-Term Potentiation (LTP) under causal firing conditions (Source -> Target).
+- **44. Test "test_stdp_ltd_acausal_firing":** Tests Long-Term Depression (LTD) under acausal firing conditions (Target -> Source).
+- **45. Test "test_stdp_dopamine_scaling":** Checks the scaling of the learning rate under high dopamine levels.
+- **46. Test "test_stdp_weight_clamping":** Ensures synaptic weights do not exceed `MAX_SYNAPSE_WEIGHT` or drop below 0.01.
+- **47. Test "test_stdp_associative_persistence_under_noise":** Hardcore stress test for Pavlovian associative persistence under heavy neural noise.
+- **48. Benchmark "bench_stdp_overhead":** Benchmarks the overhead of calculating STDP during simulation.
 
 ### Network Generation Tests (`network_generation_tests.rs`)
 
-- `test_network_generation_proportions`: Validates strict neural type proportions (Pyramidal 75%, Interneurons 15%, Sensors 4%, Motors 4%, Pacemakers 2%) and the generation of inhibitory (negative) weights for interneurons.
+- **49. Test "test_network_generation_proportions":** Validates strict neural type proportions (Pyramidal 75%, Interneurons 15%, Sensors 4%, Motors 4%, Pacemakers 2%) and the generation of inhibitory (negative) weights for interneurons.
 
 ### MMN v1.1 Validation Suite (neuron_physics_tests.rs)
 
-- **ATP-Gating (Starvation Filter)**: Ensures a starving neuron naturally increases its threshold and ignores weak stimuli.
-- **Phase Resonance (Internal Clock)**: Validates that signals propagating between neurons with matching internal phases are amplified, while opposite phases cause destructive interference (signal cancellation).
-- **Precise STDP (Targeted Dendritic Learning)**: Proves that learning (LTP) only happens on synapses connected to dendritic branches that actually contributed to a somatic spike.
-- **NMDA Multiplexing (Logical AND)**: Checks dendritic logic: distributed weak signals do not trigger a spike, whereas the exact same signals concentrated on one branch cross the `nmda_threshold` and force a somatic spike.
-- **The Matrix (Golden Master Snapshot)**: Generates and asserts a 100-tick lifecycle of a Pyramidal neuron to prevent any mathematical regressions in future engine updates.
+- **50. Test "ATP-Gating (Starvation Filter)":** Ensures a starving neuron naturally increases its threshold and ignores weak stimuli.
+- **51. Test "Phase Resonance (Internal Clock)":** Validates that signals propagating between neurons with matching internal phases are amplified, while opposite phases cause destructive interference (signal cancellation).
+- **52. Test "Precise STDP (Targeted Dendritic Learning)":** Proves that learning (LTP) only happens on synapses connected to dendritic branches that actually contributed to a somatic spike.
+- **53. Test "NMDA Multiplexing (Logical AND)":** Checks dendritic logic: distributed weak signals do not trigger a spike, whereas the exact same signals concentrated on one branch cross the `nmda_threshold` and force a somatic spike.
+- **54. Test "The Matrix (Golden Master Snapshot)":** Generates and asserts a 100-tick lifecycle of a Pyramidal neuron to prevent any mathematical regressions in future engine updates.
 
 ### Environment Regulator Tests (`regulator_tests.rs`)
 
-- `test_regulator_perfect_conditions`: Feeds perfect tick latencies (1.0ms) and ensures Oxygen and Glucose remain at 1.0 (100%).
-- `test_regulator_sudden_lag`: Feeds a single massive latency spike (10.0ms) and verifies Oxygen drops to 0.0 instantly, while Glucose remains high due to EMA smoothing.
-- `test_regulator_chronic_lag`: Simulates 500 ticks of chronic lag and verifies both Oxygen and Glucose hit rock bottom.
-- `test_homeostasis_loop_integration`: Integrates the regulator into a live simulation loop, mocks hardware lag, and verifies the environment state dynamically updates based on actual execution time.
+- **55. Test "test_regulator_perfect_conditions":** Feeds perfect tick latencies (1.0ms) and ensures Oxygen and Glucose remain at 1.0 (100%).
+- **56. Test "test_regulator_sudden_lag":** Feeds a single massive latency spike (10.0ms) and verifies Oxygen drops to 0.0 instantly, while Glucose remains high due to EMA smoothing.
+- **57. Test "test_regulator_chronic_lag":** Simulates 500 ticks of chronic lag and verifies both Oxygen and Glucose hit rock bottom.
+- **58. Test "test_homeostasis_loop_integration":** Integrates the regulator into a live simulation loop, mocks hardware lag, and verifies the environment state dynamically updates based on actual execution time.
 
 ## Block 8: Network Vitality & Diagnostics
 
 *Goal: Ensure the network stays dynamic, biological, and performs optimally.*
 
-- **Test "True Snapshot Integrity":** Creates a specific network topology and specific `Environment` levels (e.g. Oxygen 0.42). Serializes via `BrainSnapshot` and deserializes. Asserts that exact `current_tick` and `Environment` levels are perfectly preserved to prevent "Amnesia".
-- **Test "Performance Scaling TPS":** Runs network loads of varying sizes (up to 100k neurons / 1M synapses) for a small tick count. Verifies the Ticks Per Second (TPS) metric dynamically, preventing accidental inclusion of extremely slow logic in hot paths.
-- **Test "Circadian Startup Grace":** Simulates extreme hardware latency during the first 100 ticks. Asserts that the Environment Regulator maintains 1.0 oxygen (Grace Period). Fast-forwards to tick 600 with the same latency and asserts that hypoxia correctly triggers.
-- **Test "Thermal Noise Prevents Freezing":** Isolates a single Pyramidal neuron. Runs ticks without stimuli. Asserts `current_voltage` does not stagnate perfectly at `resting_voltage` but fluctuates due to biological thermal noise.
-- **Test "Phoenix Resurrection":** Artificially kills a neuron. Verifies it remains completely inactive for exactly 999 ticks. On tick 1000, asserts that the neuron revives, restores its ATP, and resumes `is_alive = true`.
-- **Test "HTM Predictive State Coincidence":** Validates Jeff Hawkins' active dendrites theory. Proves that contextual signals on Basal dendrites set the neuron into a "Predictive State" for 20 ticks. Verifies that a weak Proximal signal correctly triggers an action potential only while the predictive window is open (Coincidence Detection).
+- **59. Test "True Snapshot Integrity":** Creates a specific network topology and specific `Environment` levels (e.g. Oxygen 0.42). Serializes via `BrainSnapshot` and deserializes. Asserts that exact `current_tick` and `Environment` levels are perfectly preserved to prevent "Amnesia".
+- **60. Test "Performance Scaling TPS":** Runs network loads of varying sizes (up to 100k neurons / 1M synapses) for a small tick count. Verifies the Ticks Per Second (TPS) metric dynamically, preventing accidental inclusion of extremely slow logic in hot paths.
+- **61. Test "Circadian Startup Grace":** Simulates extreme hardware latency during the first 100 ticks. Asserts that the Environment Regulator maintains 1.0 oxygen (Grace Period). Fast-forwards to tick 600 with the same latency and asserts that hypoxia correctly triggers.
+- **62. Test "Thermal Noise Prevents Freezing":** Isolates a single Pyramidal neuron. Runs ticks without stimuli. Asserts `current_voltage` does not stagnate perfectly at `resting_voltage` but fluctuates due to biological thermal noise.
+- **63. Test "Phoenix Resurrection":** Artificially kills a neuron. Verifies it remains completely inactive for exactly 999 ticks. On tick 1000, asserts that the neuron revives, restores its ATP, and resumes `is_alive = true`.
+- **64. Test "HTM Predictive State Coincidence":** Validates Jeff Hawkins' active dendrites theory. Proves that contextual signals on Basal dendrites set the neuron into a "Predictive State" for 20 ticks. Verifies that a weak Proximal signal correctly triggers an action potential only while the predictive window is open (Coincidence Detection).
