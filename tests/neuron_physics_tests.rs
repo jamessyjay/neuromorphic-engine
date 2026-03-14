@@ -279,7 +279,7 @@ fn test_the_matrix_golden_master_snapshot() {
         });
     }
     
-    let golden_file_path = "tests/neuron_golden_state.json";
+    let golden_file_path = "reports/neuron_golden_state.json";
     
     if std::path::Path::new(golden_file_path).exists() {
         let mut file = File::open(golden_file_path).unwrap();

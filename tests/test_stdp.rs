@@ -78,6 +78,8 @@ fn test_stdp_ltp_causal_firing() {
 
     // Tick 5: Target fires
     graph.neurons[tgt as usize].current_voltage = 40.0;
+    graph.neurons[tgt as usize].last_spike_tick = 5;
+    graph.neurons[tgt as usize].branches[0].local_trace = 255;
     graph.tick(5, env.clone());
 
     let new_weight = graph.synapses[0].weight;
@@ -204,6 +206,8 @@ fn test_stdp_weight_clamping() {
     
     graph.neurons[tgt as usize].spikes_in_last_window = 10;
     graph.neurons[tgt as usize].current_voltage = 40.0;
+    graph.neurons[tgt as usize].last_spike_tick = 2;
+    graph.neurons[tgt as usize].branches[0].local_trace = 255;
     graph.tick(2, env.clone()); 
 
     let new_weight = graph.synapses[0].weight;
@@ -300,7 +304,7 @@ fn test_stdp_associative_persistence_under_noise() {
     env.dopamine_multiplier = 5.0;
     
     let mut tick = 1;
-    for _cycle in 0..100 {
+    for _cycle in 0..300 {
         // Tick T: Force spike in Group A (Source)
         for a in 0..=5 {
             graph.neurons[a as usize].current_voltage = 40.0;
@@ -320,6 +324,9 @@ fn test_stdp_associative_persistence_under_noise() {
             graph.neurons[b as usize].current_voltage = 40.0;
             graph.neurons[b as usize].energy_atp = 100.0;
             graph.neurons[b as usize].spikes_in_last_window = 10; // Prevent homeostatic penalty
+            graph.neurons[b as usize].last_spike_tick = tick;
+            graph.neurons[b as usize].branches[0].local_trace = 255;
+            graph.neurons[b as usize].branches[1].local_trace = 255;
         }
         graph.tick(tick, env.clone());
         tick += 1;

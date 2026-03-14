@@ -110,6 +110,7 @@ fn test_dopamine_amplification() {
     
     graph.neurons[tgt as usize].current_voltage = 40.0;
     graph.neurons[tgt as usize].last_spike_tick = 6;
+    graph.neurons[tgt as usize].branches[0].local_trace = 255; // MMN v1.1: Trace needed for STDP
     graph.tick(6, env.clone());
     
     

@@ -1,74 +1,74 @@
 # 🧠 Spec: Monolith Microchip Neuron (MMN v1.1 - Surgical Edition)
 
-Данная спецификация описывает интеграцию логики "Нейрона-микрочипа" (метаболический контроль, фазовая синхронизация, дендритная логика) в существующую биологически-достоверную архитектуру без изменения размера структур в памяти (Zero-Byte Growth).
+This specification describes the integration of the "Microchip Neuron" logic (metabolic gating, phase resonance, dendritic logic) into the existing biologically-plausible architecture without changing the memory layout sizes (Zero-Byte Growth).
 
-## 1. Структура памяти (Memory Layout)
+## 1. Memory Layout
 
-Общий размер `BaseNeuron` остается жестко привязанным к **128 байтам** (2 кэш-линии GPU). Мы используем существующие байты выравнивания (padding) для хранения новых параметров.
+The total size of `BaseNeuron` remains strictly tied to **128 bytes** (2 GPU cache lines). We utilize existing padding bytes to store the new parameters.
 
-### 1.1. Структура Ветки (Compartment)
+### 1.1. Branch Structure (Compartment)
 
-Размер: 8 байт (без изменений).
-Изменения: Замена 1 байта padding на `local_trace`.
+Size: 8 bytes (unchanged).
+Changes: Replaced 1 byte of padding with `local_trace`.
 
-| Параметр            | Тип      | Размер | Описание                                           |
+| Parameter           | Type     | Size   | Description                                        |
 |:--------------------|:---------|:-------|:---------------------------------------------------|
 | `branch_type`       | `u8`     | 1b     | 0=Empty, 1=Basal, 2=Trunk, 3=Tuft                  |
-| `refractory_timer`  | `u8`     | 1b     | Время "отдыха" ветки после локального спайка.      |
-| `voltage`           | `u16`    | 2b     | Fixed-point потенциал ветки.                       |
-| `nmda_threshold`    | `u16`    | 2b     | Fixed-point порог NMDA-спайка.                     |
-| `local_trace`       | `u8`     | 1b     | **Precise STDP:** След недавней активности ветки.  |
-| `_pad`              | `u8`     | 1b     | Выравнивание.                                      |
+| `refractory_timer`  | `u8`     | 1b     | "Rest" time of the branch after a local spike.     |
+| `voltage`           | `u16`    | 2b     | Fixed-point branch potential.                      |
+| `nmda_threshold`    | `u16`    | 2b     | Fixed-point threshold for NMDA spike.              |
+| `local_trace`       | `u8`     | 1b     | **Precise STDP:** Trace of recent branch activity. |
+| `_pad`              | `u8`     | 1b     | Alignment padding.                                 |
 
-### 1.2. Главная структура (BaseNeuron - выдержка изменений)
+### 1.2. Main Structure (BaseNeuron - selected changes)
 
-Размер: 128 байт (без изменений).
-Изменения: `_pad1` заменен на `internal_phase`.
+Size: 128 bytes (unchanged).
+Changes: `_pad1` replaced with `internal_phase`.
 
-| Параметр            | Тип      | Размер | Описание                                           |
+| Parameter           | Type     | Size   | Description                                        |
 |:--------------------|:---------|:-------|:---------------------------------------------------|
-| ...                 | ...      | ...    | Существующие поля (id, type_, is_alive, etc.)      |
-| `internal_phase`    | `u8`     | 1b     | **Internal Clock:** Внутренняя фаза (0-255).       |
-| ...                 | ...      | ...    | Существующие поля (voltage, ATP, x,y,z, etc.)      |
-| `branches`          | `Comp[8]`| 64b    | 8 дендритных веток (мультиплексор).                |
+| ...                 | ...      | ...    | Existing fields (id, type_, is_alive, etc.)        |
+| `internal_phase`    | `u8`     | 1b     | **Internal Clock:** Internal phase (0-255).        |
+| ...                 | ...      | ...    | Existing fields (voltage, ATP, x,y,z, etc.)        |
+| `branches`          | `Comp[8]`| 64b    | 8 dendritic branches (multiplexer).                |
 
 ---
 
-## 2. Основные механизмы (Реализация)
+## 2. Core Mechanisms (Implementation)
 
-### 2.1. Multiplexing (Дендритные логические вентили)
+### 2.1. Multiplexing (Dendritic Logic Gates)
 
-Встроенная архитектура `branches` используется как 8 независимых портов.
-Логика И-НЕ (AND) реализуется через NMDA-спайки:
+The built-in `branches` architecture is utilized as 8 independent input ports.
+The AND logic gate is implemented via NMDA spikes:
 
-* Слабые сигналы на ветке дают лишь пассивную утечку в сому.
-* При превышении `nmda_threshold` ветка генерирует мощный локальный спайк (`soma_impact = v * NMDA_SPIKE_GAIN`), который почти гарантированно пробивает порог сомы.
+* Weak signals on a branch only result in passive leak to the soma.
+* Upon exceeding `nmda_threshold`, the branch generates a powerful local spike (`soma_impact = v * NMDA_SPIKE_GAIN`), which is almost guaranteed to break the soma's threshold.
 
-### 2.2. ATP-Gating (Метаболический контроль порога)
+### 2.2. ATP-Gating (Metabolic Threshold Control)
 
-Динамическое повышение порога сомы при дефиците энергии.
+Dynamically increasing the soma's threshold during energy deficit.
 
-**Формула в `process_spike`:**
+**Formula in `process_spike`:**
 $$Ratio_{energy} = \max(0.01, \frac{ATP}{ATP_{max}})$$
 $$V_{threshold\_dynamic} = V_{threshold\_base} \cdot \left(1 + \beta \cdot (1 - Ratio_{energy})\right)$$
 
-*Где $\beta$ (`ATP_HUNGER_BETA` = 0.5) — коэффициент чувствительности к голоду. Голодный нейрон глух к слабому шуму.*
+*Where $\beta$ (`ATP_HUNGER_BETA` = 0.5) is the hunger sensitivity coefficient. A starving neuron becomes deaf to weak noise.*
 
-### 2.3. The Internal Clock (Фазовый резонанс)
+### 2.3. The Internal Clock (Phase Resonance)
 
-Каждый тик фаза нейрона сдвигается: $Phase = (Phase + 1) \pmod{256}$.
+Every tick, the neuron's phase shifts: $Phase = (Phase + 1) \pmod{256}$.
 
-При расчете `process_synapse` вычисляется линейная аппроксимация резонанса между Source и Target:
+During `process_synapse` calculation, a linear approximation of resonance between Source and Target is computed:
 $$Diff_{phase} = |Phase_{source} - Phase_{target}|$$
-*(С поправкой на круговое расстояние, макс. разница = 128)*
+*(Adjusted for circular distance, max difference = 128)*
 
 $$Multiplier_{phase} = 1.0 - \left(\frac{Diff_{phase}}{128}\right)$$
-Входящий сигнал умножается на $Multiplier_{phase}$. Синхронизированные нейроны передают 100% сигнала, в противофазе — 0%.
+The incoming signal is multiplied by $Multiplier_{phase}$. Synchronized neurons transmit 100% of the signal, whereas those in complete anti-phase transmit 0%.
 
-### 2.4. Precise STDP (Таргетированное обучение дендритов)
+### 2.4. Precise STDP (Targeted Dendritic Learning)
 
-Обучаются только те ветки, которые внесли вклад в активацию сомы.
+Only the branches that contributed to the soma's activation are trained.
 
-1. **Обновление Trace:** В `evaluate_branches` значение `local_trace` каждой ветки экспоненциально затухает каждый тик (например, `* 0.95`). Если ветка выдает NMDA-спайк, её `local_trace` устанавливается в 255.
-2. **STDP Application:** В `process_synapse` при расчете `delta_w` для LTP/LTD, изменение веса умножается на нормализованный след целевой ветки:
+1. **Trace Update:** In `evaluate_branches`, the `local_trace` value of each branch decays exponentially every tick (e.g., `* 0.95`). If a branch produces an NMDA spike, its `local_trace` is set to 255.
+2. **STDP Application:** In `process_synapse`, when calculating `delta_w` for LTP/LTD, the weight change is multiplied by the target branch's normalized trace:
     $$\Delta W_{final} = \Delta W \cdot \left(\frac{TargetBranch.local\_trace}{255}\right)$$

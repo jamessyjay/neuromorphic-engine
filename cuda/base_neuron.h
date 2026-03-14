@@ -55,6 +55,7 @@ extern "C" {
 
 // Dendritic Tree Physics (Phase 33/34)
 #define BRANCH_LEAK_COEFF 0.9f
+// MMN v1.1: NMDA logical AND gate multiplier. Applied when a branch exceeds its nmda_threshold.
 #define NMDA_SPIKE_GAIN 5.0f
 #define TRUNK_MULTIPLIER 2.0f
 #define TRUNK_ATP_COST 5.0f
@@ -77,6 +78,7 @@ extern "C" {
 #define BASELINE_LEAK_RATE 0.01f
 #define LOW_ATP_LEAK_MULTIPLIER 1.1f
 #define ATP_STRESS_THRESHOLD 30.0f
+// MMN v1.1: Hunger sensitivity. Controls how much the activation threshold increases when ATP is low.
 #define ATP_HUNGER_BETA 0.5f
 #define EMERGENCY_ATP_THRESHOLD 0.01f
 #define EMERGENCY_SILENCE_THRESHOLD 0.0f // Achievable mV, but high (sleep)

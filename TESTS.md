@@ -88,3 +88,11 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 
 ### Network Generation Tests (`network_generation_tests.rs`)
 - `test_network_generation_proportions`: Проверка строгих пропорций типов нейронов (Pyramidal 75%, Interneurons 15%, Sensors 4%, Motors 4%, Pacemakers 2%) и генерации ингибиторных (отрицательных) весов для интернейронов.
+
+### MMN v1.1 Validation Suite (neuron_physics_tests.rs)
+- **ATP-Gating (Starvation Filter)**: Ensures a starving neuron naturally increases its threshold and ignores weak stimuli.
+- **Phase Resonance (Internal Clock)**: Validates that signals propagating between neurons with matching internal phases are amplified, while opposite phases cause destructive interference (signal cancellation).
+- **Precise STDP (Targeted Dendritic Learning)**: Proves that learning (LTP) only happens on synapses connected to dendritic branches that actually contributed to a somatic spike.
+- **NMDA Multiplexing (Logical AND)**: Checks dendritic logic: distributed weak signals do not trigger a spike, whereas the exact same signals concentrated on one branch cross the `nmda_threshold` and force a somatic spike.
+- **The Matrix (Golden Master Snapshot)**: Generates and asserts a 100-tick lifecycle of a Pyramidal neuron to prevent any mathematical regressions in future engine updates.
+

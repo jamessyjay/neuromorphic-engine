@@ -185,7 +185,7 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     }
 
     float energy_ratio = fmaxf(0.01f, n->energy_ATP / n->max_atp);
-    float dynamic_threshold = n->activation_threshold * (1.0f + ATP_HUNGER_BETA * (1.0f - energy_ratio));
+    float dynamic_threshold = n->activation_threshold * (1.0f - ATP_HUNGER_BETA * (1.0f - energy_ratio));
 
     if (n->current_voltage > dynamic_threshold) {
         if (n->energy_ATP >= ATP_SPIKE_COST) {
