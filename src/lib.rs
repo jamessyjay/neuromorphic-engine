@@ -6,3 +6,5 @@ pub mod modes;
 pub mod telemetry;
 pub mod visualization;
 pub mod streamer;
+
+pub mod environment;
