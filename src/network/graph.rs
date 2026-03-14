@@ -263,9 +263,13 @@ impl NetworkGraph {
         
         // Retain only synapses where both endpoints are alive.
         // We use standard retain since we need mutable access to the vector, but we optimize the lookup.
+        let num_neurons = self.neurons.len();
         self.synapses.retain(|s| {
-            // Unsafe block is fine here because we only READ from the neurons array
-            // and we know the indices are within bounds (guaranteed by our graph construction)
+            // Safety Guard: Prevent out-of-bounds segfaults if the graph is modified
+            if s.source_id as usize >= num_neurons || s.target_id as usize >= num_neurons {
+                return false;
+            }
+            // Unsafe block is fine here because we just checked the bounds
             unsafe {
                 let src_alive = (*neurons_ptr.add(s.source_id as usize)).is_alive;
                 let dst_alive = (*neurons_ptr.add(s.target_id as usize)).is_alive;
@@ -337,6 +341,7 @@ impl NetworkGraph {
                         let branch_id = rng.random_range(0..8) as u8;
                         let is_inhib = rng.random_bool(0.1); 
                         self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
+                        outgoing_counts[i] += 1;
                         if current_tick % 1000 == 0 {
                             println!("NeuroGenesis: New synapse {} -> {} at tick {}", i, j, current_tick);
                         }
@@ -344,6 +349,9 @@ impl NetworkGraph {
                 }
             }
         }
+        
+        // Auto-Optimization: keep memory layout coalesced if synapses were added
+        self.optimize_memory_layout();
     }
 
     pub fn grow_dendritic_tree(&mut self, neuron_id: u32) {
