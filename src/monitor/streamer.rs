@@ -33,6 +33,8 @@ pub struct InitialStatePayload {
 pub struct TickUpdatePayload {
     pub tick: u32,
     pub total_spikes: u32,
+    pub global_oxygen: f32,
+    pub global_glucose: f32,
     pub neurons: Vec<(u32, f32, f32)>, // id, visual_state, atp_pct
 }
 

@@ -205,6 +205,8 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
                 let mut update = streamer::TickUpdatePayload {
                     tick,
                     total_spikes: accumulated_spikes as u32,
+                    global_oxygen: current_env.global_oxygen_level,
+                    global_glucose: current_env.global_glucose_level,
                     neurons: Vec::with_capacity(graph.neurons.len()),
                 };
                 for n in &graph.neurons {
@@ -382,6 +384,8 @@ pub async fn run_simulation(mut graph: NetworkGraph, total_ticks: u32, tx: Optio
                 let mut update = streamer::TickUpdatePayload {
                     tick,
                     total_spikes: 0,
+                    global_oxygen: current_env.global_oxygen_level,
+                    global_glucose: current_env.global_glucose_level,
                     neurons: Vec::with_capacity(graph.neurons.len()),
                 };
                 for n in &graph.neurons {
@@ -1123,6 +1127,8 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                 let mut update = crate::monitor::streamer::TickUpdatePayload {
                     tick,
                     total_spikes: 0,
+                    global_oxygen: env.global_oxygen_level,
+                    global_glucose: env.global_glucose_level,
                     neurons: Vec::new(),
                 };
                 for n in &graph.neurons {
