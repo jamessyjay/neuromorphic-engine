@@ -150,7 +150,7 @@ fn test_sensory_projection_accuracy() {
     let mut frame = vec![0.0; 1024];
     
     // 2. Light up pixel (0,0) which maps to index 0
-    frame[0] = 1.0;
+    for i in 0..102 { frame[i] = 1.0; } // Light up the entire patch for Column 0
     hub.update_frame(frame);
     
     // 3. Apply to graph (simulates stimulus injection)
