@@ -4,10 +4,9 @@ use std::sync::{Arc, Mutex};
 // src/modes.rs
 use std::time::Instant;
 use tokio::sync::broadcast;
-use crate::engine::ffi::NeuronType;
+use crate::engine::ffi::{NeuronType, Environment, Synapse};
 use crate::network::graph::NetworkGraph;
 
-use crate::engine::ffi::Environment;
 use crate::monitor::telemetry::Telemetry;
 use crate::network::stimulus;
 use crate::monitor::streamer;
@@ -991,7 +990,7 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING EMERGENCE FROM CHAOS (Phase 29) ---");
     let mut graph = NetworkGraph::new();
-    for _ in 0..500 { graph.add_neuron(NeuronType::Pyramidal); }
+    for _ in 0..crate::engine::constants::EMERGENCE_NETWORK_SIZE { graph.add_neuron(NeuronType::Pyramidal); }
     
     let mut current_env = Environment { 
         global_oxygen_level: DEFAULT_OXYGEN, 
@@ -1006,8 +1005,8 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut history = vec![];
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
-        if tick % 200 == 0 {
-            for i in 0..200 { graph.neurons[i].current_voltage += crate::engine::constants::VOLTAGE_INJECTION_STEP; }
+        if tick % crate::engine::constants::EMERGENCE_INJECTION_INTERVAL == 0 {
+            for i in 0..crate::engine::constants::EMERGENCE_INJECTION_TARGETS { graph.neurons[i as usize].current_voltage += crate::engine::constants::VOLTAGE_INJECTION_STEP; }
         }
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         graph.tick(tick, current_env);
@@ -1047,7 +1046,7 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
-        if tick % 25 == 0 { graph.neurons[source as usize].current_voltage += crate::engine::constants::VOLTAGE_EMERGENCE_INJECTION; }
+        if tick % crate::engine::constants::MORPHOLOGY_INJECTION_INTERVAL == 0 { graph.neurons[source as usize].current_voltage += crate::engine::constants::VOLTAGE_EMERGENCE_INJECTION; }
         graph.tick(tick, current_env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
@@ -1070,8 +1069,8 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
 pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
     println!("--- EXECUTING SCALABILITY BENCHMARKS ---");
-    let sizes = [1000, 2000, 4000, 8000, 16000];
-    let ticks = 50;
+    let sizes = crate::engine::constants::BENCHMARK_SCALING_SIZES;
+    let ticks = crate::engine::constants::BENCHMARK_SCALING_TICKS;
     
     let mut prev_time = 0.0;
     
@@ -1114,8 +1113,8 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
         
         if prev_time > 0.0 {
             let factor = elapsed / prev_time;
-            if factor > 2.5 {
-                println!("  [!] NON-LINEAR SCALING WARNING! Scale Factor: {:.2}x (Expected ~2.0x)", factor);
+            if factor > crate::engine::constants::BENCHMARK_MAX_DEGRADATION_FACTOR {
+                println!("⚠️ PERFORMANCE WARNING: Serialization factor {:.2}x exceeded safe threshold of {:.2}x!", factor, crate::engine::constants::BENCHMARK_MAX_DEGRADATION_FACTOR);
             } else {
                 println!("  -> OK: Scale Factor: {:.2}x", factor);
             }
@@ -1133,11 +1132,11 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
 
 pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
-    println!("--- EXECUTING SERIALIZATION STRESS TEST ---");
-    let intervals = [100, 50, 10, 5, 1];
-    let size = 1000;
-    let syn_count = 5000;
-    let ticks = 100;
+    println!("--- EXECUTING I/O LATENCY BENCHMARK ---");
+    let intervals = crate::engine::constants::BENCHMARK_IO_INTERVALS;
+    let size = crate::engine::constants::BENCH_STANDARD_SIZE;
+    let syn_count = crate::engine::constants::BENCH_STANDARD_SYNAPSES;
+    let ticks = crate::engine::constants::BENCH_STANDARD_TICKS;
     
     let mut graph = crate::network::graph::NetworkGraph::new();
     for _ in 0..size {
@@ -1184,19 +1183,14 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
         let tps = ticks as f64 / elapsed;
         
         println!("Interval: {:>3} | Time: {:.4}s | TPS: {:.2}", interval, elapsed, tps);
-        if tps < 500.0 {
-            println!("  [!] BOTTLENECK REACHED: TPS fell below 500!");
+        if tps < crate::engine::constants::BENCHMARK_MIN_ACCEPTABLE_TPS {
+            println!("⚠️ CRITICAL I/O BOTTLENECK DETECTED! TPS is {:.2}, expected > {:.2}", tps, crate::engine::constants::BENCHMARK_MIN_ACCEPTABLE_TPS);
         }
     }
     
     Ok(())
 }
-
-pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, shared_env: Arc<Mutex<crate::engine::ffi::Environment>>) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::network::graph::NetworkGraph;
-
-use crate::engine::ffi::Environment;
-    use crate::engine::ffi::{NeuronType, Synapse};
+pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, shared_env: std::sync::Arc<std::sync::Mutex<crate::engine::ffi::Environment>>) -> Result<(), Box<dyn std::error::Error>> {
     
     println!("--- EXECUTING UI TEST MODE ---");
     println!("Spawning a tiny predictable network to test visualizer functionality.");

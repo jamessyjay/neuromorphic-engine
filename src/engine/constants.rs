@@ -330,3 +330,31 @@ pub const DOPAMINE_PHASE_1_END: u32 = 200;
 pub const DOPAMINE_PHASE_2_END: u32 = 600;
 /// End tick for the recovery phase
 pub const DOPAMINE_PHASE_3_END: u32 = 1000;
+
+// --- Emergence & Morphology Test Constants ---
+/// Total number of neurons generated for chaos emergence testing
+pub const EMERGENCE_NETWORK_SIZE: u32 = 500;
+/// Number of neurons targeted for shock voltage injection in emergence tests
+pub const EMERGENCE_INJECTION_TARGETS: u32 = 200;
+/// Interval in ticks between periodic shock voltage injections
+pub const EMERGENCE_INJECTION_INTERVAL: u32 = 200;
+/// Interval in ticks between manual voltage bumps in morphology audits
+pub const MORPHOLOGY_INJECTION_INTERVAL: u32 = 25;
+
+// --- Backend Benchmark Constraints & Tolerances ---
+/// Acceptable performance degradation factor for memory serialization limits
+pub const BENCHMARK_MAX_DEGRADATION_FACTOR: f64 = 2.5;
+/// Minimum allowed Transactions Per Second (TPS) for engine health checks
+pub const BENCHMARK_MIN_ACCEPTABLE_TPS: f64 = 500.0;
+/// Standard benchmark test layout size for single-pass I/O and latency checks
+pub const BENCH_STANDARD_SIZE: usize = 1000;
+/// Standard benchmark synapse allocation count
+pub const BENCH_STANDARD_SYNAPSES: usize = 5000;
+/// Standard benchmark simulated tick duration
+pub const BENCH_STANDARD_TICKS: u32 = 100;
+/// List of network sizes to simulate iteratively during scalability benchmarking
+pub const BENCHMARK_SCALING_SIZES: [usize; 5] = [1000, 2000, 4000, 8000, 16000];
+/// Default number of ticks simulated in scaling benchmark sizes
+pub const BENCHMARK_SCALING_TICKS: u32 = 50;
+/// List of benchmark IO intervals to run serialization stress tests against
+pub const BENCHMARK_IO_INTERVALS: [u32; 5] = [100, 50, 10, 5, 1];
