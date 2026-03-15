@@ -198,7 +198,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         }
 
         if let Some(ref tx) = tx {
-            if tx.receiver_count() > 0 && tick == 1 {
+            if tx.receiver_count() > 0 && tick == start_tick + 1 {
                 let mut initial_state = streamer::InitialStatePayload {
                     total_neurons: graph.neurons.len(),
                     total_synapses: graph.synapses.len(),
@@ -382,7 +382,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
         graph.tick(tick, current_env);
         
         if let Some(ref tx) = tx {
-            if tick == 1 {
+            if tick == start_tick + 1 {
                 let mut initial_state = streamer::InitialStatePayload {
                     total_neurons: graph.neurons.len(),
                     total_synapses: graph.synapses.len(),
