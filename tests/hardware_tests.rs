@@ -260,19 +260,24 @@ fn test_true_snapshot_integrity() {
 
 #[test]
 fn test_performance_scaling_tps() {
-    println!("--- EXECUTING PERFORMANCE SCALING TPS TEST ---");
+    let mut output_buffer = String::new();
+    output_buffer.push_str("--- EXECUTING PERFORMANCE SCALING TPS TEST ---\n");
+    
+    // Reduced maximum scaling for unit testing to avoid running > 60 seconds
+    // Real benchmarks should be run via `cargo run --release -- --benchmark`
     let scales = vec![
         (2, 20),
         (10, 100),
         (100, 1000),
         (1000, 10_000),
         (10_000, 100_000),
-        (100_000, 1_000_000),
+        // Removed 100k neurons / 1M synapses from unit tests to prevent CI timeouts. 
+        // 10k neurons / 100k synapses is enough to prove scaling algorithm works.
     ];
-    let ticks = 50; // Use a smaller number of ticks for fast unit testing, but enough to measure TPS
+    let ticks = 50; 
 
-    println!("{:<15} | {:<15} | {:<15} | {:<15}", "Neurons", "Synapses", "Time (ms)", "TPS");
-    println!("{:-<15}-+-{:-<15}-+-{:-<15}-+-{:-<15}", "", "", "", "");
+    output_buffer.push_str(&format!("{:<15} | {:<15} | {:<15} | {:<15}\n", "Neurons", "Synapses", "Time (ms)", "TPS"));
+    output_buffer.push_str(&format!("{:-<15}-+-{:-<15}-+-{:-<15}-+-{:-<15}\n", "", "", "", ""));
 
     for (neurons, synapses) in scales {
         let mut graph = NetworkGraph::new();
@@ -308,9 +313,12 @@ fn test_performance_scaling_tps() {
             0
         };
 
-        println!("{:<15} | {:<15} | {:<15} | {:<15}", neurons, synapses, elapsed_ms, tps);
+        output_buffer.push_str(&format!("{:<15} | {:<15} | {:<15} | {:<15}\n", neurons, synapses, elapsed_ms, tps));
     }
-    println!("{:-<15}-+-{:-<15}-+-{:-<15}-+-{:-<15}", "", "", "", "");
+    output_buffer.push_str(&format!("{:-<15}-+-{:-<15}-+-{:-<15}-+-{:-<15}\n", "", "", "", ""));
+    
+    // Print everything at once to prevent interleaving with other multithreaded test outputs
+    print!("{}", output_buffer);
 }
 
 #[test]
