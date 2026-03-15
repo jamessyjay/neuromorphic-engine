@@ -182,3 +182,20 @@ fn test_sensory_projection_accuracy() {
     // Since pixel 0 maps only to column 0, the overall sparsity should be very low, definitely < 5-7%
     assert!(sparsity < 0.07, "SDR Sparsity violated! Expected < 7%, got {:.2}%", sparsity * 100.0);
 }
+
+#[test]
+fn test_topology_final_verification() {
+    let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 0);
+    
+    // 1. Check for clustering (columns shouldn't be all at the same X point)
+    let n0 = &graph.neurons[0];
+    let n9000 = &graph.neurons[9000];
+    assert!(n0.x != n9000.x, "Error: All columns are in the same X position!");
+
+    // 2. Check layers
+    let photoneuron = graph.neurons.iter().find(|n| n.layer_id == 4).unwrap();
+    assert_eq!(photoneuron.type_ as u8, 5, "Error: Layer 4 must consist of Photoreceptors!");
+
+    // 3. Check metadata mapping correctly
+    assert!(graph.neurons.iter().any(|n| n.column_id == 9), "Error: Column IDs are not assigned correctly!");
+}

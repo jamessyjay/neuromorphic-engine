@@ -25,7 +25,7 @@ pub enum StreamMessage {
 pub struct InitialStatePayload {
     pub total_neurons: usize,
     pub total_synapses: usize,
-    pub neurons: Vec<(u32, f32, f32, f32, u8, u16, u8, u8)>, // id, x, y, z, type, column_id, layer_id, minicolumn_id
+    pub neurons: Vec<(u32, f32, f32, f32, u8, u16, u8, u8, u32)>, // id, x, y, z, type, column_id, layer_id, minicolumn_id
     pub synapses: Vec<(u32, u32, f32)>,         // source_id, target_id, weight
 }
 

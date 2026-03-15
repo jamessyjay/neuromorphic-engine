@@ -68,7 +68,7 @@ pub fn generate_initial_state(graph: &NetworkGraph) -> streamer::InitialStatePay
         synapses: Vec::with_capacity(graph.synapses.len()),
     };
     for n in &graph.neurons {
-        initial_state.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_, n.column_id, n.layer_id, n.minicolumn_id));
+        initial_state.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_, n.column_id, n.layer_id, n.minicolumn_id, n.status_flags));
     }
     for s in &graph.synapses {
         initial_state.synapses.push((s.source_id, s.target_id, s.weight));
@@ -179,55 +179,50 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     let mut graph = NetworkGraph::new();
     let mut rng = rand::rng();
 
-    println!("Generating Benchmark Network (Cortical Columns v0.5.0): {} neurons, {} synapses...", neurons_count, synapses_count);
+    println!("Generating Benchmark Network (Cortical Columns v0.5.2): {} neurons, {} synapses...", neurons_count, synapses_count);
 
-    use crate::engine::constants::*;
-
-    // Validate that we are generating exactly what the architecture expects (if possible),
-    // but we'll adapt to user arguments if they differ (for tests).
-    // The specification mandates 10 columns * 1000 neurons, but for flexibility
-    // we'll use the requested neurons_count and distribute them across COLUMNS_COUNT.
-    let columns = COLUMNS_COUNT as usize;
+    let columns = 10;
+    // We strictly use 1000 per col to fit the mathematical requirements of v0.5.2.
+    // If the user requests exactly 1000 neurons, we assume they mean 10 columns of 100, but the spec says "1000 neurons per column".
+    // We will distribute the `neurons_count` evenly if it's not 10000, but let's stick to the spec's proportions.
     let neurons_per_col = neurons_count / columns;
-    let minicolumns_per_col = 50;
 
-    let spacing_x = COORD_SCALE / 5.0; // grid 5x2
-    let spacing_y = COORD_SCALE / 2.0;
-    
-    // Centers of the columns evenly distributed inside the 0..65535 space
-    let column_centers_x: Vec<f32> = (0..5).map(|i| (spacing_x / 2.0) + (i as f32 * spacing_x)).collect();
-    let column_centers_y: Vec<f32> = (0..2).map(|i| (spacing_y / 2.0) + (i as f32 * spacing_y)).collect();
-
-    for col_idx in 0..columns {
-        let center_x = column_centers_x[col_idx % 5];
-        let center_y = column_centers_y[col_idx / 5];
+    for col_id in 0..columns {
+        let center_x = ((col_id % 5) as f32) * 12000.0 + 10000.0;
+        let center_y = ((col_id / 5) as f32) * 20000.0 + 10000.0;
 
         for i in 0..neurons_per_col {
-            let (n_type, layer_id, z_min, z_max) = if i < 200 {
-                (NeuronType::Photoreceptor, 4, LAYER_4_Z_MIN, LAYER_4_Z_MAX) // L4
-            } else if i < 500 {
-                (NeuronType::Pyramidal, 6, LAYER_6_Z_MIN, LAYER_6_Z_MAX)     // L6
-            } else if i < 700 {
-                (NeuronType::Purkinje, 5, LAYER_5_Z_MIN, LAYER_5_Z_MAX)      // L5
+            // Distribute proportionally to 1000
+            // We'll normalize 'i' to a 0..1000 scale so the proportions hold even if neurons_per_col is smaller.
+            let proportion_idx = (i as f32 / neurons_per_col as f32 * 1000.0) as usize;
+
+            let (n_type, layer_id, z_min, z_max) = if proportion_idx < 300 {
+                (crate::engine::ffi::NeuronType::Pyramidal, 6, 0.0, 10000.0)
+            } else if proportion_idx < 500 {
+                (crate::engine::ffi::NeuronType::Purkinje, 5, 10001.0, 25000.0)
+            } else if proportion_idx < 700 {
+                (crate::engine::ffi::NeuronType::Photoreceptor, 4, 25001.0, 40000.0)
+            } else if proportion_idx < 950 {
+                (crate::engine::ffi::NeuronType::Pyramidal, 2, 40001.0, 60000.0)
             } else {
-                (NeuronType::Pyramidal, 2, LAYER_2_3_Z_MIN, LAYER_2_3_Z_MAX) // L2/3
+                (crate::engine::ffi::NeuronType::Interneuron, 1, 60001.0, 65535.0)
             };
 
             let _id = graph.add_neuron(n_type);
             let n_id = {
                 let n = graph.neurons.last_mut().unwrap();
 
-                n.column_id = col_idx as u16;
+                n.column_id = col_id as u16;
                 n.layer_id = layer_id as u8;
-                n.minicolumn_id = (i % minicolumns_per_col) as u8;
+                n.minicolumn_id = (i / 20) as u8;
 
-                // Coordinates (Cylinder)
-                let dx = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 5000.0;
-                let dy = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 5000.0;
+                // Local scatter
+                let dx = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
+                let dy = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
                 
                 n.x = (center_x + dx).clamp(0.0, 65535.0) as u16;
                 n.y = (center_y + dy).clamp(0.0, 65535.0) as u16;
-                n.z = rand::RngExt::random_range(&mut rng, z_min..=z_max);
+                n.z = rand::RngExt::random_range(&mut rng, z_min..=z_max) as u16;
                 
                 n.id
             };
@@ -299,6 +294,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             5 => assert!(n.z >= LAYER_5_Z_MIN && n.z <= LAYER_5_Z_MAX, "L5 Z mismatch"),
             4 => assert!(n.z >= LAYER_4_Z_MIN && n.z <= LAYER_4_Z_MAX, "L4 Z mismatch"),
             2 => assert!(n.z >= LAYER_2_3_Z_MIN && n.z <= LAYER_2_3_Z_MAX, "L2/3 Z mismatch"),
+            1 => assert!(n.z >= 60001 && n.z <= 65535, "L1 Z mismatch"),
             _ => panic!("Unknown layer ID {}", n.layer_id),
         }
     }
@@ -1201,7 +1197,7 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
                     synapses: Vec::with_capacity(graph.synapses.len()),
                 };
                 for n in &graph.neurons {
-                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_, n.column_id, n.layer_id, n.minicolumn_id));
+                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_, n.column_id, n.layer_id, n.minicolumn_id, n.status_flags));
                 }
                 for s in &graph.synapses {
                     snapshot.synapses.push((s.source_id, s.target_id, s.weight));
