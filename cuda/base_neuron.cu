@@ -54,6 +54,7 @@ __device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impac
         assumed = old;
         float current_v = unpack_voltage(assumed);
         current_v += voltage_impact;
+        current_v = fmaxf(-100.0f, fminf(current_v, 150.0f)); // Saturation limit (Spec 2.2)
         uint16_t new_val = pack_voltage(current_v);
         old = atomicCAS(address, assumed, new_val);
     } while (assumed != old);
@@ -66,6 +67,7 @@ static inline void atomic_add_packed_voltage(uint16_t* address, float voltage_im
     while (true) {
         float current_v = unpack_voltage(old);
         current_v += voltage_impact;
+        current_v = current_v > 150.0f ? 150.0f : (current_v < -100.0f ? -100.0f : current_v); // Saturation limit (Spec 2.2)
         uint16_t new_val = pack_voltage(current_v);
         if (atomic_addr->compare_exchange_weak(old, new_val, std::memory_order_relaxed)) {
             break;
@@ -129,8 +131,8 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     // Phase 40: Recovery (Asymptotic to max_atp)
     float atp_gap = n->max_atp - n->energy_ATP;
     if (atp_gap > 0.0f) {
-        // Recovery slows down as it reaches max_atp
-        n->energy_ATP += (ATP_RECOVERY_RATE * env.wakefulness_multiplier) * (atp_gap / (n->max_atp * 0.5f));
+        // Recovery slows down as it reaches max_atp, and is dependent on oxygen
+        n->energy_ATP += (ATP_RECOVERY_RATE * env.wakefulness_multiplier * env.global_oxygen_level) * (atp_gap / (n->max_atp * 0.5f));
     }
     
     if (n->energy_ATP > n->max_atp) {

@@ -36,6 +36,9 @@ pub struct TickUpdatePayload {
     pub global_oxygen: f32,
     pub global_glucose: f32,
     pub neurons: Vec<(u32, f32, f32)>, // id, visual_state, atp_pct
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub synapses: Option<Vec<(u32, u32, f32)>>, // source_id, target_id, weight
+    pub synapse_count: usize,
 }
 
 pub async fn start_server(tx: broadcast::Sender<String>, shared_env: Arc<Mutex<crate::engine::ffi::Environment>>) {

@@ -174,6 +174,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
     let mut telemetry = Telemetry::new();
     let mut accumulated_spikes = 0;
     let mut regulator = EnvironmentRegulator::new();
+    let mut last_synapse_count = graph.synapses.len();
 
     for tick in (start_tick + 1)..=(start_tick + total_ticks) {
         let tick_start = Instant::now();
@@ -221,12 +222,24 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
             }
 
             if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_BENCHMARK == 0 {
+                let current_synapse_count = graph.synapses.len();
+                let should_send_synapses = tick % 500 == 0 || current_synapse_count != last_synapse_count;
+                last_synapse_count = current_synapse_count;
+                
                 let mut update = streamer::TickUpdatePayload {
                     tick,
                     total_spikes: accumulated_spikes,
                     global_oxygen: current_env.global_oxygen_level,
                     global_glucose: current_env.global_glucose_level,
                     neurons: Vec::with_capacity(graph.neurons.len()),
+                    synapses: if should_send_synapses {
+                        let mut syn_vec = Vec::with_capacity(graph.synapses.len());
+                        for s in &graph.synapses {
+                            syn_vec.push((s.source_id, s.target_id, s.weight));
+                        }
+                        Some(syn_vec)
+                    } else { None },
+                    synapse_count: current_synapse_count,
                 };
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
@@ -375,6 +388,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
     
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut regulator = EnvironmentRegulator::new();
+    let mut last_synapse_count = graph.synapses.len();
 
     for tick in (start_tick + 1)..=(start_tick + total_ticks) {
         let tick_start = Instant::now();
@@ -406,12 +420,24 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
 
             if tick % WS_SNAPSHOT_INTERVAL_SIMULATION == 0 {
                 let mut accumulated_spikes = 0;
+                let current_synapse_count = graph.synapses.len();
+                let should_send_synapses = tick % 500 == 0 || current_synapse_count != last_synapse_count;
+                last_synapse_count = current_synapse_count;
+                
                 let mut update = streamer::TickUpdatePayload {
                     tick,
                     total_spikes: 0,
                     global_oxygen: current_env.global_oxygen_level,
                     global_glucose: current_env.global_glucose_level,
                     neurons: Vec::with_capacity(graph.neurons.len()),
+                    synapses: if should_send_synapses {
+                        let mut syn_vec = Vec::with_capacity(graph.synapses.len());
+                        for s in &graph.synapses {
+                            syn_vec.push((s.source_id, s.target_id, s.weight));
+                        }
+                        Some(syn_vec)
+                    } else { None },
+                    synapse_count: current_synapse_count,
                 };
                 for n in &graph.neurons {
                     if n.last_spike_tick == tick {
@@ -1185,6 +1211,8 @@ use crate::engine::ffi::Environment;
                     global_oxygen: env.global_oxygen_level,
                     global_glucose: env.global_glucose_level,
                     neurons: Vec::new(),
+                    synapses: None,
+                    synapse_count: graph.synapses.len(),
                 };
                 for n in &graph.neurons {
                     let state = if n.is_alive == 0 {
