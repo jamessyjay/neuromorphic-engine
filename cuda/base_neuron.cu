@@ -488,6 +488,21 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
     if (idx >= syn_count) return;
     
     Synapse* s = &synapses[idx];
+    
+#if __CUDA_ARCH__ >= 350
+    // Instruction 1.3 C: Use __ldg() for read-only access to neurons array
+    uint8_t src_alive = __ldg((const uint8_t*)&neurons[s->source_id].is_alive);
+    uint8_t tgt_alive = __ldg((const uint8_t*)&neurons[s->target_id].is_alive);
+#else
+    uint8_t src_alive = neurons[s->source_id].is_alive;
+    uint8_t tgt_alive = neurons[s->target_id].is_alive;
+#endif
+
+    if (!src_alive || !tgt_alive) {
+        s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
+        return;
+    }
+
     process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], env, current_tick);
 }
 #endif

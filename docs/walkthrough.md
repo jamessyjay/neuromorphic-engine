@@ -287,3 +287,10 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **True Snapshot Progression:** Corrected hardcoded `current_tick: 0` during saves. The engine now respects exactly which tick the simulation was paused on, saving `BrainSnapshot` with the accurate `tick` value, ensuring time isn't reset on a resume.
 - **RNG Initialization Optimization:** Passed `rand::rng` as a reference to `get_gaussian` and into generation functions to eliminate extremely heavy and redundant PRNG structural allocations during network generation.
 - **Strict Duplicate Pruning:** Hardened the `graph.connect()` method to scan `self.synapses` before insertion. If an identical pathway (`source_id`, `target_id`, `branch_id`) already exists, the function simply adds `weight` to the existing synapse instead of cloning a duplicate.
+
+## Phase 53: Overclocking & Micro-Optimizations
+
+**Summary:** 
+- **Bitwise Math:** Replaced modulo operator `% 256` with bitwise `& 0xFF` for `internal_phase` updates. This avoids expensive integer division instructions on the GPU.
+- **Loop Unrolling:** Added `#pragma unroll` to the `evaluate_branches` function in CUDA. Since `NUM_BRANCHES` is a fixed compile-time constant (8), this allows the compiler to flatten the loop and execute branch evaluations concurrently within the warp, skipping branch prediction overhead.
+- **LDG Read-Only Cache:** Deployed the `__ldg()` intrinsic for the early-exit checks in `tick_synapses_kernel`. By explicitly routing the `is_alive` state fetches for `source` and `target` neurons through the read-only data cache, we drastically reduce L1 bandwidth pressure during dense synaptic ticks.
