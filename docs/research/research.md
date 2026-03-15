@@ -1,190 +1,108 @@
-# **Deep Technical Audit of the SC-NeuroCore Neuromorphic System: Architecture, Mathematics, and Implementation Potential**
+# **Deep Technical Audit of the Neuromorphic Engine: Architecture, Biology, and Implementation Potential**
 
-The modern computing paradigm is undergoing a fundamental shift necessitated by the "bottleneck" of the von Neumann architecture. Constraints related to the separation of memory and processing units lead to significant energy losses and delays in real-time data processing. In this context, the SC-NeuroCore project (implemented within the neuromorphic-engine repository) represents an ambitious engineering solution that combines Stochastic Computing (SC), Spiking Neural Networks (SNN), and high-performance low-level backends in Rust and CUDA to create scalable neuromorphic hardware. This audit focuses on a detailed analysis of the scientific foundation, architectural decisions, and software implementation to determine the system's technological maturity and applicability in critical fields.
+The modern computing paradigm is undergoing a fundamental shift necessitated by the "bottleneck" of the von Neumann architecture. In this context, the Neuromorphic Engine represents an ambitious engineering solution that combines biologically plausible neural modeling, Spike-Timing-Dependent Plasticity (STDP), Homeostatic regulation, and high-performance low-level backends in Rust and CUDA to create a massively parallel, biologically accurate brain simulation. This audit focuses on a detailed analysis of the scientific foundation, architectural decisions, and software implementation to determine the system's technological maturity and applicability in computational neuroscience and AI research.
 
 ## **Scientific and Theoretical Foundation: Neurodynamics and Plasticity**
 
-The system's scientific base relies on two primary concepts of the biological brain: the temporal dynamics of individual neurons and local learning rules dependent on the timing of spikes. Unlike traditional neural networks, where information is transmitted as continuous activation values, SC-NeuroCore's spiking networks operate with discrete events — spikes — enabling unprecedented energy efficiency and biological plausibility.
+The system's scientific base relies on several core concepts of the biological brain: temporal dynamics of individual neurons, active dendritic computation, local learning rules dependent on spike timing, and global metabolic homeostasis. Unlike traditional artificial neural networks (ANNs), the Neuromorphic Engine operates with discrete spikes constrained by simulated metabolic resources (ATP, Oxygen, Glucose), enabling unprecedented biological plausibility.
 
-### **Mathematical Models of Neurons (LIF and Izhikevich)**
+### **Mathematical Models of Neurons (Metabolic Leaky Integrate-and-Fire)**
 
-The primary computational element of the system is the Leaky Integrate-and-Fire (LIF) neuron model. This model was chosen for its optimal balance between computational complexity and the ability to mimic basic functions of biological neurons. Mathematically, the membrane potential state $V(t)$ in the system is described by the following discrete equation implemented in the Rust core:
+The primary computational element of the system is a heavily augmented Leaky Integrate-and-Fire (LIF) model. Mathematically, the membrane potential state $V(t)$ is integrated continuously, but its ability to fire is strictly gated by metabolic constraints:
 
-$V(t+1) \= V(t) \+ \\frac{1}{\\tau\_m} \[I(t) \- (V(t) \- V\_{rest})\]$
+1. **ATP Gating:** A neuron must possess sufficient ATP to fire. Each action potential consumes a massive chunk of energy.
+2. **Calcium Toxicity:** Excessive firing leads to intracellular calcium buildup. If calcium thresholds are exceeded, the neuron dies.
+3. **Dynamic Thresholds:** As part of homeostatic plasticity, neurons experiencing high traffic dynamically raise their activation thresholds to prevent runaway excitation (seizures).
 
-Here, $\\tau\_m$ represents the membrane time constant, determining the rate of potential "leakage" toward the resting state $V\_{rest}$, and $I(t)$ is the total input current from synapses. When the potential reaches the threshold $V\_{th}$, a spike is generated, and the potential is reset to $V\_{reset}$.
+### **Active Dendrites and HTM (Predictive State)**
 
-For more complex scenarios requiring the reproduction of specific firing patterns (e.g., bursting or frequency adaptation), the system provides the Izhikevich model. It uses a system of two coupled differential equations, allowing it to model nearly all types of cortical neuron activity. The flexibility to choose between LIF and Izhikevich models allows the system to be optimized for specific tasks: from simple classification to modeling the complex dynamics of cortical columns.
+The engine implements advanced dendritic logic inspired by the Thousand Brains Theory (HTM):
+- **Proximal Dendrites (Branch 0):** Act as direct feedforward inputs. Sufficient excitation here causes immediate somatic depolarization.
+- **Basal/Apical Dendrites (Branches 1-7):** Act as contextual predictors. Activation here does not trigger a spike but places the neuron into a **Predictive State**.
+- **Coincidence Detection:** If a feedforward signal arrives while the neuron is in a predictive state, the required voltage threshold for an action potential is significantly reduced.
 
-### **Synaptic Plasticity (STDP and R-STDP)**
+### **Synaptic Plasticity (STDP and Dopamine Modulation)**
 
-Learning in SC-NeuroCore is implemented via the Spike-Timing-Dependent Plasticity (STDP) mechanism. This is a local learning rule that modifies synaptic weight $w$ based on the relative timing of pre-synaptic ($t\_{pre}$) and post-synaptic ($t\_{post}$) spikes. The engine implementation uses the standard exponential rule:
-
-$\\Delta w \= \\begin{cases} A\_+ e^{-\\Delta t / \\tau\_+} & \\text{for } \\Delta t \> 0 \\\\ \-A\_- e^{\\Delta t / \\tau\_-} & \\text{for } \\Delta t \< 0 \\end{cases}$
-
-where $\\Delta t \= t\_{post} \- t\_{pre}$. Particular attention in the architecture is given to Reward-Modulated STDP (R-STDP), which introduces a global modulating signal, allowing the network to learn in reinforcement learning tasks. This is achieved by storing "eligibility traces" for each synapse, which record potential weight changes and apply them only upon receiving an external reward signal.
+Learning is implemented via Spike-Timing-Dependent Plasticity (STDP), modifying synaptic weights based on the causal relationship between pre-synaptic and post-synaptic spikes. The engine further incorporates a global Dopamine Modulator:
+- Reward signals (e.g., Pavlovian conditioning) trigger dopamine rushes.
+- High dopamine amplifies Long-Term Potentiation (LTP), solidifying active synaptic connections.
+- Neurotransmitter buffers simulate synaptic fatigue, preventing infinite high-frequency signal transmission.
 
 ## **Architectural Analysis: Engine, Network, and Monitor**
 
-The SC-NeuroCore architecture is designed as a multi-level system, ensuring a seamless transition from high-level Python modeling to bit-true cycle-accurate replication in Verilog RTL code for FPGA.
+The architecture is designed as a strict domain-driven, multi-level system, separating the Rust orchestrator from the CUDA physics matrix.
 
-### **Modular Structure and Access Tiers**
+### **Modular Structure**
 
-The system is divided into several functional levels (Tiers), each responsible for its own area. This allows developers to use a stable core for edge deployments while conducting deep research in experimental modules.
+| Domain | Modules | Purpose |
+| :--- | :--- | :--- |
+| **Engine** | `ffi`, `environment`, `constants`, `snapshot` | Hardware orchestration, Unified Memory bridges, and global environment state |
+| **Network** | `graph`, `stimulus` | Topology management, external sensor injection, neurogenesis and microglia |
+| **Monitor** | `streamer`, `telemetry`, `visualization` | Real-time WebSockets UI, performance tracking, and chart rendering |
+| **Runner** | `modes` | Execution loops (emergence, dopamine tests, UI tests, stress benchmarks) |
+| **CUDA** | `base_neuron.cu`, `allocator.h` | Massively parallel device-side physics and numerical integration |
 
-| Tier | Modules | Status | Application Area |
-| :---- | :---- | :---- | :---- |
-| **Core** | neurons, synapses, layers, compiler, hdl\_gen | Production | Industrial deployment, RTL generation |
-| **Simulation** | solvers, transformers, learning, pipeline | Stable | Research of architectures and learning algorithms |
-| **Bridges** | quantum (Qiskit), adapters/holonomic (JAX) | Stable | Hybrid computing, gradient optimization |
-| **Research** | robotics, physics, bio, optics | Tested | Sector-specific scientific research |
-| **Frontier** | world\_model, generative, swarm | Experimental | Cutting-edge AI developments |
+### **Environment Regulator (Hardware-Biology Feedback Loop)**
 
-### **Engine Module: High-Performance Core**
+A unique feature of the engine is the `EnvironmentRegulator`. It monitors the host hardware's Tick Per Second (TPS) latency. If the hardware begins to lag under heavy load, the regulator simulates biological "Hypoxia" (oxygen deprivation). Global oxygen drops, forcing neurons into a lower activity state, effectively saving the hardware from crashing by utilizing biological feedback loops.
 
-The core of the system (sc\_neurocore\_engine) is written in Rust. The choice of Rust is driven by the need for memory safety without a garbage collector, which is critical for deterministic real-time modeling of neural processes. The engine provides acceleration up to 512x compared to real-time, making it one of the fastest SNN software simulators available today.
+### **Neurogenesis and Microglia (Structural Plasticity)**
 
-### **Network Module: Topology Management**
+The network is not static:
+- **Neurogenesis:** Spatially aware stochastic sampling allows highly active neurons in close proximity to sprout new dendritic connections.
+- **Microglia:** A background service probabilistically prunes weak synapses that haven't transmitted signals recently, maintaining a clean network topology while respecting competitive minimum-synapse thresholds.
 
-The Network module handles the organization of layers and connections. The primary data structure here is SCDenseLayer — a fully connected layer operating on stochastic computing principles. Interactions between neurons are organized through sparse adjacency matrices, minimizing memory footprint and bypassing the "Liebig's Law" constraints typical of many neuromorphic platforms where the number of synapses per neuron is strictly fixed.
+## **Low-Level Mathematics and Optimization (Rust & CUDA)**
 
-### **Monitor Module: Telemetry and Analysis**
+A deep audit of the source code reveals severe optimizations aimed at real-time performance on GPUs.
 
-The monitoring system is based on the BitstreamSpikeRecorder component, which captures spike streams in real-time. This allows for deep analysis of network dynamics, including inter-spike interval histograms and population synchronization analysis. Recorders are integrated directly into the computational pipeline, minimizing data collection overhead.
+### **Unified Memory and FFI**
 
-## **Low-Level Mathematics and Optimization (.rs /.cu)**
+The engine operates on `cudaMallocManaged` (Unified Memory), eliminating the need to manually copy massive weight arrays back and forth over the PCIe bus every tick. Rust owns the pointers and safely synchronizes them during telemetry reads.
 
-A deep audit of the source code reveals several unique mathematical solutions aimed at optimizing computations on both CPU and GPU.
+### **CUDA Optimizations**
 
-### **Stochastic Computing and LFSR**
+1. **Atomic Voltage Updates:** Dendritic summation utilizes hardware-level `atomicCAS` loops to prevent race conditions when multiple synapses fire into the same target branch simultaneously.
+2. **Memory Coalescing:** The graph strictly sorts synapses by `target_id` (and then `source_id`), ensuring that GPU warps read from contiguous memory blocks, drastically reducing VRAM thrashing.
+3. **Loop Unrolling:** Dendritic branch evaluations are heavily unrolled (`#pragma unroll`) since the branch count is fixed at compile time, reducing instruction overhead.
 
-The cornerstone of SC-NeuroCore's computational efficiency is the use of stochastic bitstreams to represent numbers. Instead of expensive multipliers requiring many logic gates on an FPGA, the system uses AND logic gates to multiply probabilities of a "one" appearing in the bitstream.
+## **Unique Engineering Solutions and Biological Mechanics**
 
-To generate pseudo-random sequences, a 16-bit Linear Feedback Shift Register (LFSR) with the polynomial $x^{16} \+ x^{14} \+ x^{13} \+ x^{11} \+ 1$ is utilized. The period of this register is 65535 cycles, providing sufficient statistical independence to prevent correlation errors in stochastic computations.
+During the audit, the following innovative solutions implemented in the Neuromorphic Engine were identified:
 
-**Technical Encoding Specifications:**
-
-* **Number Format**: Q8.8 (16-bit signed fixed-point).  
-* **Seed Policy**: For input encoders, the base is 0xACE1 \+ i \* 7; for weights, it is 0xBEEF \+ i \* 13. This guarantees deterministic stochastic processes while preserving their statistical properties.
-
-### **Rust Optimization**
-
-The Rust code (.rs) actively employs SIMD instructions via the ndarray library and multi-threading through rayon. The "Path Selection" engineering solution allows the system to automatically choose the most efficient algorithm based on the data batch size.
-
-| Execution Path | Optimal Batch Size | Mechanism |
-| :---- | :---- | :---- |
-| forward\_fast | 1–4 samples | Specialized Rust kernels with low overhead |
-| forward\_batch\_numpy | \>= 10 samples | Vectorized computations via NumPy/Numba |
-| CUDA | Large batches | Parallel computations on CuPy/CUDA |
-
-### **CUDA Kernels and GPU Acceleration**
-
-For large-scale networks, the system utilizes CUDA kernels (.cu), providing parallel updates for millions of synapses. Particular focus is placed on the spike propagation phase, traditionally a bottleneck in SNN simulations. Using specialized data structures in GPU memory yields a 14x energy efficiency advantage over traditional CPU-based clusters.
-
-## **Extended List of Unique Engineering Solutions and Data Structures (50 Points)**
-
-During the detailed technical audit, the following 50 innovative solutions implemented in SC-NeuroCore were identified:
-
-1. **Bit-True Digital Twin**: The system guarantees bit-level matching between Python simulation and Verilog RTL execution.  
-2. **Maximal-Length 16-bit LFSR**: Use of an optimal polynomial for stochastic stream generation.  
-3. **Q8.8 Fixed-Point Pipeline**: A fully integer computational pipeline, eliminating the need for an FPU.  
-4. **Deterministic Stochastic Computing (DSC)**: Synchronized bitstream permutation method to increase precision.  
-5. **Stochastic Dot Product Unit**: Hardware scalar product block based on AND logic.  
-6. **Bernoulli Bitstream Encoder**: Efficient converter of real numbers into probability streams.  
-7. **Sobol Sequence Integration**: Support for Sobol sequences to accelerate computational convergence.  
-8. **Explicit Bit-Width Masking**: Global \_mask() function for overflow control per hardware specs.  
-9. **Multi-Tier Module System**: Hierarchical repo structure separating production and research tasks.  
-10. **Path-Selection Routing Strategy**: Dynamic selection of the computational path based on micro-batch size.  
-11. **Rayon Work-Stealing Parallelism**: Utilization of Rust's modern scheduler for CPU load balancing.  
-12. **SystemVerilog Emitter Core**: Automatic translation of the network graph into synthesizable FPGA code.  
-13. **AXI-Lite Interface Bridge**: Integration of the neuromorphic core with standard SoC buses.  
-14. **Eligibility Trace Buffers**: Compact storage of temporal variables for R-STDP.  
-15. **Exponential Decay Look-Up Tables (LUT)**: Hardware optimization of exponent calculation for STDP.  
-16. **Homeostatic Threshold Scaling**: Algorithm for dynamic neuron threshold adjustment to stabilize activity.  
-17. **Sparse Adjacency Matrix Storage**: Optimized structure for storing weights of sparse networks.  
-18. **Trainable Axonal Delays**: Support for trainable delays to implement STDDP.  
-19. **Quantum Bridge (Qiskit/PennyLane)**: Integration capabilities with quantum simulators.  
-20. **Holonomic JAX Adapter**: Module for using gradient-based optimization via JAX.  
-21. **SCPN (Spiking Cyclic Petri Nets)**: Integration of Petri nets for logic flow modeling.  
-22. **HDC (Hyper-Dimensional Computing) Module**: Support for computing in ultra-high dimensional vector spaces.  
-23. **Ensemble Consensus Orchestrator**: Voting system between independent neural network agents.  
-24. **Fault-Tolerant Stochastic Logic**: Utilizing stochastic stream redundancy for operation in noisy conditions.  
-25. **CycloneDX SBOM Generation**: Automated creation of software bill of materials for security.  
-26. **PyO3 Extension Interface**: High-speed Rust-to-Python bridge without data copying.  
-27. **Dockerized Simulation Environment**: Containerization of the entire environment for research reproducibility.  
-28. **SOT-MTJ Hardware Target Logic**: Architectural support for Spin-Orbit Torque Magnetic Tunnel Junction memory.  
-29. **Analog/Digital Mixed-Signal Hooks**: Interfaces for interaction with analog neuromorphic processors.  
-30. **Contiguous Trace Memory Allocation**: Grouping neural trace data to minimize cache misses.  
-31. **Ring Buffer Spike History**: Efficient data structure for storing spike times within the plasticity window.  
-32. **Compressed Bitstream Recorders**: Recorders that save only significant bitstream changes.  
-33. **Refractory Period Hardware Timers**: Hardware timers for implementing the refractory period.  
-34. **Lookup-Table Based Synaptic Responses**: Tabular approximation of post-synaptic currents.  
-35. **Threshold-Based Trace Pruning**: Ignoring small weight changes ($x\_{thr}$) to save memory.  
-36. **Anti-LIF Decoding Kernels**: Specialized kernels for recovering noisy signals.  
-37. **Vectorized LIF Updates**: Batch updating of neuron states via SIMD.  
-38. **Static IR Graph Compiler**: Compiler transforming the network into an Intermediate Representation before HDL generation.  
-39. **Seed Policy Inversion Logic**: Method for reverse verification of stochastic streams.  
-40. **Master-Slave Address Remapping**: Dynamic spike routing in hardware implementation.  
-41. **Event-Based Coding Optimizers**: Data preprocessing for Dynamic Vision Sensors (DVS).  
-42. **Bit-Serial Multiplication Units**: Bit-by-bit multiplication to minimize silicon area.  
-43. **LFSR State Checkpointing**: Ability to save and restore random number generator states.  
-44. **Non-Volatile Weight Mapping**: Support for mapping weights onto memristor arrays.  
-45. **Stochastic ReLU Activation**: Adaptation of classical activation functions for spiking networks.  
-46. **Temporal Contrast Encoding**: Algorithm for extracting temporal changes in spike data.  
-47. **Hierarchical Network Definitions**: Support for nested structures and ensembles in network config.  
-48. **Clipping & Saturation Logic**: Overflow protection in recurrent spiking networks.  
-49. **Entropy Policy Manager**: Quality control of random numbers based on power consumption.  
-50. **Hardware-Accelerated IR Compiler**: Using the Rust engine to speed up compilation of complex topologies.
-
-## **Potential Applications and Specifications**
-
-Thanks to the unique combination of stochastic computing and high performance, SC-NeuroCore finds application in several critical areas.
-
-### **Specifications and Performance**
-
-Audit results confirm the following key system metrics:
-
-* **Energy Efficiency**: 0.92 pJ per synaptic operation (SOP) in 28nm process.  
-* **Area Density**: 1.68 $\\mu m^2$ per computational component.  
-* **Simulation Speed**: Up to 512x relative to real-time on standard GPUs.  
-* **Throughput**: Processing up to 84.23 million samples per second in specialized RTL implementations.
-
-### **Application Areas**
-
-**1\. Real-Time Monitoring and Edge AI:** The neuromorphic engine is ideal for autonomous monitoring. For example, in aquaponics, the system is used for real-time fish sizing, providing ANN-level accuracy while consuming 45% fewer hardware resources. The model's compactness allows deployment on low-cost FPGAs (e.g., Altera Cyclone V), making it economically viable.
-
-**2\. Radio Intelligence and Signal Processing (SIGINT):** A specialized "GhostHunter" (Anti-LIF) modification demonstrated unique capabilities in recovering structured data (Morse code, QPSK) from signals buried below the noise floor. The biological approach to signal filtering allows information extraction where traditional Digital Signal Processing (DSP) methods fail.
-
-**3\. Neuromorphic Hardware Prototyping:** SC-NeuroCore serves as a powerful tool for developing new chips. The ability to generate Verilog code from Python models allows researchers to rapidly test new neuron and synapse architectures before proceeding to tape-out.
+1. **ATP Metabolic Simulation**: Action potentials consume energy, requiring Astrocytes to continuously supply ATP to working neurons.
+2. **The Phoenix Loop**: Dead neurons (from toxicity or hypoxia) enter a coma state and "resurrect" after a set duration to allow network recovery.
+3. **Thermal Noise (PCG32-lite)**: Fast device-side pseudo-random noise perturbates voltages to prevent the network from freezing into complete silence.
+4. **Nursery Protection Phase**: Bootstrapping networks receive artificially boosted STDP learning rates and infinite ATP during their initial ticks to form a stable core before pruning begins.
+5. **Dopamine Decay & Pavlovian Hooks**: Stimulus services that dynamically partition sensors for Bell (neutral) and Meat (reward) inputs.
+6. **Probabilistic Microglia Pruning**: Soft pruning logic replacing hard thresholds, allowing weak but historically important connections a chance to survive.
+7. **True Brain Snapshots**: Binary serialization of the complete state, including environment levels, current tick, and graph topology, allowing flawless pauses and resumes.
+8. **Asynchronous WebSockets HUD**: Non-blocking telemetry streaming that offloads UI updates to a background Tokio runtime.
+9. **Dynamic Telemetry Sampling**: Aggregating stats instead of storing giant vectors to prevent OOM errors on networks scaling up to 1M+ synapses.
 
 ## **Identification of Problem Areas and Risks**
 
-Despite technological excellence, the audit identified several risk zones requiring attention for industrial deployment.
+Despite technological excellence, the audit identified several risk zones requiring attention for future scaling.
 
-### **Numerical Stability and Quantization**
+### **Serialization Backpressure**
 
-The use of the Q8.8 format imposes strict limits on the dynamic range of weights. In deep recurrent networks, this can lead to gradient vanishing or, conversely, uncontrolled activity growth (spike explosion). Trace pruning mechanisms ($x\_{thr}$) can introduce systematic errors that accumulate during prolonged training.
+While the JSON streamer is asynchronous, packing massive arrays (100k+ neurons) into JSON strings every few ticks can bottleneck the CPU thread. The engine currently handles this via dynamic sampling intervals (`UI_SAMPLING_DIVISOR`), but a transition to a binary WebSocket protocol (e.g., flatbuffers or bincode over WS) might be necessary for massive live visualizations.
 
-### **Stochastic Computing Limitations**
+### **VRAM Limitations for Dense Topology**
 
-While stochastic computing minimizes silicon area, it requires significant time to achieve high precision. Bitstream length correlates directly with computational error ($Error \\propto 1/\\sqrt{N}$, where $N$ is bitstream length). For tasks requiring high precision (e.g., exact scientific calculations), SC-NeuroCore may be less effective than traditional floating-point methods.
+Because the engine simulates individual synapses with explicit states (neurotransmitter buffers, refractory ticks, specific branch targets), heavily interconnected networks (high density) rapidly consume VRAM. 
 
-### **SNN Training Data Deficit**
+### **Nursery Calibration**
 
-Training spiking networks "from scratch" is hindered by the non-differentiability of spikes. Although the system supports bridges to JAX and gradient methods, the ANN-SNN conversion process remains labor-intensive and often results in a 1–3% accuracy loss. Furthermore, available datasets are often insufficient to fully realize the potential of STDP-based learning.
-
-### **Hardware Resource Dependency (Liebig's Law)**
-
-While the SC-NeuroCore architecture strives for maximum flexibility, physical SRAM limitations on FPGAs or ASICs dictate the maximum number of synapses. In networks with extremely high connectivity (high fan-in/fan-out), the system may run out of memory for weight storage long before neuron computational capacity is exhausted.
+The chaotic nature of the Gaussian-distributed weights means that without proper "Nursery Phase" tuning, networks can either immediately flatline or enter incurable global seizures within the first 100 ticks.
 
 ## **Conclusion and Strategic Recommendations**
 
-Audit results characterize SC-NeuroCore as a mature and highly efficient platform for developing neuromorphic systems. The Rust and CUDA implementation ensures excellent scalability, while stochastic computing opens the path to creating ultra-low-power Edge AI devices.
+Audit results characterize the Neuromorphic Engine as a highly mature platform for computational neuroscience and biological AI modeling. The Rust and CUDA implementation ensures excellent scalability, while the deep biological mechanics open the path to creating systems that learn and adapt naturally.
 
 **Development Recommendations:**
+1. **Binary WebSockets Protocol**: Replace JSON strings in the streamer with a binary format to allow denser UI visualizer updates.
+2. **Multi-GPU Orchestration**: Expand the CUDA backend to partition the `NetworkGraph` across multiple GPUs to push beyond the 1-2 million synapse barrier.
+3. **Short-Term Plasticity (STP)**: Integrate short-term facilitation and depression models to better process fast time-series inputs.
 
-1. **Implement Adaptive Quantization**: Develop mechanisms to dynamically change representation precision (e.g., switching to Q16.16 in critical network nodes).  
-2. **Expand Model Library**: Integrate more complex synapse models accounting for Short-Term Plasticity (STP) to improve time-series processing.  
-3. **Optimize RTL Compiler**: Improve Place and Route (P\&R) algorithms to minimize hardware latencies when working with large weight matrices.
-
-Overall, the project holds high potential for commercialization in IoT, agrotech, and specialized radio communication sectors, offering an alternative to traditional neuroprocessors in tasks where power consumption and reaction speed are critical.
+Overall, the project holds immense potential for researching autonomous adaptation, lifelong learning, and bridging the gap between biological chaos and deterministic hardware execution.
