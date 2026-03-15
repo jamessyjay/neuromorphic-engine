@@ -27,7 +27,7 @@ impl BrainSnapshot {
             let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open {}", filename));
             let reader = BufReader::new(file);
             match bincode::deserialize_from(reader) {
-                Ok(mut snapshot) => {
+                Ok(snapshot) => {
                     let mut snap: BrainSnapshot = snapshot;
                     snap.graph.optimize_memory_layout();
                     Some(snap)
