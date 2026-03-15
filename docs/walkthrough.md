@@ -225,9 +225,10 @@ To secure the biological integrity and hardware stability of the engine, a compl
 
 ## Phase 46: Enterprise Architecture Refactoring & Environment Regulator (MMN v1.1)
 
-**Summary:** 
+**Summary:**
+
 - **Cyber-Biological Homeostasis:** Implemented `EnvironmentRegulator` in Rust that translates hardware Tick Latency into biological `hypoxia_penalty` and `glucose` starvation. If the system lags, the network literally chokes, reducing spikes to save hardware. Closed the feedback loop.
-- **Enterprise Refactoring:** Migrated the flat `src/` directory to a Domain-Driven structure without touching C++ physics. 
+- **Enterprise Refactoring:** Migrated the flat `src/` directory to a Domain-Driven structure without touching C++ physics.
   - `src/engine/`: FFI, Environment, Constants
   - `src/network/`: Graph, Stimulus
   - `src/monitor/`: Telemetry, Streamer, Visualization
@@ -235,37 +236,41 @@ To secure the biological integrity and hardware stability of the engine, a compl
 
 ## Phase 47: UI HUD & Stable Snapshot (MMN v1.1)
 
-**Summary:** 
+**Summary:**
+
 - **Homeostasis HUD:** Exposed `global_oxygen` and `global_glucose` in the JSON Streamer payload. Added dynamic progress bars to the frontend Visualizer (`index.html`) to observe the network "breathing" in real-time.
 - **Save File State-Leak Fix:** Fixed a bug where a residual `brain_save.bin` or default `parsed_neurons` values would cause the CLI to generate a tiny 2-neuron test network instead of respecting `--neurons` parameters.
 - **Snapshot Backup:** Created the `monolith-microchip-neuron-v1.1` Git branch as a pristine backup snapshot of the fully stabilized, domain-driven, cyber-biological MMN engine before moving forward.
 
 ## Phase 48: True Snapshots, Performance Profiling & Network Vitality
 
-**Summary:** 
+**Summary:**
+
 - **True Brain Snapshot (`src/engine/snapshot.rs`):** Refactored network serialization. The old `save_to_disk` only saved topology, causing "Amnesia" regarding global tick (phase resonance) and environment levels upon load. Created `BrainSnapshot` wrapper to serialize `current_tick`, `Environment`, and `NetworkGraph` together, allowing seamless resuming of homeostasis and phase dynamics.
 - **TPS Performance Benchmark:** Implemented `test_performance_scaling_tps` inside `hardware_tests.rs`. This automatically benchmarks Tick Per Second (TPS) across various network sizes (from 2 neurons/20 synapses up to 100k neurons/1M synapses), guaranteeing we don't accidentally merge extremely slow operations.
-- **Network Vitality (Biological Immersion):** 
+- **Network Vitality (Biological Immersion):**
   - *Startup Grace Period & Circadian Drive:* The Environment Regulator gives the network 500 ticks of immunity against lag-induced hypoxia during startup. A `wakefulness_multiplier` boosts ATP recovery during the early phase and decays.
   - *Thermal Noise:* Implemented a fast, stateless PCG32-lite pseudo-random generator directly in the CUDA and CPU kernels to perturb `current_voltage` every tick by `[-1.0, 1.5] mV`. This promotes spontaneous network exploration and helps prevent the network from getting permanently "frozen" under threshold.
   - *The Phoenix Loop:* Replaced a 16-bit padding field in `BaseNeuron` with `dead_ticks`. When a neuron dies (e.g., from Calcium Overdose or Hypoxia), it doesn't stay dead forever. Instead, it enters a 1000-tick coma and then resurrects with full ATP and reset parameters, giving the brain a chance to heal dynamically.
 
 ## Phase 49: HTM Active Dendrites & Predictive State
 
-**Summary:** 
+**Summary:**
+
 - **Predictive State Architecture:** Modified the non-linear summation logic inside `evaluate_branches`. We separated the biological role of dendrites into two distinct functional classes, bringing us closer to Jeff Hawkins' Thousand Brains Theory:
   - **Proximal Dendrites (Branch 0):** Act as direct feedforward inputs. If an NMDA threshold is crossed here, it causes massive somatic depolarization (can directly trigger an action potential).
   - **Basal/Apical Dendrites (Branches 1-7):** Act as contextual predictors. If an NMDA threshold is crossed here, it *does not* depolarize the soma to the threshold. Instead, it places the neuron into a **Predictive State** for 20 ticks.
 - **Memory Layout:** Packed the new `predictive_ticks` variable into the main `BaseNeuron` struct as a `u8` (byte). To maintain exactly 128-byte cache line alignment, `spikes_in_last_window` was downsized from `u16` to `u8`.
 - **Coincidence Detection:** During the physics loop (`process_spike`), if `predictive_ticks > 0`, the neuron temporarily receives a `+15.0 mV` virtual offset. This means any incoming feedforward proximal signal requires significantly less strength to trigger a spike (classic Coincidence Detection).
-- **Testing:** Fixed old spatial summation tests to respect the new non-proximal passiveness. Wrote a rigorous `test_htm_predictive_state_coincidence` that validates the 3 phases: 
-  1. Context sets predictive state. 
-  2. Weak signal triggers spike while predictive. 
+- **Testing:** Fixed old spatial summation tests to respect the new non-proximal passiveness. Wrote a rigorous `test_htm_predictive_state_coincidence` that validates the 3 phases:
+  1. Context sets predictive state.
+  2. Weak signal triggers spike while predictive.
   3. Weak signal fails to trigger spike after predictive state decays.
 
 ## Phase 50: Zero-Tolerance Refactor (Data Integrity & Concurrency)
 
-**Summary:** 
+**Summary:**
+
 - **CUDA/CPU Atomic Voltage Update:** Eliminated severe data races during dendritic voltage summation. Implemented `atomic_add_packed_voltage` using a hardware-level `atomicCAS` loop in CUDA and `std::atomic` compare-exchange for the CPU fallback. Multiple synapses hitting the same target branch simultaneously now perfectly integrate their payload.
 - **STDP Causality Paradox Fix:** Tightened the STDP Potentiation logic. Long-Term Potentiation (LTP) now strictly requires `source->last_spike_tick < target->last_spike_tick`. Simultaneous spiking on the same tick no longer triggers an impossible instant feedback loop.
 - **Memory Coalescing (O(N^2) Thrashing Prevention):** Enforced a mandatory sorting step `optimize_memory_layout()` on the `synapses` vector. Synapses are now strictly sorted by `target_id` (and then `source_id`). This ensures GPU warps process neighboring memory addresses, drastically reducing cache misses and VRAM thrashing.
@@ -274,7 +279,8 @@ To secure the biological integrity and hardware stability of the engine, a compl
 
 ## Phase 51: Titanic Foundation (Stimulus Hardening & Safety)
 
-**Summary:** 
+**Summary:**
+
 - **Dynamic Sensor Discovery:** Refactored `StimulusService` to dynamically discover sensors via `n.type_ == NeuronType::Photoreceptor || Nociceptor` rather than relying on hardcoded group sizes. This ensures stimuli are routed to actual sensing neurons regardless of network generation parameters.
 - **Pre-computed Partitioning:** Sensor IDs are split into `bell_group` and `meat_group` during initialization instead of allocating and parsing vectors dynamically on every tick.
 - **Zombie Protection:** Added `graph.neurons[idx].is_alive == 1` checks to the `StimulusService`. The engine no longer wastes forced spikes on dead neurons.
@@ -282,7 +288,8 @@ To secure the biological integrity and hardware stability of the engine, a compl
 
 ## Phase 52: Core Hardening Final (Dynamic Telemetry & Memory Coalescing)
 
-**Summary:** 
+**Summary:**
+
 - **Dynamic Telemetry Sampling:** Overhauled `BenchmarkData` and `SimulationData` to sample stats strictly based on network scale (`1 sample per N ticks`). Replaced RAM-heavy scalar vectors (`avg_atp`, `avg_calcium`) with running `f64` accumulators to absolutely obliterate OOM issues on giant 100k+ neuron runs. Visualizer adjusted accordingly.
 - **True Snapshot Progression:** Corrected hardcoded `current_tick: 0` during saves. The engine now respects exactly which tick the simulation was paused on, saving `BrainSnapshot` with the accurate `tick` value, ensuring time isn't reset on a resume.
 - **RNG Initialization Optimization:** Passed `rand::rng` as a reference to `get_gaussian` and into generation functions to eliminate extremely heavy and redundant PRNG structural allocations during network generation.
@@ -290,26 +297,30 @@ To secure the biological integrity and hardware stability of the engine, a compl
 
 ## Phase 53: Overclocking & Micro-Optimizations
 
-**Summary:** 
+**Summary:**
+
 - **Bitwise Math:** Replaced modulo operator `% 256` with bitwise `& 0xFF` for `internal_phase` updates. This avoids expensive integer division instructions on the GPU.
 - **Loop Unrolling:** Added `#pragma unroll` to the `evaluate_branches` function in CUDA. Since `NUM_BRANCHES` is a fixed compile-time constant (8), this allows the compiler to flatten the loop and execute branch evaluations concurrently within the warp, skipping branch prediction overhead.
 - **LDG Read-Only Cache:** Deployed the `__ldg()` intrinsic for the early-exit checks in `tick_synapses_kernel`. By explicitly routing the `is_alive` state fetches for `source` and `target` neurons through the read-only data cache, we drastically reduce L1 bandwidth pressure during dense synaptic ticks.
 
 ## Phase 54: RAII & Safe Resource Cleanup
 
-**Summary:** 
+**Summary:**
+
 - **Ownership Model Definition:** Defined strict boundaries where `NetworkGraph` via Rust `Vec` owns Host RAM, and C++ handles explicitly allocated device buffers.
 - **Rust `Drop` Trait:** Implemented `impl Drop for NetworkGraph` to ensure that before any Host vectors are deleted, `crate::engine::ffi::synchronize_device()` is called. This guarantees the GPU has completely finished reading/writing the memory before Rust reclaims it.
 - **CUDA Cleanup API:** Exposed a safe `cleanup_gpu_resources` C++ function through FFI with built-in null-pointer checks (`if (ptr == nullptr) return;`) and safe `#ifdef USE_CUDA` wrappers to prevent invalid free crashes on macOS mocks while ensuring zero VRAM leaks on Jetson hardware.
 - **Validation Test:** Created a destructive test `test_resource_cleanup_no_double_free` that instantiates and drops `NetworkGraph` 100 times sequentially, verifying complete memory stability without segfaults.
 
 ## Phase 50: Metabolic Hysteresis & State Sync (v0.4.7)
+
 - **Unified Visual State Mapping**: Updated `run_ui_test` in `modes.rs` to use the same logic as `run_simulation` and `run_benchmark_mode` for determining the visual state of neurons. State 4.0 is now explicitly used for Metabolic Shutdown.
 - **CUDA Metabolic Hysteresis**: Added a new state `STATE_METABOLIC_SHUTDOWN` in `base_neuron.h`. In `base_neuron.cu`, if ATP drops below 15.0, the neuron enters shutdown and cannot spike until ATP recovers to 40.0.
 - **Phoenix Energy Boost**: When a neuron resurrects after death (Phoenix cycle), its ATP is instantly fully replenished (`energy_ATP = max_atp`) so it can start functioning immediately.
 - **Nursery Protection**: Added a protection mechanism in `modes.rs` (for ticks < 5000) where ATP is artificially maintained at a minimum of 50.0 to ensure successful network initialization.
 
 ## Refactoring: Cleaned up duplicate code in `modes.rs` (v0.4.7+)
+
 - Extracted common `visual_state` mapping logic into `get_visual_state` helper function.
 - Extracted `InitialStatePayload` generation into `generate_initial_state` helper function.
 - Extracted `Nursery Protection` loop into `apply_nursery_protection` helper function.
@@ -318,6 +329,7 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - Extracted WebSockets broadcasting logic into `broadcast_initial_state` and `broadcast_tick_update` helper functions.
 
 ## Deep Persistence & GPU Sync (v0.4.8)
+
 - **Dynamic Tick Persistence:** Changed snapshot saving to use the actual `total_ticks` or `start_tick + total_ticks` instead of a hardcoded value (3).
 - **Reliable Initial State Broadcast:** Modified the WebSocket broadcast to periodically resend the `InitialStatePayload` (every 5000 ticks) so UI clients can reconnect safely.
 - **Forced GPU Memory Re-synchronization:** Added `force_sync_gpu` in `NetworkGraph` to handle memory synchronization explicitly upon loading from snapshot. It simulates mapping Rust vectors to CUDA environment properly.
@@ -326,15 +338,17 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Sensory Input Summation:** Implemented continuous summing for photoreceptors rather than static assignment, allowing synapse feedback integration with external lighting. (Resolved failing tests associated with it).
 
 ## Refactoring & Cleanup (v0.4.8+1)
+
 - **Magic Numbers Extracted:** Replaced hardcoded values (like `5000`, `50`) in `modes.rs` with explicit constants `NURSERY_PROTECTION_TICKS`, `WS_INITIAL_STATE_INTERVAL`, `ASYNC_YIELD_INTERVAL`, etc., to make the simulation loops more readable and maintainable.
 - **Snapshot Boilerplate Cleanup:** Consolidated the `BrainSnapshot` creation and metric export boilerplate across numerous tests and modes into a single `finalize_and_save_snapshot` helper function, massively reducing code duplication in `modes.rs`.
 - **Total Magic Number Eradication:** Cleaned up `modes.rs` entirely. Extracted all hardcoded numbers (ATP thresholds, node proportions, coordinate limits, timer scaling multipliers, base weights) into `constants.rs`. Code is now legible and ready for future balancing tweaks without digging through loop functions. Also renamed confusing `n` and `s` variables in `run_scaling_benchmarks` to `num_neurons` and `num_synapses`.
 - **Compiler Warnings Fixed:** Added `cuda` to the `[features]` block in `Cargo.toml` to resolve `unexpected cfg condition value: cuda` warnings when checking conditional compilation flags in `graph.rs`.
 - **Further Loop and Snapshot Refactoring:** Cleaned up the repeating code in `run_dopamine_rush_mode` into a single loop mapping phases by constant intervals. Extracted a static method `save_test_snapshot` to `BrainSnapshot` impl to dramatically shrink the boilerplate block used for dumping simulation snapshots to disk across all integration tests in `modes.rs`. Test lengths (`3000`, `5000`) and the light cycle tick durations have also been migrated into `constants.rs`.
-- **Final Magic Numbers Sweep:** Removed the remaining hardcoded values for scaling array sizes `[1000, 2000, 4000, 8000, 16000]`, benchmark testing network volumes (`5000` synapses, `100` ticks), emergence targets (`500` node capacities, `200` interval targets), and TPS constraints (`500.0`, `2.5x` factor) in `modes.rs`. Replaced them with defined constraints in `constants.rs`. 
+- **Final Magic Numbers Sweep:** Removed the remaining hardcoded values for scaling array sizes `[1000, 2000, 4000, 8000, 16000]`, benchmark testing network volumes (`5000` synapses, `100` ticks), emergence targets (`500` node capacities, `200` interval targets), and TPS constraints (`500.0`, `2.5x` factor) in `modes.rs`. Replaced them with defined constraints in `constants.rs`.
 
 ### Architectural Update: Microglia Calibration & Synaptic Plasticity (v0.4.9)
-- **Probabilistic Pruning:** Overhauled `run_microglia_service` to use probabilistic, rather than binary, logic. Removed all hard thresholds replacing them with softer conditional probability pruning based on ticks since last activation and minimum weight checks. 
-- **Competitive Pruning:** Introduced `MIN_SYNAPSES_PER_NEURON` constraint (`3` by default) into the Microglia service ensuring neurons don't get completely disconnected and orphaned from the core network graph. Microglia skip pruning completely for neurons with `< 3` synapses. 
+
+- **Probabilistic Pruning:** Overhauled `run_microglia_service` to use probabilistic, rather than binary, logic. Removed all hard thresholds replacing them with softer conditional probability pruning based on ticks since last activation and minimum weight checks.
+- **Competitive Pruning:** Introduced `MIN_SYNAPSES_PER_NEURON` constraint (`3` by default) into the Microglia service ensuring neurons don't get completely disconnected and orphaned from the core network graph. Microglia skip pruning completely for neurons with `< 3` synapses.
 - **Nursery Phase Adaptations:** Dynamic adjustment of `STDP_LEARNING_RATE` added inside `apply_nursery_protection`. The learning rate gets amplified by 2x during the initial 5000 Nursery Ticks to give structures the chance to solidify before pruning rules take effect.
 - **Persistence Layer Synchronization:** Discarded all raw occurrences of manually built `BrainSnapshot` at the end of runtime methods (`run_benchmark_mode` and `run_simulation`), defaulting to the static `BrainSnapshot::save_test_snapshot` helper or `finalize_and_save_snapshot` to stop accidental overriding of actual progression ticks down to tick 3. Tests consistently recover gracefully without data loss.
