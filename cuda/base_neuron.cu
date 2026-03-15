@@ -3,6 +3,7 @@
 #include "base_neuron.h"
 #include <cmath>
 #include <cstdint>
+#include <stdio.h>
 
 #ifdef USE_CUDA
 #include <curand_kernel.h>
@@ -87,6 +88,13 @@ static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t cu
 // Atomic function: Apoptosis / Death Handler
 static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason, uint32_t current_tick) {
     if (current_tick < NETWORK_GRACE_PERIOD_TICKS) return;
+    
+    // Phase 18 Fix: The Dying Breath
+    if (current_tick == 5001 && n->is_alive) {
+        printf("[Dying Breath] Tick 5001 | Neuron %d | Reason: %d | ATP: %.2f | Calcium: %.2f | V: %.2f\n", 
+               n->id, reason, n->energy_ATP, n->calcium_level, n->current_voltage);
+    }
+
     n->is_alive = 0;
     n->death_reason = reason;
     n->current_voltage = 0.0f;
@@ -133,6 +141,12 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
         hypoxia_penalty = (0.5f - env.global_oxygen_level) * 1.0f; 
     }
     float passive_drain = BASELINE_LEAK_RATE + hypoxia_penalty;
+    
+    // Phase 14: Metabolic Calibration (Protocol "Evolution")
+    if (current_tick < NETWORK_GRACE_PERIOD_TICKS) {
+        passive_drain /= 5.0f;
+    }
+    
     n->energy_ATP -= passive_drain;
 
     // Glucose processing
@@ -244,7 +258,7 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     }
 
     // EMERGENCY GUARD 2.0: Explicit ATP check
-    if (n->energy_ATP < EMERGENCY_ATP_THRESHOLD) {
+    if (n->energy_ATP <= 0.0f) {
         if (env.global_oxygen_level < MIN_OXYGEN_LEVEL) {
             die_gracefully(n, DEATH_ATP_LOW, current_tick);
         } else if (env.global_glucose_level < MIN_GLUCOSE_LEVEL) {
@@ -252,6 +266,12 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         } else {
             n->current_voltage = n->resting_voltage; // Sleep mode
         }
+        return;
+    }
+
+    // Phase 18 Fix: "Metabolic Coma" (Safety Valve)
+    if (n->energy_ATP < n->max_atp * 0.10f) {
+        n->current_voltage = n->resting_voltage;
         return;
     }
 

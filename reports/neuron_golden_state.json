@@ -2,8 +2,8 @@
   {
     "tick": 1,
     "soma_v": -68.78471,
-    "dyn_thresh": -52.14082,
-    "atp": 103.03209,
+    "dyn_thresh": -52.143093,
+    "atp": 103.04109,
     "internal_phase": 1,
     "port0_v": 0.0,
     "trace0": 0
@@ -11,8 +11,8 @@
   {
     "tick": 2,
     "soma_v": -68.00971,
-    "dyn_thresh": -52.13829,
-    "atp": 103.022095,
+    "dyn_thresh": -52.142845,
+    "atp": 103.04009,
     "internal_phase": 2,
     "port0_v": 0.0,
     "trace0": 0
@@ -20,8 +20,8 @@
   {
     "tick": 3,
     "soma_v": -68.947716,
-    "dyn_thresh": -52.135765,
-    "atp": 103.012115,
+    "dyn_thresh": -52.14259,
+    "atp": 103.0391,
     "internal_phase": 3,
     "port0_v": 0.0,
     "trace0": 0
@@ -29,8 +29,8 @@
   {
     "tick": 4,
     "soma_v": -69.90196,
-    "dyn_thresh": -52.13324,
-    "atp": 103.002144,
+    "dyn_thresh": -52.14234,
+    "atp": 103.03811,
     "internal_phase": 4,
     "port0_v": 0.0,
     "trace0": 0
@@ -38,8 +38,8 @@
   {
     "tick": 5,
     "soma_v": -69.62496,
-    "dyn_thresh": -52.13072,
-    "atp": 102.99218,
+    "dyn_thresh": -52.142094,
+    "atp": 103.037125,
     "internal_phase": 5,
     "port0_v": 15.0,
     "trace0": 0
@@ -47,8 +47,8 @@
   {
     "tick": 6,
     "soma_v": -69.60996,
-    "dyn_thresh": -52.1282,
-    "atp": 102.98222,
+    "dyn_thresh": -52.141846,
+    "atp": 103.03614,
     "internal_phase": 6,
     "port0_v": 15.0,
     "trace0": 0
@@ -56,8 +56,8 @@
   {
     "tick": 7,
     "soma_v": -68.756966,
-    "dyn_thresh": -52.125687,
-    "atp": 102.97228,
+    "dyn_thresh": -52.141594,
+    "atp": 103.03516,
     "internal_phase": 7,
     "port0_v": 15.0,
     "trace0": 0
@@ -65,8 +65,8 @@
   {
     "tick": 8,
     "soma_v": -68.08797,
-    "dyn_thresh": -52.123173,
-    "atp": 102.96235,
+    "dyn_thresh": -52.141346,
+    "atp": 103.03418,
     "internal_phase": 8,
     "port0_v": 15.0,
     "trace0": 0
@@ -74,8 +74,8 @@
   {
     "tick": 9,
     "soma_v": -68.73472,
-    "dyn_thresh": -52.12066,
-    "atp": 102.95242,
+    "dyn_thresh": -52.141098,
+    "atp": 103.0332,
     "internal_phase": 9,
     "port0_v": 15.0,
     "trace0": 0
@@ -83,8 +83,8 @@
   {
     "tick": 10,
     "soma_v": -69.13272,
-    "dyn_thresh": -52.11815,
-    "atp": 102.942505,
+    "dyn_thresh": -52.140854,
+    "atp": 103.03223,
     "internal_phase": 10,
     "port0_v": 15.0,
     "trace0": 0
@@ -92,8 +92,8 @@
   {
     "tick": 11,
     "soma_v": -68.51647,
-    "dyn_thresh": -52.115643,
-    "atp": 102.9326,
+    "dyn_thresh": -52.140606,
+    "atp": 103.03126,
     "internal_phase": 11,
     "port0_v": 15.0,
     "trace0": 0
@@ -101,8 +101,8 @@
   {
     "tick": 12,
     "soma_v": -68.68947,
-    "dyn_thresh": -52.113144,
-    "atp": 102.92271,
+    "dyn_thresh": -52.14036,
+    "atp": 103.03029,
     "internal_phase": 12,
     "port0_v": 15.0,
     "trace0": 0
@@ -110,8 +110,8 @@
   {
     "tick": 13,
     "soma_v": -67.83622,
-    "dyn_thresh": -52.11064,
-    "atp": 102.91282,
+    "dyn_thresh": -52.140118,
+    "atp": 103.02933,
     "internal_phase": 13,
     "port0_v": 15.0,
     "trace0": 0
@@ -119,8 +119,8 @@
   {
     "tick": 14,
     "soma_v": -68.58022,
-    "dyn_thresh": -52.108143,
-    "atp": 102.90294,
+    "dyn_thresh": -52.139874,
+    "atp": 103.028366,
     "internal_phase": 14,
     "port0_v": 15.0,
     "trace0": 0
@@ -128,8 +128,8 @@
   {
     "tick": 15,
     "soma_v": -67.30122,
-    "dyn_thresh": -52.105644,
-    "atp": 102.893074,
+    "dyn_thresh": -52.139633,
+    "atp": 103.027405,
     "internal_phase": 15,
     "port0_v": 15.0,
     "trace0": 0
@@ -137,8 +137,8 @@
   {
     "tick": 16,
     "soma_v": -66.695724,
-    "dyn_thresh": -52.10315,
-    "atp": 102.88322,
+    "dyn_thresh": -52.13939,
+    "atp": 103.02645,
     "internal_phase": 16,
     "port0_v": 15.0,
     "trace0": 0
@@ -146,8 +146,8 @@
   {
     "tick": 17,
     "soma_v": -67.584724,
-    "dyn_thresh": -52.10066,
-    "atp": 102.87337,
+    "dyn_thresh": -52.13915,
+    "atp": 103.0255,
     "internal_phase": 17,
     "port0_v": 15.0,
     "trace0": 0
@@ -155,8 +155,8 @@
   {
     "tick": 18,
     "soma_v": -66.22098,
-    "dyn_thresh": -52.098167,
-    "atp": 102.863525,
+    "dyn_thresh": -52.138912,
+    "atp": 103.02454,
     "internal_phase": 18,
     "port0_v": 15.0,
     "trace0": 0
@@ -164,8 +164,8 @@
   {
     "tick": 19,
     "soma_v": -65.89773,
-    "dyn_thresh": -52.09568,
-    "atp": 102.8537,
+    "dyn_thresh": -52.138668,
+    "atp": 103.0236,
     "internal_phase": 19,
     "port0_v": 15.0,
     "trace0": 0
@@ -173,8 +173,8 @@
   {
     "tick": 20,
     "soma_v": -65.38623,
-    "dyn_thresh": -52.093197,
-    "atp": 102.84388,
+    "dyn_thresh": -52.13843,
+    "atp": 103.02265,
     "internal_phase": 20,
     "port0_v": 15.0,
     "trace0": 0
@@ -182,8 +182,8 @@
   {
     "tick": 21,
     "soma_v": -66.174484,
-    "dyn_thresh": -52.090714,
-    "atp": 102.83407,
+    "dyn_thresh": -52.13819,
+    "atp": 103.021706,
     "internal_phase": 21,
     "port0_v": 15.0,
     "trace0": 0
@@ -191,8 +191,8 @@
   {
     "tick": 22,
     "soma_v": -66.646736,
-    "dyn_thresh": -52.088234,
-    "atp": 102.824265,
+    "dyn_thresh": -52.137955,
+    "atp": 103.02077,
     "internal_phase": 22,
     "port0_v": 15.0,
     "trace0": 0
@@ -200,8 +200,8 @@
   {
     "tick": 23,
     "soma_v": -67.25574,
-    "dyn_thresh": -52.08576,
-    "atp": 102.814476,
+    "dyn_thresh": -52.13772,
+    "atp": 103.01983,
     "internal_phase": 23,
     "port0_v": 15.0,
     "trace0": 0
@@ -209,8 +209,8 @@
   {
     "tick": 24,
     "soma_v": -66.842735,
-    "dyn_thresh": -52.083282,
-    "atp": 102.804695,
+    "dyn_thresh": -52.137478,
+    "atp": 103.01889,
     "internal_phase": 24,
     "port0_v": 15.0,
     "trace0": 0
@@ -218,8 +218,8 @@
   {
     "tick": 25,
     "soma_v": -67.24724,
-    "dyn_thresh": -52.08081,
-    "atp": 102.79492,
+    "dyn_thresh": -52.137245,
+    "atp": 103.01796,
     "internal_phase": 25,
     "port0_v": 15.0,
     "trace0": 0
@@ -227,8 +227,8 @@
   {
     "tick": 26,
     "soma_v": -68.23549,
-    "dyn_thresh": -52.07834,
-    "atp": 102.78516,
+    "dyn_thresh": -52.13701,
+    "atp": 103.01703,
     "internal_phase": 26,
     "port0_v": 15.0,
     "trace0": 0
@@ -236,8 +236,8 @@
   {
     "tick": 27,
     "soma_v": -67.89149,
-    "dyn_thresh": -52.075874,
-    "atp": 102.775406,
+    "dyn_thresh": -52.136772,
+    "atp": 103.016106,
     "internal_phase": 27,
     "port0_v": 15.0,
     "trace0": 0
@@ -245,8 +245,8 @@
   {
     "tick": 28,
     "soma_v": -67.09024,
-    "dyn_thresh": -52.073406,
-    "atp": 102.76566,
+    "dyn_thresh": -52.136543,
+    "atp": 103.01518,
     "internal_phase": 28,
     "port0_v": 15.0,
     "trace0": 0
@@ -254,8 +254,8 @@
   {
     "tick": 29,
     "soma_v": -65.82874,
-    "dyn_thresh": -52.070946,
-    "atp": 102.75593,
+    "dyn_thresh": -52.136307,
+    "atp": 103.01426,
     "internal_phase": 29,
     "port0_v": 15.0,
     "trace0": 0
@@ -263,8 +263,8 @@
   {
     "tick": 30,
     "soma_v": -64.893745,
-    "dyn_thresh": -52.068485,
-    "atp": 102.7462,
+    "dyn_thresh": -52.136078,
+    "atp": 103.01334,
     "internal_phase": 30,
     "port0_v": 15.0,
     "trace0": 0
@@ -272,8 +272,8 @@
   {
     "tick": 31,
     "soma_v": -63.646744,
-    "dyn_thresh": -52.066025,
-    "atp": 102.73649,
+    "dyn_thresh": -52.13584,
+    "atp": 103.01243,
     "internal_phase": 31,
     "port0_v": 15.0,
     "trace0": 0
@@ -281,8 +281,8 @@
   {
     "tick": 32,
     "soma_v": -64.46224,
-    "dyn_thresh": -52.06357,
-    "atp": 102.72678,
+    "dyn_thresh": -52.13561,
+    "atp": 103.01151,
     "internal_phase": 32,
     "port0_v": 15.0,
     "trace0": 0
@@ -290,8 +290,8 @@
   {
     "tick": 33,
     "soma_v": -64.77924,
-    "dyn_thresh": -52.06112,
-    "atp": 102.71709,
+    "dyn_thresh": -52.13538,
+    "atp": 103.010605,
     "internal_phase": 33,
     "port0_v": 15.0,
     "trace0": 0
@@ -299,8 +299,8 @@
   {
     "tick": 34,
     "soma_v": -64.85999,
-    "dyn_thresh": -52.058662,
-    "atp": 102.7074,
+    "dyn_thresh": -52.135155,
+    "atp": 103.0097,
     "internal_phase": 34,
     "port0_v": 15.0,
     "trace0": 0
@@ -308,8 +308,8 @@
   {
     "tick": 35,
     "soma_v": -64.019745,
-    "dyn_thresh": -52.056217,
-    "atp": 102.69772,
+    "dyn_thresh": -52.134922,
+    "atp": 103.00879,
     "internal_phase": 35,
     "port0_v": 15.0,
     "trace0": 0
@@ -317,8 +317,8 @@
   {
     "tick": 36,
     "soma_v": -64.578995,
-    "dyn_thresh": -52.053772,
-    "atp": 102.68806,
+    "dyn_thresh": -52.134697,
+    "atp": 103.00789,
     "internal_phase": 36,
     "port0_v": 15.0,
     "trace0": 0
@@ -326,8 +326,8 @@
   {
     "tick": 37,
     "soma_v": -64.32099,
-    "dyn_thresh": -52.051327,
-    "atp": 102.6784,
+    "dyn_thresh": -52.134464,
+    "atp": 103.00699,
     "internal_phase": 37,
     "port0_v": 15.0,
     "trace0": 0
@@ -335,8 +335,8 @@
   {
     "tick": 38,
     "soma_v": -62.96974,
-    "dyn_thresh": -52.048885,
-    "atp": 102.66875,
+    "dyn_thresh": -52.13424,
+    "atp": 103.00609,
     "internal_phase": 38,
     "port0_v": 15.0,
     "trace0": 0
@@ -344,8 +344,8 @@
   {
     "tick": 39,
     "soma_v": -61.47174,
-    "dyn_thresh": -52.046444,
-    "atp": 102.6591,
+    "dyn_thresh": -52.134014,
+    "atp": 103.005196,
     "internal_phase": 39,
     "port0_v": 15.0,
     "trace0": 0
@@ -353,8 +353,8 @@
   {
     "tick": 40,
     "soma_v": -62.16024,
-    "dyn_thresh": -52.04401,
-    "atp": 102.649475,
+    "dyn_thresh": -52.13379,
+    "atp": 103.0043,
     "internal_phase": 40,
     "port0_v": 15.0,
     "trace0": 0
@@ -362,8 +362,8 @@
   {
     "tick": 41,
     "soma_v": -62.12449,
-    "dyn_thresh": -52.041576,
-    "atp": 102.639854,
+    "dyn_thresh": -52.13356,
+    "atp": 103.00341,
     "internal_phase": 41,
     "port0_v": 15.0,
     "trace0": 0
@@ -371,8 +371,8 @@
   {
     "tick": 42,
     "soma_v": -61.31374,
-    "dyn_thresh": -52.039143,
-    "atp": 102.63024,
+    "dyn_thresh": -52.13334,
+    "atp": 103.002525,
     "internal_phase": 42,
     "port0_v": 15.0,
     "trace0": 0
@@ -380,8 +380,8 @@
   {
     "tick": 43,
     "soma_v": -61.46599,
-    "dyn_thresh": -52.036713,
-    "atp": 102.620636,
+    "dyn_thresh": -52.133114,
+    "atp": 103.00164,
     "internal_phase": 43,
     "port0_v": 15.0,
     "trace0": 0
@@ -389,8 +389,8 @@
   {
     "tick": 44,
     "soma_v": -61.54099,
-    "dyn_thresh": -52.034286,
-    "atp": 102.611046,
+    "dyn_thresh": -52.13289,
+    "atp": 103.000755,
     "internal_phase": 44,
     "port0_v": 15.0,
     "trace0": 0
@@ -398,8 +398,8 @@
   {
     "tick": 45,
     "soma_v": -60.77124,
-    "dyn_thresh": -52.03186,
-    "atp": 102.60146,
+    "dyn_thresh": -52.13267,
+    "atp": 102.99988,
     "internal_phase": 45,
     "port0_v": 15.0,
     "trace0": 0
@@ -407,8 +407,8 @@
   {
     "tick": 46,
     "soma_v": -59.78649,
-    "dyn_thresh": -52.029438,
-    "atp": 102.59189,
+    "dyn_thresh": -52.132446,
+    "atp": 102.999,
     "internal_phase": 46,
     "port0_v": 15.0,
     "trace0": 0
@@ -416,8 +416,8 @@
   {
     "tick": 47,
     "soma_v": -60.12974,
-    "dyn_thresh": -52.027016,
-    "atp": 102.58232,
+    "dyn_thresh": -52.13222,
+    "atp": 102.99812,
     "internal_phase": 47,
     "port0_v": 15.0,
     "trace0": 0
@@ -425,8 +425,8 @@
   {
     "tick": 48,
     "soma_v": -60.37524,
-    "dyn_thresh": -52.024597,
-    "atp": 102.57276,
+    "dyn_thresh": -52.132004,
+    "atp": 102.99725,
     "internal_phase": 48,
     "port0_v": 15.0,
     "trace0": 0
@@ -434,8 +434,8 @@
   {
     "tick": 49,
     "soma_v": -60.83349,
-    "dyn_thresh": -52.022182,
-    "atp": 102.56322,
+    "dyn_thresh": -52.131783,
+    "atp": 102.99638,
     "internal_phase": 49,
     "port0_v": 15.0,
     "trace0": 0
@@ -443,8 +443,8 @@
   {
     "tick": 50,
     "soma_v": -61.438488,
-    "dyn_thresh": -52.019768,
-    "atp": 102.55368,
+    "dyn_thresh": -52.131565,
+    "atp": 102.995514,
     "internal_phase": 50,
     "port0_v": 15.0,
     "trace0": 0
@@ -452,8 +452,8 @@
   {
     "tick": 51,
     "soma_v": -59.994488,
-    "dyn_thresh": -52.01736,
-    "atp": 102.54415,
+    "dyn_thresh": -52.131344,
+    "atp": 102.99465,
     "internal_phase": 51,
     "port0_v": 15.0,
     "trace0": 0
@@ -461,8 +461,8 @@
   {
     "tick": 52,
     "soma_v": -60.630238,
-    "dyn_thresh": -52.01495,
-    "atp": 102.53463,
+    "dyn_thresh": -52.131126,
+    "atp": 102.99379,
     "internal_phase": 52,
     "port0_v": 15.0,
     "trace0": 0
@@ -470,8 +470,8 @@
   {
     "tick": 53,
     "soma_v": -59.563736,
-    "dyn_thresh": -52.012547,
-    "atp": 102.52512,
+    "dyn_thresh": -52.13091,
+    "atp": 102.99293,
     "internal_phase": 53,
     "port0_v": 15.0,
     "trace0": 0
@@ -479,8 +479,8 @@
   {
     "tick": 54,
     "soma_v": -59.403736,
-    "dyn_thresh": -52.01014,
-    "atp": 102.515625,
+    "dyn_thresh": -52.13069,
+    "atp": 102.99207,
     "internal_phase": 54,
     "port0_v": 15.0,
     "trace0": 0
@@ -488,8 +488,8 @@
   {
     "tick": 55,
     "soma_v": -58.161236,
-    "dyn_thresh": -52.00774,
-    "atp": 102.506134,
+    "dyn_thresh": -52.130474,
+    "atp": 102.99122,
     "internal_phase": 55,
     "port0_v": 15.0,
     "trace0": 0
@@ -497,8 +497,8 @@
   {
     "tick": 56,
     "soma_v": -58.187737,
-    "dyn_thresh": -52.00534,
-    "atp": 102.49665,
+    "dyn_thresh": -52.13026,
+    "atp": 102.990364,
     "internal_phase": 56,
     "port0_v": 15.0,
     "trace0": 0
@@ -506,8 +506,8 @@
   {
     "tick": 57,
     "soma_v": -58.44124,
-    "dyn_thresh": -52.00294,
-    "atp": 102.487175,
+    "dyn_thresh": -52.130047,
+    "atp": 102.98952,
     "internal_phase": 57,
     "port0_v": 15.0,
     "trace0": 0
@@ -515,8 +515,8 @@
   {
     "tick": 58,
     "soma_v": -57.158737,
-    "dyn_thresh": -52.00055,
-    "atp": 102.477715,
+    "dyn_thresh": -52.129833,
+    "atp": 102.98867,
     "internal_phase": 58,
     "port0_v": 15.0,
     "trace0": 0
@@ -524,8 +524,8 @@
   {
     "tick": 59,
     "soma_v": -55.989986,
-    "dyn_thresh": -51.998158,
-    "atp": 102.46826,
+    "dyn_thresh": -52.129616,
+    "atp": 102.98782,
     "internal_phase": 59,
     "port0_v": 15.0,
     "trace0": 0
@@ -533,8 +533,8 @@
   {
     "tick": 60,
     "soma_v": -55.088737,
-    "dyn_thresh": -51.99577,
-    "atp": 102.45882,
+    "dyn_thresh": -52.129406,
+    "atp": 102.986984,
     "internal_phase": 60,
     "port0_v": 15.0,
     "trace0": 0
@@ -542,8 +542,8 @@
   {
     "tick": 61,
     "soma_v": -55.822487,
-    "dyn_thresh": -51.99338,
-    "atp": 102.44938,
+    "dyn_thresh": -52.129196,
+    "atp": 102.986145,
     "internal_phase": 61,
     "port0_v": 15.0,
     "trace0": 0
@@ -551,8 +551,8 @@
   {
     "tick": 62,
     "soma_v": -54.672237,
-    "dyn_thresh": -51.990993,
-    "atp": 102.43995,
+    "dyn_thresh": -52.12898,
+    "atp": 102.985306,
     "internal_phase": 62,
     "port0_v": 15.0,
     "trace0": 0
@@ -560,8 +560,8 @@
   {
     "tick": 63,
     "soma_v": -55.22949,
-    "dyn_thresh": -51.988613,
-    "atp": 102.430534,
+    "dyn_thresh": -52.128773,
+    "atp": 102.984474,
     "internal_phase": 63,
     "port0_v": 15.0,
     "trace0": 0
@@ -569,8 +569,8 @@
   {
     "tick": 64,
     "soma_v": -54.46124,
-    "dyn_thresh": -51.986233,
-    "atp": 102.42113,
+    "dyn_thresh": -52.12856,
+    "atp": 102.98364,
     "internal_phase": 64,
     "port0_v": 15.0,
     "trace0": 0
@@ -578,8 +578,8 @@
   {
     "tick": 65,
     "soma_v": -54.28524,
-    "dyn_thresh": -51.983852,
-    "atp": 102.41173,
+    "dyn_thresh": -52.12835,
+    "atp": 102.98281,
     "internal_phase": 65,
     "port0_v": 15.0,
     "trace0": 0
@@ -587,8 +587,8 @@
   {
     "tick": 66,
     "soma_v": -54.89999,
-    "dyn_thresh": -51.98148,
-    "atp": 102.402336,
+    "dyn_thresh": -52.12814,
+    "atp": 102.98199,
     "internal_phase": 66,
     "port0_v": 15.0,
     "trace0": 0
@@ -596,8 +596,8 @@
   {
     "tick": 67,
     "soma_v": -53.98349,
-    "dyn_thresh": -51.979103,
-    "atp": 102.39295,
+    "dyn_thresh": -52.127934,
+    "atp": 102.98116,
     "internal_phase": 67,
     "port0_v": 15.0,
     "trace0": 0
@@ -605,8 +605,8 @@
   {
     "tick": 68,
     "soma_v": -53.71099,
-    "dyn_thresh": -51.976734,
-    "atp": 102.38358,
+    "dyn_thresh": -52.127724,
+    "atp": 102.98034,
     "internal_phase": 68,
     "port0_v": 15.0,
     "trace0": 0
@@ -614,8 +614,8 @@
   {
     "tick": 69,
     "soma_v": -52.46374,
-    "dyn_thresh": -51.974365,
-    "atp": 102.37422,
+    "dyn_thresh": -52.127518,
+    "atp": 102.97952,
     "internal_phase": 69,
     "port0_v": 15.0,
     "trace0": 0
@@ -623,8 +623,8 @@
   {
     "tick": 70,
     "soma_v": -51.333492,
-    "dyn_thresh": -51.972,
-    "atp": 102.36487,
+    "dyn_thresh": -52.12731,
+    "atp": 102.97871,
     "internal_phase": 70,
     "port0_v": 15.0,
     "trace0": 0
@@ -632,8 +632,8 @@
   {
     "tick": 71,
     "soma_v": 40.10325,
-    "dyn_thresh": -45.64414,
-    "atp": 77.35552,
+    "dyn_thresh": -45.801613,
+    "atp": 77.97789,
     "internal_phase": 71,
     "port0_v": 15.0,
     "trace0": 0
@@ -641,8 +641,8 @@
   {
     "tick": 72,
     "soma_v": -80.497215,
-    "dyn_thresh": -45.64792,
-    "atp": 77.370445,
+    "dyn_thresh": -45.81982,
+    "atp": 78.049866,
     "internal_phase": 72,
     "port0_v": 15.0,
     "trace0": 0
@@ -650,8 +650,8 @@
   {
     "tick": 73,
     "soma_v": -78.29722,
-    "dyn_thresh": -45.651688,
-    "atp": 77.38535,
+    "dyn_thresh": -45.837982,
+    "atp": 78.12163,
     "internal_phase": 73,
     "port0_v": 15.0,
     "trace0": 0
@@ -659,8 +659,8 @@
   {
     "tick": 74,
     "soma_v": -78.90272,
-    "dyn_thresh": -45.65546,
-    "atp": 77.40025,
+    "dyn_thresh": -45.856087,
+    "atp": 78.193184,
     "internal_phase": 74,
     "port0_v": 15.0,
     "trace0": 0
@@ -668,8 +668,8 @@
   {
     "tick": 75,
     "soma_v": -79.075966,
-    "dyn_thresh": -45.659225,
-    "atp": 77.41514,
+    "dyn_thresh": -45.87414,
+    "atp": 78.264534,
     "internal_phase": 75,
     "port0_v": 15.0,
     "trace0": 0
@@ -677,8 +677,8 @@
   {
     "tick": 76,
     "soma_v": -79.25847,
-    "dyn_thresh": -45.662987,
-    "atp": 77.43001,
+    "dyn_thresh": -45.89214,
+    "atp": 78.33567,
     "internal_phase": 76,
     "port0_v": 15.0,
     "trace0": 0
@@ -686,8 +686,8 @@
   {
     "tick": 77,
     "soma_v": -79.26472,
-    "dyn_thresh": -45.666748,
-    "atp": 77.44486,
+    "dyn_thresh": -45.910084,
+    "atp": 78.4066,
     "internal_phase": 77,
     "port0_v": 15.0,
     "trace0": 0
@@ -695,8 +695,8 @@
   {
     "tick": 78,
     "soma_v": -77.91697,
-    "dyn_thresh": -45.6705,
-    "atp": 77.4597,
+    "dyn_thresh": -45.92798,
+    "atp": 78.477325,
     "internal_phase": 78,
     "port0_v": 15.0,
     "trace0": 0
@@ -704,8 +704,8 @@
   {
     "tick": 79,
     "soma_v": -77.32622,
-    "dyn_thresh": -45.67425,
-    "atp": 77.474525,
+    "dyn_thresh": -45.945824,
+    "atp": 78.547844,
     "internal_phase": 79,
     "port0_v": 15.0,
     "trace0": 0
@@ -713,8 +713,8 @@
   {
     "tick": 80,
     "soma_v": -77.27572,
-    "dyn_thresh": -45.677998,
-    "atp": 77.489334,
+    "dyn_thresh": -45.96361,
+    "atp": 78.61816,
     "internal_phase": 80,
     "port0_v": 15.0,
     "trace0": 0
@@ -722,8 +722,8 @@
   {
     "tick": 81,
     "soma_v": -76.97947,
-    "dyn_thresh": -45.68174,
-    "atp": 77.50413,
+    "dyn_thresh": -45.98135,
+    "atp": 78.68826,
     "internal_phase": 81,
     "port0_v": 15.0,
     "trace0": 0
@@ -731,8 +731,8 @@
   {
     "tick": 82,
     "soma_v": -76.78872,
-    "dyn_thresh": -45.685482,
-    "atp": 77.518906,
+    "dyn_thresh": -45.999043,
+    "atp": 78.75817,
     "internal_phase": 82,
     "port0_v": 15.0,
     "trace0": 0
@@ -740,8 +740,8 @@
   {
     "tick": 83,
     "soma_v": -76.71272,
-    "dyn_thresh": -45.689217,
-    "atp": 77.533676,
+    "dyn_thresh": -46.016674,
+    "atp": 78.82787,
     "internal_phase": 83,
     "port0_v": 15.0,
     "trace0": 0
@@ -749,8 +749,8 @@
   {
     "tick": 84,
     "soma_v": -76.12547,
-    "dyn_thresh": -45.69295,
-    "atp": 77.54843,
+    "dyn_thresh": -46.03426,
+    "atp": 78.89737,
     "internal_phase": 84,
     "port0_v": 15.0,
     "trace0": 0
@@ -758,8 +758,8 @@
   {
     "tick": 85,
     "soma_v": -76.14772,
-    "dyn_thresh": -45.696682,
-    "atp": 77.56317,
+    "dyn_thresh": -46.051792,
+    "atp": 78.96667,
     "internal_phase": 85,
     "port0_v": 15.0,
     "trace0": 0
@@ -767,8 +767,8 @@
   {
     "tick": 86,
     "soma_v": -74.73522,
-    "dyn_thresh": -45.70041,
-    "atp": 77.577896,
+    "dyn_thresh": -46.069275,
+    "atp": 79.03576,
     "internal_phase": 86,
     "port0_v": 15.0,
     "trace0": 0
@@ -776,8 +776,8 @@
   {
     "tick": 87,
     "soma_v": -74.91597,
-    "dyn_thresh": -45.704132,
-    "atp": 77.592606,
+    "dyn_thresh": -46.086704,
+    "atp": 79.10465,
     "internal_phase": 87,
     "port0_v": 15.0,
     "trace0": 0
@@ -785,8 +785,8 @@
   {
     "tick": 88,
     "soma_v": -73.75747,
-    "dyn_thresh": -45.707848,
-    "atp": 77.6073,
+    "dyn_thresh": -46.104088,
+    "atp": 79.17335,
     "internal_phase": 88,
     "port0_v": 15.0,
     "trace0": 0
@@ -794,8 +794,8 @@
   {
     "tick": 89,
     "soma_v": -73.81747,
-    "dyn_thresh": -45.71156,
-    "atp": 77.62198,
+    "dyn_thresh": -46.121414,
+    "atp": 79.24184,
     "internal_phase": 89,
     "port0_v": 15.0,
     "trace0": 0
@@ -803,8 +803,8 @@
   {
     "tick": 90,
     "soma_v": -74.10547,
-    "dyn_thresh": -45.71527,
-    "atp": 77.63664,
+    "dyn_thresh": -46.138695,
+    "atp": 79.31013,
     "internal_phase": 90,
     "port0_v": 15.0,
     "trace0": 0
@@ -812,8 +812,8 @@
   {
     "tick": 91,
     "soma_v": -73.41397,
-    "dyn_thresh": -45.71898,
-    "atp": 77.6513,
+    "dyn_thresh": -46.155926,
+    "atp": 79.37822,
     "internal_phase": 91,
     "port0_v": 15.0,
     "trace0": 0
@@ -821,8 +821,8 @@
   {
     "tick": 92,
     "soma_v": -72.09197,
-    "dyn_thresh": -45.722687,
-    "atp": 77.66594,
+    "dyn_thresh": -46.1731,
+    "atp": 79.44611,
     "internal_phase": 92,
     "port0_v": 15.0,
     "trace0": 0
@@ -830,8 +830,8 @@
   {
     "tick": 93,
     "soma_v": -72.800476,
-    "dyn_thresh": -45.726383,
-    "atp": 77.680565,
+    "dyn_thresh": -46.19023,
+    "atp": 79.51381,
     "internal_phase": 93,
     "port0_v": 15.0,
     "trace0": 0
@@ -839,8 +839,8 @@
   {
     "tick": 94,
     "soma_v": -71.69523,
-    "dyn_thresh": -45.730083,
-    "atp": 77.695175,
+    "dyn_thresh": -46.20731,
+    "atp": 79.581314,
     "internal_phase": 94,
     "port0_v": 15.0,
     "trace0": 0
@@ -848,8 +848,8 @@
   {
     "tick": 95,
     "soma_v": -71.719475,
-    "dyn_thresh": -45.733776,
-    "atp": 77.70977,
+    "dyn_thresh": -46.22434,
+    "atp": 79.64862,
     "internal_phase": 95,
     "port0_v": 15.0,
     "trace0": 0
@@ -857,8 +857,8 @@
   {
     "tick": 96,
     "soma_v": -72.02373,
-    "dyn_thresh": -45.73746,
-    "atp": 77.72435,
+    "dyn_thresh": -46.24132,
+    "atp": 79.71573,
     "internal_phase": 96,
     "port0_v": 15.0,
     "trace0": 0
@@ -866,8 +866,8 @@
   {
     "tick": 97,
     "soma_v": -70.816475,
-    "dyn_thresh": -45.741146,
-    "atp": 77.738914,
+    "dyn_thresh": -46.258255,
+    "atp": 79.782646,
     "internal_phase": 97,
     "port0_v": 15.0,
     "trace0": 0
@@ -875,8 +875,8 @@
   {
     "tick": 98,
     "soma_v": -70.362724,
-    "dyn_thresh": -45.74483,
-    "atp": 77.75347,
+    "dyn_thresh": -46.27513,
+    "atp": 79.849365,
     "internal_phase": 98,
     "port0_v": 15.0,
     "trace0": 0
@@ -884,8 +884,8 @@
   {
     "tick": 99,
     "soma_v": -69.053474,
-    "dyn_thresh": -45.74851,
-    "atp": 77.76801,
+    "dyn_thresh": -46.291965,
+    "atp": 79.91589,
     "internal_phase": 99,
     "port0_v": 15.0,
     "trace0": 0
@@ -893,8 +893,8 @@
   {
     "tick": 100,
     "soma_v": -69.192726,
-    "dyn_thresh": -45.752186,
-    "atp": 77.78254,
+    "dyn_thresh": -46.30875,
+    "atp": 79.98222,
     "internal_phase": 100,
     "port0_v": 15.0,
     "trace0": 0

@@ -22,8 +22,8 @@ fn test_metabolic_sink() {
     let mut env = default_env();
     env.global_oxygen_level = 0.4;
 
-    // Grace period protects neurons until tick 500
-    for tick in 501..=700 {
+    // Grace period protects neurons until tick 5000
+    for tick in 5001..=5200 {
         for n in &mut graph.neurons {
             if n.is_alive == 1 {
                 n.current_voltage = 100.0; 
@@ -70,7 +70,7 @@ fn test_mitochondrial_failure() {
     env.global_glucose_level = 0.05; // Critical glucose
     env.global_oxygen_level = 0.4; // Hypoxia required for death
 
-    for tick in 1..=500 {
+    for tick in 5001..=5500 {
         // Minimal activity to burn ATP slowly
         if tick % 10 == 0 {
             for n in &mut graph.neurons {
@@ -113,7 +113,11 @@ fn test_oxygen_deprivation() {
     let mut env = default_env();
     env.global_oxygen_level = 0.0; // Total hypoxia
 
-    for tick in 1..=600 {
+    for n in &mut graph.neurons {
+        n.energy_atp = 0.1; // Set very low ATP so they die almost instantly
+    }
+
+    for tick in 5001..=5050 {
         graph.tick(tick, env.clone());
     }
     
@@ -128,7 +132,7 @@ fn test_calcium_overdose() {
     let id = graph.add_neuron(NeuronType::Pyramidal);
     let env = default_env();
     
-    for tick in 1..=500 {
+    for tick in 5001..=5500 {
         // Force spike every tick, bypassing refractory by artificially resetting it
         if graph.neurons[id as usize].is_alive == 1 {
             graph.neurons[id as usize].current_voltage = 100.0; 

@@ -75,7 +75,7 @@ fn test_atp_gating_starvation_filter() {
     }
     
     assert!(n_fed.current_voltage <= n_fed.resting_voltage + 5.0 || n_fed.refractory_time_left > 0.0, "Fed neuron should have spiked!");
-    assert!(n_starving.current_voltage > n_starving.resting_voltage + 5.0 && n_starving.refractory_time_left == 0.0, "Starving neuron should have ignored the signal due to higher dynamic threshold!");
+    assert!((n_starving.current_voltage - n_starving.resting_voltage).abs() < 5.0, "Starving neuron should have entered metabolic coma (returning near resting voltage due to thermal noise)");
 }
 
 

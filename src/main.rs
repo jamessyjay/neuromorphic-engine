@@ -93,12 +93,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if is_benchmark {
         // Force fresh start for benchmark if requested
-        if args.contains(&String::from("--fresh")) {
-            if std::path::Path::new("brain_save.bin").exists() {
+        if args.contains(&String::from("--fresh"))
+            && std::path::Path::new("brain_save.bin").exists() {
                 println!("Deleting old brain_save.bin for a fresh start...");
                 let _ = std::fs::remove_file("brain_save.bin");
             }
-        }
 
         if tx_option.is_some() {
             println!("\n=======================================================");

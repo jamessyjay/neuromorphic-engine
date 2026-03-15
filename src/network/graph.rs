@@ -14,6 +14,12 @@ pub struct NetworkGraph {
 
 
 
+impl Default for NetworkGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NetworkGraph {
     pub fn new() -> Self {
         NetworkGraph {
@@ -71,7 +77,7 @@ impl NetworkGraph {
         hasher.update((self.neurons.len() as u32).to_le_bytes());
         for n in &self.neurons {
             hasher.update(n.id.to_le_bytes());
-            hasher.update((n.is_alive as u8).to_le_bytes());
+            hasher.update(n.is_alive.to_le_bytes());
             hasher.update(n.energy_atp.to_bits().to_le_bytes());
             hasher.update(n.metabolic_wear.to_le_bytes());
         }

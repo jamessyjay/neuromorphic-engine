@@ -113,6 +113,9 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
         if rand::RngExt::random_bool(&mut rng, 0.1) {
             graph.neurons[i].current_voltage = -30.0;
         }
+        // Phase 14: Metabolic Calibration - Glucose Injection at birth
+        graph.neurons[i].energy_atp = graph.neurons[i].max_atp;
+        graph.neurons[i].calcium_level = 0.0;
     }
 
     // Force memory coalescing after generation
@@ -220,7 +223,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
             if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_BENCHMARK == 0 {
                 let mut update = streamer::TickUpdatePayload {
                     tick,
-                    total_spikes: accumulated_spikes as u32,
+                    total_spikes: accumulated_spikes,
                     global_oxygen: current_env.global_oxygen_level,
                     global_glucose: current_env.global_glucose_level,
                     neurons: Vec::with_capacity(graph.neurons.len()),
@@ -288,7 +291,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         }
         if tick % TELEMETRY_PRINT_INTERVAL == 0 {
             let dead_count = graph.neurons.iter().filter(|n| n.is_alive == 0).count();
-            telemetry.print_report(graph.neurons.len(), graph.synapses.len(), dead_count);
+            telemetry.print_report(graph.neurons.len(), graph.synapses.len(), dead_count, &graph.neurons);
         }
 
         data.ticks.push(tick);
@@ -597,8 +600,8 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
     let _total_ticks = 5000;
     println!("--- EXECUTING SLEEP CYCLE TEST (Phase 35 Validation) ---");
     let mut graph = if let Some(loaded_snapshot) = BrainSnapshot::load_from_disk("brain_save.bin") {
-        let loaded_graph = loaded_snapshot.graph;
-        loaded_graph
+        
+        loaded_snapshot.graph
     } else {
         setup_benchmark(1000, 10000)
     };
@@ -705,7 +708,7 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
 
     for tick in 1..=1200 {
         env.light_level = if (tick / 50) % 2 == 0 { LIGHT_HIGH } else { LIGHT_LOW };
-        if tick >= 300 && tick <= 800 {
+        if (300..=800).contains(&tick) {
             env.dopamine_multiplier = BOOSTED_DOPAMINE;
         } else {
             env.dopamine_multiplier = DEFAULT_DOPAMINE;
@@ -997,7 +1000,7 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
         
         let start = Instant::now();
         for t in 1..=ticks {
-            graph.tick(t, env.clone());
+            graph.tick(t, env);
         }
         let elapsed = start.elapsed().as_secs_f64();
         
@@ -1061,7 +1064,7 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
                     synapses: Vec::with_capacity(graph.synapses.len()),
                 };
                 for n in &graph.neurons {
-                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_ as u8));
+                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_));
                 }
                 for s in &graph.synapses {
                     snapshot.synapses.push((s.source_id, s.target_id, s.weight));
@@ -1148,9 +1151,9 @@ use crate::engine::ffi::Environment;
 
         let current_env = {
             if let Ok(env_guard) = shared_env.lock() {
-                env_guard.clone()
+                *env_guard
             } else {
-                env.clone()
+                env
             }
         };
         
@@ -1167,7 +1170,7 @@ use crate::engine::ffi::Environment;
                     synapses: Vec::new(),
                 };
                 for n in &graph.neurons {
-                    initial.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_ as u8));
+                    initial.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_));
                 }
                 for s in &graph.synapses {
                     initial.synapses.push((s.source_id, s.target_id, s.weight));
@@ -1191,7 +1194,7 @@ use crate::engine::ffi::Environment;
                             _ => 5.0, // Regenerating/Other (Green)
                         }
                     } else if n.current_voltage >= 30.0 { 2.0 } else if n.current_voltage > -50.0 { 1.0 } else { 0.0 };
-                    let atp_percent = (n.energy_atp / n.max_atp * 100.0) as f32;
+                    let atp_percent = n.energy_atp / n.max_atp * 100.0;
                     update.neurons.push((n.id, state, atp_percent));
                 }
                 

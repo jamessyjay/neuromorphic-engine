@@ -14,6 +14,12 @@ pub struct Telemetry {
     pub sim_speed: f64, // Simulated time / Real time (1.0 = realtime)
 }
 
+impl Default for Telemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Telemetry {
     pub fn new() -> Self {
         Self {
@@ -34,7 +40,7 @@ impl Telemetry {
         }
     }
 
-    pub fn print_report(&self, num_neurons: usize, num_synapses: usize, dead_count: usize) {
+    pub fn print_report(&self, num_neurons: usize, num_synapses: usize, dead_count: usize, neurons: &[BaseNeuron]) {
         println!("\n--- TELEMETRY REPORT ---");
         println!("Status: {} Alive | {} Dead (Total: {})", num_neurons - dead_count, dead_count, num_neurons);
         println!("Simulation Speed: {:.2}x ({})", 
@@ -50,6 +56,27 @@ impl Telemetry {
         println!("Memory Overhead: {:.2} KB total", total_mem_kb);
         println!("  - Per Neuron: {} bytes", neuron_mem);
         println!("  - Per Synapse: {} bytes", synapse_mem);
+
+        // Death Monitor (Phase 14)
+        if dead_count > 0 {
+            let mut atp_deaths = 0;
+            let mut calcium_deaths = 0;
+            let mut glucose_deaths = 0;
+            for n in neurons {
+                if n.is_alive == 0 {
+                    match n.death_reason {
+                        1 => atp_deaths += 1,
+                        2 => calcium_deaths += 1,
+                        3 => glucose_deaths += 1,
+                        _ => {}
+                    }
+                }
+            }
+            println!("Death Monitor (Total {}):", dead_count);
+            println!("  - Hypoxia (ATP Low): {:.1}%", (atp_deaths as f32 / dead_count as f32) * 100.0);
+            println!("  - Calcium Toxicity: {:.1}%", (calcium_deaths as f32 / dead_count as f32) * 100.0);
+            println!("  - Glucose Starvation: {:.1}%", (glucose_deaths as f32 / dead_count as f32) * 100.0);
+        }
         
         // Jetson/Tegrastats Mock
         if let Ok(content) = fs::read_to_string("/sys/devices/virtual/thermal/thermal_zone0/temp") {

@@ -37,7 +37,7 @@ extern "C" {
 #define ACTION_POTENTIAL_PEAK 40.0f
 
 // Metabolic parameters (Phase 40)
-#define ATP_RECOVERY_RATE 0.05f
+#define ATP_RECOVERY_RATE 0.15f
 #define ATP_SPIKE_COST 25.0f
 #define GLUCOSE_CONVERSION_RATE 0.2f
 #define MIN_GLUCOSE_LEVEL 0.1f
@@ -57,7 +57,7 @@ extern "C" {
 #define DEATH_CALCIUM_HIGH 2
 #define DEATH_GLUCOSE_STARVATION 3
 #define RESURRECTION_TICK_DELAY 1000
-#define NETWORK_GRACE_PERIOD_TICKS 500
+#define NETWORK_GRACE_PERIOD_TICKS 5000
 
 // Dendritic Tree Physics (Phase 33/34)
 #define BRANCH_LEAK_COEFF 0.9f
@@ -82,14 +82,14 @@ extern "C" {
 #define HOMEOSTATIC_PENALTY 0.5f
 #define HOMEOSTATIC_RECOVERY 0.1f
 
-#define BASELINE_LEAK_RATE 0.01f
+#define BASELINE_LEAK_RATE 0.005f
 #define LOW_ATP_LEAK_MULTIPLIER 1.1f
 #define ATP_STRESS_THRESHOLD 30.0f
 // MMN v1.1: Hunger sensitivity. Controls how much the activation threshold increases when ATP is low.
 #define ATP_HUNGER_BETA 0.5f
 #define EMERGENCY_ATP_THRESHOLD 0.01f
 #define EMERGENCY_SILENCE_THRESHOLD 0.0f // Achievable mV, but high (sleep)
-#define CALCIUM_RECOVERY_RATE 0.5f
+#define CALCIUM_RECOVERY_RATE 1.0f
 #define VOLTAGE_DRIFT_RATE 0.4f
 
 // Photoreceptor specific

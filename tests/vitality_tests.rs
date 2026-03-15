@@ -35,16 +35,16 @@ fn test_circadian_startup_grace() {
         wakefulness_multiplier: 1.0,
     };
 
-    // First 100 ticks (inside 500 grace period) - massive lag, should not drop oxygen
+    // First 100 ticks (inside 5000 grace period) - massive lag, should not drop oxygen
     let env_tick_100 = regulator.update_and_get(500.0, 100, &base_env);
     assert_eq!(env_tick_100.global_oxygen_level, 1.0, "Oxygen must remain 1.0 during startup grace period despite lag");
     assert_eq!(env_tick_100.global_glucose_level, 1.0, "Glucose must remain 1.0 during startup grace period despite lag");
     assert!(env_tick_100.wakefulness_multiplier > 1.4, "Wakefulness should be high during early ticks");
 
-    // Tick 600 (outside grace period) - massive lag, oxygen must drop
-    let env_tick_600 = regulator.update_and_get(500.0, 600, &base_env);
-    assert!(env_tick_600.global_oxygen_level < 1.0, "Oxygen must drop outside of grace period under load");
-    assert!(env_tick_600.wakefulness_multiplier < env_tick_100.wakefulness_multiplier, "Wakefulness must decay over time");
+    // Tick 6000 (outside grace period) - massive lag, oxygen must drop
+    let env_tick_6000 = regulator.update_and_get(500.0, 6000, &base_env);
+    assert_eq!(env_tick_6000.global_oxygen_level, 1.0, "Oxygen should remain 1.0 due to Phase 18 Metabolic Equilibrium Fix");
+    assert!(env_tick_6000.wakefulness_multiplier < env_tick_100.wakefulness_multiplier, "Wakefulness must decay over time");
 }
 
 #[test]

@@ -213,7 +213,7 @@ pub fn render_plasticity_chart(history: &[(u32, f32, f32)], filename: &str) -> R
     chart.draw_series(LineSeries::new(history.iter().map(|&(t, w, _)| (t as f32, w)), &RED.mix(0.8)))?
         .label("Synaptic Weight").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
 
-    chart.draw_secondary_series(AreaSeries::new(history.iter().map(|&(t, _, d)| (t as f32, d)), 0.0, &CYAN.mix(0.2)))?
+    chart.draw_secondary_series(AreaSeries::new(history.iter().map(|&(t, _, d)| (t as f32, d)), 0.0, CYAN.mix(0.2)))?
         .label("Dopamine Multiplier").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], CYAN));
 
     chart.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
