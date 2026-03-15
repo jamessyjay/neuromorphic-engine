@@ -201,7 +201,12 @@
                     if (s && t) {
                         const idx = i*6;
                         pos[idx]=s.x; pos[idx+1]=s.y; pos[idx+2]=s.z; pos[idx+3]=t.x; pos[idx+4]=t.y; pos[idx+5]=t.z;
-                        _tempColor.setHSL(0.55, 0.8, 0.2);
+                        
+                        // Map weight (typically 0.0 to 5.0) to lightness (0.3 to 0.8)
+                        const weight = syn[2] || 1.0;
+                        const lightness = Math.min(0.8, 0.3 + (weight * 0.1));
+                        _tempColor.setHSL(0.55, 0.9, lightness); // Dynamic brightness based on weight
+                        
                         col[idx]=col[idx+3]=_tempColor.r; col[idx+1]=col[idx+4]=_tempColor.g; col[idx+2]=col[idx+5]=_tempColor.b;
                         s.outgoing.push({ targetId: syn[1] });
                     }
@@ -209,7 +214,13 @@
                 const lineGeo = new THREE.BufferGeometry();
                 lineGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
                 lineGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-                synapseLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.2 }));
+                // Additive blending makes dense connections look brighter and "thicker"
+                synapseLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ 
+                    vertexColors: true, 
+                    transparent: true, 
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending 
+                }));
                 scene.add(synapseLines);
 
                 pulseSystem = new THREE.Points(pulseGeometry, new THREE.PointsMaterial({ color: 0xccffef, size: 0.8, map: glowTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
