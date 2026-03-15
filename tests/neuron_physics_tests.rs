@@ -71,8 +71,8 @@ fn test_atp_gating_starvation_filter() {
     env.wakefulness_multiplier = 0.0; // Disable recovery so starving stays starving
     
     unsafe {
-        tick_neuron_cpu(&mut n_fed, env.clone(), 1);
-        tick_neuron_cpu(&mut n_starving, env.clone(), 1);
+        tick_neuron_cpu(&mut n_fed, std::ptr::null_mut(), 0, env.clone(), 1);
+        tick_neuron_cpu(&mut n_starving, std::ptr::null_mut(), 0, env.clone(), 1);
     }
     
     assert!(n_fed.current_voltage <= n_fed.resting_voltage + 5.0 || n_fed.refractory_time_left > 0.0, "Fed neuron should have spiked!");
@@ -243,8 +243,8 @@ fn test_nmda_multiplexing_logical_and() {
     n_focus.branches[0].voltage = pack_voltage(sub_stimulus * 2.0);
     
     unsafe {
-        tick_neuron_cpu(&mut n_dist, env.clone(), 1);
-        tick_neuron_cpu(&mut n_focus, env.clone(), 1);
+        tick_neuron_cpu(&mut n_dist, std::ptr::null_mut(), 0, env.clone(), 1);
+        tick_neuron_cpu(&mut n_focus, std::ptr::null_mut(), 0, env.clone(), 1);
     }
     
     println!("Dist voltage: {}, Focus voltage: {}", n_dist.current_voltage, n_focus.current_voltage);
@@ -280,7 +280,7 @@ fn test_the_matrix_golden_master_snapshot() {
         }
         
         unsafe {
-            tick_neuron_cpu(&mut neuron, env.clone(), tick);
+            tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), tick);
         }
         
         // Calculate dynamic threshold
@@ -355,7 +355,7 @@ fn test_htm_predictive_state_coincidence() {
     // Phase 1: Context arrives on Basal branch 3
     neuron.branches[4].voltage = pack_voltage(15.0); // Over NMDA threshold
     
-    unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 1); }
+    unsafe { tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), 1); }
     
     println!("predictive_ticks: {}, current_voltage: {}, resting: {}, threshold: {}", neuron.predictive_ticks, neuron.current_voltage, neuron.resting_voltage, neuron.activation_threshold);
     assert_eq!(neuron.predictive_ticks, 19, "Neuron should enter Predictive State for 20 ticks");
@@ -375,21 +375,21 @@ fn test_htm_predictive_state_coincidence() {
     
     neuron.current_voltage = neuron.resting_voltage + 10.0;
     
-    unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 2); }
+    unsafe { tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), 2); }
     
     assert_eq!(neuron.last_spike_tick, 2, "Neuron MUST SPIKE due to coincidence of weak signal + Predictive State");
     
     // Reset and wait for predictive state to wear off
     neuron.current_voltage = neuron.resting_voltage;
     for tick in 3..=60 {
-        unsafe { tick_neuron_cpu(&mut neuron, env.clone(), tick); }
+        unsafe { tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), tick); }
     }
     
     assert_eq!(neuron.predictive_ticks, 0, "Predictive state should have worn off");
     
     // Phase 3: Send the exact same weak signal (10mV) without predictive state
     neuron.current_voltage = neuron.resting_voltage + 10.0;
-    unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 61); }
+    unsafe { tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), 61); }
     
     assert_ne!(neuron.last_spike_tick, 61, "Neuron MUST NOT SPIKE from weak signal without predictive context");
 }

@@ -215,6 +215,11 @@ fn test_dendritic_role_separation() {
     graph.add_neuron(NeuronType::Pyramidal); // 0 (Source for Proximal)
     graph.add_neuron(NeuronType::Pyramidal); // 1 (Source for Distal)
     graph.add_neuron(NeuronType::Pyramidal); // 2 (Target)
+    
+    // Separate into different columns to avoid WTA inhibition interfering with the test
+    graph.neurons[0].column_id = 0;
+    graph.neurons[1].column_id = 1;
+    graph.neurons[2].column_id = 2;
 
     let env = Environment {
         global_oxygen_level: 1.0,

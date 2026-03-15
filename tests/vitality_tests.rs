@@ -3,7 +3,7 @@ use neuromorphic_engine::engine::environment::EnvironmentRegulator;
 
 // For FFI tests
 extern "C" {
-    fn tick_neuron_cpu(neuron: *mut BaseNeuron, env: Environment, current_tick: u32);
+    fn tick_neuron_cpu(neuron: *mut BaseNeuron, all_neurons: *mut BaseNeuron, count: std::ffi::c_int, env: Environment, current_tick: u32);
     fn init_neuron(neuron: *mut BaseNeuron, id: u32, type_: NeuronType, seed: u32);
 }
 
@@ -72,7 +72,7 @@ fn test_thermal_noise_prevents_freezing() {
 
     // Tick it 50 times in a vacuum
     for tick in 1..=50 {
-        unsafe { tick_neuron_cpu(&mut neuron, env.clone(), tick); }
+        unsafe { tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), tick); }
     }
 
     // Since we apply thermal noise, voltage should NOT be exactly the resting voltage.
@@ -99,12 +99,12 @@ fn test_phoenix_resurrection() {
 
     // Tick 999 times - should remain dead
     for tick in 1..=999 {
-        unsafe { tick_neuron_cpu(&mut neuron, env.clone(), tick); }
+        unsafe { tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), tick); }
         assert_eq!(neuron.is_alive, 0, "Neuron should remain dead at tick {}", tick);
     }
     
     // Tick 1000 - Resurrection!
-    unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 1000); }
+    unsafe { tick_neuron_cpu(&mut neuron, std::ptr::null_mut(), 0, env.clone(), 1000); }
     
     assert_eq!(neuron.is_alive, 1, "Phoenix loop must resurrect neuron at 1000 ticks");
     assert_eq!(neuron.energy_atp, neuron.max_atp, "Resurrected neuron must have full ATP");

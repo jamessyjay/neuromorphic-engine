@@ -455,10 +455,10 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
     
-    
+    // Phase 3: Reset WTA Inhibition Flag at the start of the tick
+    neurons[idx].status_flags &= ~FLAG_IS_INHIBITED;
     
     // Trace Cleanup: Ensure spike_trace is properly decayed or zeroed
-
     if (!neurons[idx].is_alive) {
         neurons[idx].spike_trace = 0.0f;
         neurons[idx].dead_ticks += 1;
@@ -466,15 +466,13 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
             // Phoenix Resurrection
             neurons[idx].is_alive = true;
             neurons[idx].calcium_level = 0.0f;
-            neurons[idx].energy_ATP = neurons[idx].max_atp; // Phoenix Energy Boost (v0.4.7) - Guaranteed full charge
+            neurons[idx].energy_ATP = neurons[idx].max_atp;
             neurons[idx].current_voltage = neurons[idx].resting_voltage;
             neurons[idx].dead_ticks = 0;
             neurons[idx].death_reason = 0;
         }
         return;
     }
-
-    
 
     update_metabolism(&neurons[idx], env, current_tick);
     update_calcium(&neurons[idx], current_tick);
@@ -483,7 +481,43 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     
     // Thermal Noise (Phase 48)
     neurons[idx].current_voltage += get_thermal_noise(neurons[idx].id, current_tick);
+}
 
+// Optimized Kernel 1.5: WTA Lateral Inhibition Broadcast (Phase 2)
+// Since this is GPU, an O(N^2) naive loop per minicolumn is slow but functional for 10k. 
+// A better way is each thread = 1 neuron. If it spiked, it suppresses others in its minicolumn.
+__global__ void wta_broadcast_kernel(BaseNeuron* neurons, int count, uint32_t current_tick) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= count) return;
+
+    BaseNeuron* n = &neurons[idx];
+    if (!n->is_alive) return;
+
+    // Only pyramidal and interneurons participate in minicolumn WTA
+    if (n->type != TYPE_PYRAMIDAL && n->type != TYPE_INTERNEURON) return;
+
+    // Check if any *other* neuron in the same minicolumn spiked THIS tick
+    bool suppressed = false;
+    for (int i = 0; i < count; i++) {
+        if (i == idx) continue;
+        BaseNeuron* other = &neurons[i];
+        if (other->column_id == n->column_id && other->minicolumn_id == n->minicolumn_id) {
+            if (other->last_spike_tick == current_tick) {
+                // Determine winner if both spiked (e.g. lower ID wins or higher voltage won)
+                // If the other neuron spiked and has a lower ID, it wins the tie-breaker
+                if (n->last_spike_tick != current_tick || other->id < n->id) {
+                    suppressed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (suppressed) {
+        n->status_flags |= FLAG_IS_INHIBITED;
+        n->current_voltage = n->resting_voltage;
+        n->refractory_time_left = 5.0f; // Set refractory to 5 ticks as per spec
+    }
 }
 
 // Optimized Kernel 2: Parallel Synapse Processing (Axon delivery & binding)
@@ -525,6 +559,10 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
     int n_blocks = (count + t_per_b - 1) / t_per_b;
     tick_neurons_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
     cudaDeviceSynchronize(); 
+
+    // Phase 2: WTA Broadcast
+    wta_broadcast_kernel<<<n_blocks, t_per_b>>>(neurons, count, current_tick);
+    cudaDeviceSynchronize();
     
     int s_blocks = (syn_count + t_per_b - 1) / t_per_b;
     tick_synapses_kernel<<<s_blocks, t_per_b>>>(synapses, syn_count, neurons, env, current_tick);
@@ -538,7 +576,9 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 #ifndef USE_CUDA
 extern "C" {
 
-    void tick_neuron_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
+    void tick_neuron_cpu(BaseNeuron* neuron, BaseNeuron* all_neurons, int count, Environment env, uint32_t current_tick) {
+        // Phase 3 (WTA reset) and SDR threshold happen in Rust tick() loop before this
+        
         if (!neuron->is_alive) {
             neuron->spike_trace = 0.0f;
             neuron->predictive_ticks = 0;

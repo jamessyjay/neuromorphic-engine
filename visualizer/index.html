@@ -479,7 +479,7 @@
                             else _tempColor.copy(TYPE_COLORS.dead);
                         } else {
                             if (n.statusFlags & FLAG_IS_INHIBITED) {
-                                _tempColor.copy(baseColor).multiplyScalar(0.2);
+                                _tempColor.copy(baseColor).multiplyScalar(0.1);
                             } else {
                                 _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
                             }

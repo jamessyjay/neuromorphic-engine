@@ -198,3 +198,58 @@ fn test_topology_final_verification() {
     // 3. Check metadata mapping correctly
     assert!(graph.neurons.iter().any(|n| n.column_id == 9), "Error: Column IDs are not assigned correctly!");
 }
+
+#[test]
+fn test_no_orphan_neurons() {
+    // Generate a full network using the new Setup logic
+    let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 10000);
+    
+    let mut out_counts = vec![0; graph.neurons.len()];
+    for s in &graph.synapses {
+        out_counts[s.source_id as usize] += 1;
+    }
+    
+    // Check that every neuron has at least 3 outgoing synapses (except if there are some edge cases, 
+    // but the spec dictates out_synapses >= 3 is guaranteed by the new Orphan logic)
+    for (i, n) in graph.neurons.iter().enumerate() {
+        assert!(out_counts[i] >= 3, "Orphan detected! Neuron {} (Layer {}) has only {} outgoing synapses.", i, n.layer_id, out_counts[i]);
+    }
+}
+
+#[test]
+fn test_wta_suppression() {
+    let mut graph = NetworkGraph::new();
+    
+    // Create a minicolumn with 2 neurons (Pyramidal)
+    for i in 0..2 {
+        graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = 1;
+        graph.neurons[id].minicolumn_id = 1;
+        graph.neurons[id].layer_id = 2; // L2/3
+        graph.neurons[id].is_alive = 1;
+    }
+    
+    let env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        stdp_learning_rate: 0.1,
+        wakefulness_multiplier: 1.0,
+    };
+    
+    // Force spike on Neuron A
+    graph.force_sync_gpu();
+    graph.neurons[0].current_voltage = 50.0; // Above threshold to trigger spike in phase 1
+    
+    // Run tick 1
+    graph.tick(1, env);
+    
+    // Neuron 0 should have spiked in tick 1
+    assert_eq!(graph.neurons[0].last_spike_tick, 1, "Neuron A should have spiked");
+    
+    // Check Neuron 1 (Neuron B) for FLAG_IS_INHIBITED right after the tick where Neuron A spiked
+    assert_eq!((graph.neurons[1].status_flags & constants::FLAG_IS_INHIBITED) > 0, true, "Neuron B must have FLAG_IS_INHIBITED set due to WTA suppression from Neuron A.");
+}

@@ -218,13 +218,49 @@ impl NetworkGraph {
     }
 
     pub fn tick(&mut self, current_tick: u32, env: crate::engine::ffi::Environment) {
-        self.apply_wta_inhibition();
+        // Phase 3: Сброс (happens at the beginning of tick)
+        for n in &mut self.neurons {
+            n.status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
+        }
+
         #[cfg(target_os = "macos")]
         {
             // MacOS CPU Fallback using Rayon Multi-Threading
             self.neurons.par_iter_mut().for_each(|n| {
-                unsafe { crate::engine::ffi::tick_neuron_cpu(n, env, current_tick); }
+                // To avoid changing tick_neuron_cpu signature again, pass null for all_neurons
+                unsafe { crate::engine::ffi::tick_neuron_cpu(n, std::ptr::null_mut(), 0, env, current_tick); }
             });
+
+            // Phase 2: Broadcast (WTA)
+            use std::collections::HashMap;
+            let mut minicolumn_winners: HashMap<(u16, u8), u32> = HashMap::new();
+            for n in &self.neurons {
+                if n.is_alive == 1 && n.last_spike_tick == current_tick && (n.type_ == 0 || n.type_ == 2) {
+                    let key = (n.column_id, n.minicolumn_id);
+                    let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
+                    if n.id < *current_winner {
+                        *current_winner = n.id;
+                    }
+                }
+            }
+
+            for n in &mut self.neurons {
+                if n.is_alive == 1 {
+                    let key = (n.column_id, n.minicolumn_id);
+                    if let Some(&winner_id) = minicolumn_winners.get(&key) {
+                        if n.id != winner_id {
+                            n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
+                            n.current_voltage = n.resting_voltage;
+                            n.refractory_time_left = 5.0;
+                            if n.last_spike_tick == current_tick {
+                                // Rollback spike for suppressed losers
+                                n.last_spike_tick = current_tick.saturating_sub(1);
+                                n.spikes_in_last_window = n.spikes_in_last_window.saturating_sub(1);
+                            }
+                        }
+                    }
+                }
+            }
 
             // Convert pointer to usize to make it trivially Send+Sync
             let neurons_ptr_usize = self.neurons.as_mut_ptr() as usize;
@@ -247,6 +283,37 @@ impl NetworkGraph {
                     env,
                     current_tick
                 );
+            }
+        }
+
+        self.apply_sdr_tuning(current_tick);
+    }
+
+    pub fn apply_sdr_tuning(&mut self, current_tick: u32) {
+        // SDR Tuning for L4 (Target Sparsity 5%)
+        let mut l4_total = 0;
+        let mut l4_active = 0;
+        for n in &self.neurons {
+            if n.layer_id == 4 && n.is_alive == 1 {
+                l4_total += 1;
+                if n.last_spike_tick == current_tick {
+                    l4_active += 1;
+                }
+            }
+        }
+
+        if l4_total > 0 {
+            let activity = l4_active as f32 / l4_total as f32;
+            let gamma = 0.1; // Sensitivity coefficient
+            // theta_t+1 = theta_t + (activity - 0.05) * gamma
+            let adjustment = (activity - 0.05) * gamma;
+            
+            for n in &mut self.neurons {
+                if n.layer_id == 4 && n.is_alive == 1 {
+                    n.activation_threshold += adjustment;
+                    // Clamp threshold to reasonable biological limits
+                    n.activation_threshold = n.activation_threshold.clamp(-65.0, 10.0);
+                }
             }
         }
     }

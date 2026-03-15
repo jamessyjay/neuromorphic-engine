@@ -141,6 +141,10 @@ extern "C" {
 #define THERMAL_NOISE_MAGIC_C 277803737u
 #define THERMAL_NOISE_SCALE 2.5f
 
+// Flags
+#define FLAG_IS_INHIBITED (1 << 0)
+#define FLAG_IS_PREDICTIVE (1 << 1)
+
 // Structural Defaults
 #define DEFAULT_VOLTAGE_VAR 2.0f
 #define PURKINJE_RESTING -65.0f

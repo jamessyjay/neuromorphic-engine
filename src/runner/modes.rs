@@ -302,6 +302,83 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     // Force memory coalescing after generation
     graph.optimize_memory_layout();
 
+    // 1. Elimination of Orphans (TЗ №4)
+    let mut outgoing_synapses: Vec<Vec<u32>> = vec![Vec::new(); graph.neurons.len()];
+    for s in &graph.synapses {
+        outgoing_synapses[s.source_id as usize].push(s.target_id);
+    }
+
+    let mut new_synapses = Vec::new();
+    for i in 0..graph.neurons.len() {
+        let n_layer = graph.neurons[i].layer_id;
+        let mut has_l4_to_l23 = false;
+        
+        if n_layer == 4 {
+            for &t_id in &outgoing_synapses[i] {
+                if graph.neurons[t_id as usize].layer_id == 2 {
+                    has_l4_to_l23 = true;
+                    break;
+                }
+            }
+        }
+        
+        let target_layer = match n_layer {
+            6 => 4,
+            5 => 6,
+            4 => 2,
+            2 => 5,
+            1 => 2,
+            _ => 2,
+        };
+        
+        let mut needed = 0;
+        if outgoing_synapses[i].len() < 3 {
+            needed = 3 - outgoing_synapses[i].len();
+        }
+        if n_layer == 4 && !has_l4_to_l23 {
+            needed = needed.max(1);
+        }
+        
+        if needed > 0 {
+            let n_col = graph.neurons[i].column_id;
+            let nx = graph.neurons[i].x as f32;
+            let ny = graph.neurons[i].y as f32;
+            let nz = graph.neurons[i].z as f32;
+            
+            let mut candidates = Vec::new();
+            for j in 0..graph.neurons.len() {
+                if i == j { continue; }
+                if outgoing_synapses[i].contains(&(j as u32)) { continue; } // Don't duplicate synapses
+                let cand = &graph.neurons[j];
+                // Try strictly target layer first, but fallback to any layer in the same column if not enough
+                if cand.column_id == n_col {
+                    let dx = cand.x as f32 - nx;
+                    let dy = cand.y as f32 - ny;
+                    let dz = cand.z as f32 - nz;
+                    let dist = dx*dx + dy*dy + dz*dz;
+                    let layer_match_bonus = if cand.layer_id == target_layer { 0.0 } else { 100000000.0 };
+                    candidates.push((j, dist + layer_match_bonus, cand.layer_id));
+                }
+            }
+            
+            candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            
+            for k in 0..needed.min(candidates.len()) {
+                let target_id = candidates[k].0 as u32;
+                // Add to outgoing_synapses to prevent next checks from reusing it if logic changes
+                outgoing_synapses[i].push(target_id); 
+                new_synapses.push((i as u32, target_id, 2.5));
+            }
+        }
+    }
+    
+    for (src, tgt, w) in new_synapses {
+        graph.connect(src, tgt, w, 0, false, false);
+    }
+    
+    // Re-optimize memory layout after adding new orphan-saving synapses
+    graph.optimize_memory_layout();
+
     println!("Network generation complete.");
     graph
 }
