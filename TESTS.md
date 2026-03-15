@@ -117,3 +117,27 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 - **62. Test "Thermal Noise Prevents Freezing":** Isolates a single Pyramidal neuron. Runs ticks without stimuli. Asserts `current_voltage` does not stagnate perfectly at `resting_voltage` but fluctuates due to biological thermal noise.
 - **63. Test "Phoenix Resurrection":** Artificially kills a neuron. Verifies it remains completely inactive for exactly 999 ticks. On tick 1000, asserts that the neuron revives, restores its ATP, and resumes `is_alive = true`.
 - **64. Test "HTM Predictive State Coincidence":** Validates Jeff Hawkins' active dendrites theory. Proves that contextual signals on Basal dendrites set the neuron into a "Predictive State" for 20 ticks. Verifies that a weak Proximal signal correctly triggers an action potential only while the predictive window is open (Coincidence Detection).
+
+### 65. `test_atomic_hammer`
+**Location:** `tests/edge_cases_tests.rs`
+**Purpose:** Ensure `atomic_add_packed_voltage` reliably handles 512 concurrent sources spiking onto a single dendrite without data loss.
+
+### 66. `test_sequence_recall`
+**Location:** `tests/edge_cases_tests.rs`
+**Purpose:** Verify HTM active dendrites. A -> B -> C forms a predictive chain. Spiking A causes B to enter predictive state, which then correctly propagates sequence memory without misfiring.
+
+### 67. `test_seizure`
+**Location:** `tests/edge_cases_tests.rs`
+**Purpose:** Validate Homeostatic E/I balance. Provoking a massive spike wave on 50% of a 1000-neuron network should automatically regulate and calm down back to background noise levels within 500 ticks.
+
+### 68. `test_signal_race_condition`
+**Location:** `tests/edge_cases_tests.rs`
+**Purpose:** Verify accurate synapse delivery delays. An unmyelinated spike (4 ticks) and myelinated spike (1 tick) triggered with precise offset must arrive and sum perfectly on the identical tick.
+
+### 69. `test_metabolic_darwinism`
+**Location:** `tests/edge_cases_tests.rs`
+**Purpose:** Check long-term structural stability. Over 10,000 ticks of neurogenesis and microglial pruning, the total synapse count must remain stable and not cascade to 0 or infinity.
+
+### 70. `test_inhibitory_stdp`
+**Location:** `tests/edge_cases_tests.rs`
+**Purpose:** Validate inhibitory plasticity. If a target is hyperactive, the inhibitory synapses connected to it must strengthen to suppress the activity.
