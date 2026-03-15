@@ -371,7 +371,9 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             
             candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
             
-            for k in 0..needed.min(candidates.len()) {
+            let mut added = 0;
+            for k in 0..candidates.len() {
+                if added >= needed { break; }
                 let target_id = candidates[k].0 as u32;
                 
                 // Extra safety: Enforce L6->L5 ban even during orphan saving
@@ -385,6 +387,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
                 let is_inhib = graph.neurons[i].type_ == crate::engine::ffi::NeuronType::Interneuron as u8;
                 let w = if is_inhib { -2.5 } else { 2.5 };
                 new_synapses.push((i as u32, target_id, w, is_inhib));
+                added += 1;
             }
         }
     }

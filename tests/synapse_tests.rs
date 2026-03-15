@@ -18,6 +18,8 @@ fn test_classic_ltp() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[src as usize].column_id = 0;
+    graph.neurons[tgt as usize].column_id = 1;
     let env = default_env();
     
     let synapse = Synapse {
@@ -33,16 +35,14 @@ fn test_classic_ltp() {
     };
     graph.synapses.push(synapse);
     
-    graph.neurons[src as usize].current_voltage = 40.0;
-    graph.neurons[src as usize].last_spike_tick = 1;
+    graph.neurons[src as usize].current_voltage = 50.0;
     graph.tick(1, env.clone());
     
     for tick in 2..=5 { graph.tick(tick, env.clone()); }
     
     assert!(graph.synapses[0].last_activation_tick > 0, "Synapse should record activation tick after delivery");
     
-    graph.neurons[tgt as usize].current_voltage = 40.0;
-    graph.neurons[tgt as usize].last_spike_tick = 6;
+    graph.neurons[tgt as usize].current_voltage = 50.0;
     graph.neurons[tgt as usize].branches[0].local_trace = 255;
     graph.tick(6, env.clone());
     
@@ -56,6 +56,8 @@ fn test_classic_ltd() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[src as usize].column_id = 0;
+    graph.neurons[tgt as usize].column_id = 1;
     let env = default_env();
     
     let synapse = Synapse {
@@ -92,6 +94,8 @@ fn test_dopamine_amplification() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[src as usize].column_id = 0;
+    graph.neurons[tgt as usize].column_id = 1;
     let mut env = default_env();
     env.dopamine_multiplier = 10.0;
     env.stdp_learning_rate = 50.0;
@@ -109,8 +113,7 @@ fn test_dopamine_amplification() {
     };
     graph.synapses.push(synapse);
     
-    graph.neurons[src as usize].current_voltage = 40.0;
-    graph.neurons[src as usize].last_spike_tick = 1;
+    graph.neurons[src as usize].current_voltage = 50.0;
     graph.tick(1, env.clone());
     
     for tick in 2..=5 { graph.tick(tick, env.clone()); }
@@ -133,6 +136,8 @@ fn test_synaptic_scaling() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[src as usize].column_id = 0;
+    graph.neurons[tgt as usize].column_id = 1;
     let env = default_env();
     
     let synapse = Synapse {
@@ -159,6 +164,8 @@ fn test_reliability_fade() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[src as usize].column_id = 0;
+    graph.neurons[tgt as usize].column_id = 1;
     let env = default_env();
      
     
@@ -188,6 +195,8 @@ fn test_receptor_saturation() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    graph.neurons[src as usize].column_id = 0;
+    graph.neurons[tgt as usize].column_id = 1;
     let env = default_env();
     
     let synapse = Synapse {

@@ -240,10 +240,11 @@ fn test_stdp_associative_persistence_under_noise() {
     let mut graph = NetworkGraph::new();
     
     // Step 1: Network Architecture & Grouping
-    for _ in 0..100 {
+    for i in 0..100 {
         let n = graph.add_neuron(NeuronType::Pyramidal);
         // Explicitly enable dendritic branch 0 (Basal) so signals can reach the soma
         graph.neurons[n as usize].branches[0].branch_type = 1;
+        graph.neurons[n as usize].column_id = i as u16; // Give each neuron its own column to avoid WTA
     }
 
     let mut env = default_env();

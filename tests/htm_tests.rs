@@ -1,5 +1,5 @@
 use neuromorphic_engine::network::graph::NetworkGraph;
-use neuromorphic_engine::engine::ffi::{NeuronType, Environment, Compartment, Synapse};
+use neuromorphic_engine::engine::ffi::{NeuronType, Environment};
 use neuromorphic_engine::engine::constants;
 
 fn default_env() -> Environment {
