@@ -49,21 +49,25 @@ graph TD
 ```
 
 ### 1. Engine (`src/engine/`)
+
 - `ffi.rs`: The strict bridge between Rust and C++. It maps arrays directly to GPU kernels.
 - `constants.rs`: Hardcoded engine limits, metabolic floors, and phase intervals.
 - `environment.rs`: `EnvironmentRegulator` handles the biological feedback loop (hardware lag → hypoxia → metabolic depression).
 - `snapshot.rs`: Complete binary serialization (`BrainSnapshot`) of topological and environmental state, enabling true persistence and resumption.
 
 ### 2. Network (`src/network/`)
+
 - `graph.rs`: Core `NetworkGraph` structure containing neurons and synapses. Manages macro-level biological services (Neurogenesis, Microglia).
 - `stimulus.rs`: Routes external stimuli (e.g., Bell vs Meat) and triggers global dopamine rushes based on Pavlovian logic.
 
 ### 3. Monitor (`src/monitor/`)
+
 - `streamer.rs`: Tokio-based asynchronous WebSocket server pushing decoupled visual states to the UI.
 - `telemetry.rs`: Captures and aggregates spike data, ATP profiles, and synaptic distributions.
 - `visualization.rs`: Generates analytical charts via `plotters`.
 
 ### 4. Runner (`src/runner/`)
+
 - `modes.rs`: Centralizes the execution loops (`run_simulation`, `run_benchmark_mode`, etc.), managing ticks, timers, and snapshot callbacks.
 
 ## Memory Management (Unified Memory)

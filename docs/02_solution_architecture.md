@@ -12,14 +12,15 @@ Each neuron has an **ATP** charge (energy).
 
 - **Generation:** Depends on `global_oxygen_level` and `metabolic_wear` (mitochondrial wear). Accelerated during early "wakefulness".
 - **Consumption:** Baseline leakage (`leak_coeff`) + massive consumption during a spike (`ATP_SPIKE_COST`).
-- **Shutdown & Death:** 
+- **Shutdown & Death:**
   - If ATP drops below critical levels (`< 15.0`), the neuron enters a metabolic shutdown (State 4), unable to spike until ATP recovers.
   - If ATP reaches `0.0`, or calcium toxicity gets too high, `die_gracefully()` is called.
 
 ### The Phoenix Loop (Resurrection)
 
 To prevent permanent network degradation, death is not always final.
-- Dead neurons enter a coma state (`dead_ticks`). 
+
+- Dead neurons enter a coma state (`dead_ticks`).
 - After 1000 ticks of rest, the neuron "resurrects" with a fully restored ATP pool, allowing the brain to heal dynamically over long simulations.
 
 ### Heterogeneity and Chaos (Spec 11)
@@ -70,6 +71,7 @@ The network topology is not static. Highly active neurons in close spatial proxi
 ### Microglia (Probabilistic Pruning)
 
 A background immune service that prunes weak or inactive synapses.
+
 - **Probabilistic Drop:** Soft pruning based on weight and ticks since the last activation. Weak synapses have a chance to survive instead of being instantly deleted.
 - **Competitive Retention:** A neuron is guaranteed to maintain at least `MIN_SYNAPSES_PER_NEURON` (e.g., 3), ensuring the network never fragments into completely isolated islands.
 
@@ -86,5 +88,6 @@ If a neuron spikes too frequently, its `activation_threshold` dynamically increa
 ### Wear & Aging
 
 **Mitochondrial Wear:** With each spike, the `metabolic_wear` parameter increases.
+
 - The higher the wear, the slower ATP regenerates.
 - This limits the maximum discharge frequency of the neuron over long periods and simulates biological fatigue. Sleep cycles periodically flush out this wear.
