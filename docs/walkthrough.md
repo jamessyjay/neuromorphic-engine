@@ -355,3 +355,11 @@ To secure the biological integrity and hardware stability of the engine, a compl
 
 ### Documentation Sync
 - **Project Structure Rewrite:** Complete overhaul of `docs/PROJECT_STRUCTURE.md` to accurately reflect the Domain-Driven Rust/CUDA Neuromorphic Engine architecture, rather than the old template contents.
+
+### Cortical Column Architecture (v0.5.0) - FFI Layer Rewrite
+- **Expanded BaseNeuron (256 bytes):** Restructured the core `BaseNeuron` struct strictly aligned to 64-byte boundaries (cache lines) pushing total size to exactly 256 bytes.
+- **Reference Frames & WTA:** Added `column_id`, `minicolumn_id`, `layer_id`, `status_flags` (with `FLAG_IS_INHIBITED`), and reference coordinates `ref_coord_x/y` paving the way for full Cortical Column implementation.
+- **Dendritic Array Growth:** Expanded `branches` from 8 to 16, adding definitions for `BRANCH_MASK_PROXIMAL`, `BRANCH_MASK_DISTAL`, and `BRANCH_MASK_APICAL`.
+- **WTA Reset Logic:** Added a hardware-level bitwise reset of the `FLAG_IS_INHIBITED` flag at the absolute start of `tick_neurons_kernel` to prevent neurons from getting permanently locked out.
+- **Serialization Invalidated:** Wiped previous `brain_save.bin` as the massive size change in struct geometry safely prevents memory layout corruption upon loading.
+- **Full Alignment Testing:** Created `test_memory_alignment` and patched test files ensuring that `BaseNeuron` exactly matches `256` bytes and `Compartment` remains perfectly tight at `8` bytes without implicit rustc padding interference.
