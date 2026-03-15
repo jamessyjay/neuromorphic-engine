@@ -1,3 +1,4 @@
+use crate::network::stimulus::SensoryHub;
 use crate::engine::snapshot::BrainSnapshot;
 use crate::engine::environment::EnvironmentRegulator;
 use std::sync::{Arc, Mutex};
@@ -334,7 +335,10 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
             wakefulness_multiplier: 1.0,
     };
     
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
 
     let total_elements = graph.neurons.len() + graph.synapses.len();
     let sampling_interval = (total_elements as f32 / 1000.0).ceil() as u32;
@@ -522,7 +526,10 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
             wakefulness_multiplier: 1.0,
     });
     
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
     let mut regulator = EnvironmentRegulator::new();
     let mut last_synapse_count = graph.synapses.len();
 
@@ -733,7 +740,10 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
 
     for tick in 1..=crate::engine::constants::TOTAL_LONG_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
@@ -776,7 +786,10 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
     let mut history = vec![];
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
@@ -821,7 +834,10 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
     let mut history = vec![];
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
@@ -868,7 +884,10 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
 
     for _ in 0..10 { graph.add_neuron(NeuronType::Pyramidal); }
     let n1 = graph.add_neuron(NeuronType::Pyramidal);
@@ -917,7 +936,10 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
     let n1 = graph.add_neuron(NeuronType::Pacemaker);
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
     graph.connect(n1, n2, crate::engine::constants::WEIGHT_TEST_DEFAULT, 0, false, true);
@@ -962,7 +984,10 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
     };
     
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
     let mut history = vec![];
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
@@ -999,7 +1024,10 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
     let mut history = vec![];
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
@@ -1039,7 +1067,10 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0, 
     };
 
-    let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+        let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
+    
+    let mut sensory_hub = SensoryHub::new();
+    sensory_hub.build_mapping(&graph);
     let mut history = vec![];
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {

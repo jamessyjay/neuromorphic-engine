@@ -139,3 +139,45 @@ fn test_connectivity_enforcement() {
     
     assert_eq!(l6_to_l5_count, 0, "L6 must NOT directly connect to L5! Connectivity ban failed.");
 }
+
+#[test]
+fn test_sensory_projection_accuracy() {
+    let mut graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 100);
+    let mut hub = neuromorphic_engine::network::stimulus::SensoryHub::new();
+    hub.build_mapping(&graph);
+    
+    // 1. Clear frame
+    let mut frame = vec![0.0; 1024];
+    
+    // 2. Light up pixel (0,0) which maps to index 0
+    frame[0] = 1.0;
+    hub.update_frame(frame);
+    
+    // 3. Apply to graph (simulates stimulus injection)
+    hub.apply_to_graph(&mut graph);
+    
+    // 4. Verification
+    let mut active_col_1 = 0;
+    let mut active_col_10 = 0;
+    let mut total_l4 = 0;
+    let mut total_active_l4 = 0;
+    
+    for n in &graph.neurons {
+        if n.layer_id == 4 {
+            total_l4 += 1;
+            if n.current_voltage > 100.0 { // Was boosted to STIMULUS_VOLTAGE_BOOST (150.0)
+                total_active_l4 += 1;
+                if n.column_id == 0 { active_col_1 += 1; }
+                if n.column_id == 9 { active_col_10 += 1; }
+            }
+        }
+    }
+    
+    assert!(active_col_1 > 0, "Column 0 should have received stimulus from pixel 0!");
+    assert_eq!(active_col_10, 0, "Column 9 (last column) should NOT receive stimulus from pixel 0!");
+    
+    let sparsity = total_active_l4 as f32 / total_l4 as f32;
+    println!("SDR Sparsity for single pixel activation: {:.2}%", sparsity * 100.0);
+    // Since pixel 0 maps only to column 0, the overall sparsity should be very low, definitely < 5-7%
+    assert!(sparsity < 0.07, "SDR Sparsity violated! Expected < 7%, got {:.2}%", sparsity * 100.0);
+}

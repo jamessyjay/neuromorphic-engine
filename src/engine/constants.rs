@@ -257,6 +257,13 @@ pub const FORCED_SPIKE_VOLTAGE: f32 = 40.0;
 /// Base ATP level to set when artificially resetting a neuron
 pub const FULL_ATP_LEVEL: f32 = 100.0;
 
+
+// --- Virtual Retina & Sensory Hub Constants (v0.5.0) ---
+pub const INPUT_DIM: usize = 32;
+pub const TOTAL_INPUT_CHANNELS: usize = 1024; // 32 * 32
+pub const SDR_TARGET_SPARSITY: f32 = 0.05; // 5% active input neurons
+pub const STIMULUS_VOLTAGE_BOOST: f32 = 150.0;
+
 // --- Stimulus & Conditioning Constants ---
 /// Percentage of the network dedicated to sensory input (Bell + Meat)
 pub const SENSOR_GROUP_PERCENTAGE: f32 = 0.04;
