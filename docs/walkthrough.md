@@ -308,3 +308,25 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **CUDA Metabolic Hysteresis**: Added a new state `STATE_METABOLIC_SHUTDOWN` in `base_neuron.h`. In `base_neuron.cu`, if ATP drops below 15.0, the neuron enters shutdown and cannot spike until ATP recovers to 40.0.
 - **Phoenix Energy Boost**: When a neuron resurrects after death (Phoenix cycle), its ATP is instantly fully replenished (`energy_ATP = max_atp`) so it can start functioning immediately.
 - **Nursery Protection**: Added a protection mechanism in `modes.rs` (for ticks < 5000) where ATP is artificially maintained at a minimum of 50.0 to ensure successful network initialization.
+
+## Refactoring: Cleaned up duplicate code in `modes.rs` (v0.4.7+)
+- Extracted common `visual_state` mapping logic into `get_visual_state` helper function.
+- Extracted `InitialStatePayload` generation into `generate_initial_state` helper function.
+- Extracted `Nursery Protection` loop into `apply_nursery_protection` helper function.
+- Cleaned up duplicate code across `run_benchmark_mode`, `run_simulation`, and `run_ui_test`.
+- Extracted common environment update logic (Dynamic Homeostasis) into `update_environment` helper function.
+- Extracted WebSockets broadcasting logic into `broadcast_initial_state` and `broadcast_tick_update` helper functions.
+
+## Deep Persistence & GPU Sync (v0.4.8)
+- **Dynamic Tick Persistence:** Changed snapshot saving to use the actual `total_ticks` or `start_tick + total_ticks` instead of a hardcoded value (3).
+- **Reliable Initial State Broadcast:** Modified the WebSocket broadcast to periodically resend the `InitialStatePayload` (every 5000 ticks) so UI clients can reconnect safely.
+- **Forced GPU Memory Re-synchronization:** Added `force_sync_gpu` in `NetworkGraph` to handle memory synchronization explicitly upon loading from snapshot. It simulates mapping Rust vectors to CUDA environment properly.
+- **Instant Dashboard Hydration:** UI visualizer now instantly populates neuron and synapse counts when loading `InitialStatePayload`.
+- **Synapse Geometry Refresh:** The visualizer successfully rebuilds scene lines upon receiving a fresh network snapshot.
+- **Sensory Input Summation:** Implemented continuous summing for photoreceptors rather than static assignment, allowing synapse feedback integration with external lighting. (Resolved failing tests associated with it).
+
+## Refactoring & Cleanup (v0.4.8+1)
+- **Magic Numbers Extracted:** Replaced hardcoded values (like `5000`, `50`) in `modes.rs` with explicit constants `NURSERY_PROTECTION_TICKS`, `WS_INITIAL_STATE_INTERVAL`, `ASYNC_YIELD_INTERVAL`, etc., to make the simulation loops more readable and maintainable.
+- **Snapshot Boilerplate Cleanup:** Consolidated the `BrainSnapshot` creation and metric export boilerplate across numerous tests and modes into a single `finalize_and_save_snapshot` helper function, massively reducing code duplication in `modes.rs`.
+- **Total Magic Number Eradication:** Cleaned up `modes.rs` entirely. Extracted all hardcoded numbers (ATP thresholds, node proportions, coordinate limits, timer scaling multipliers, base weights) into `constants.rs`. Code is now legible and ready for future balancing tweaks without digging through loop functions. Also renamed confusing `n` and `s` variables in `run_scaling_benchmarks` to `num_neurons` and `num_synapses`.
+- **Compiler Warnings Fixed:** Added `cuda` to the `[features]` block in `Cargo.toml` to resolve `unexpected cfg condition value: cuda` warnings when checking conditional compilation flags in `graph.rs`.

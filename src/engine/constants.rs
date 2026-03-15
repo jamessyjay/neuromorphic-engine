@@ -18,8 +18,14 @@ pub const WINDOW_SIZE: u32 = 20;
 pub const WS_SNAPSHOT_INTERVAL_BENCHMARK: u32 = 15;
 /// Ticks between WebSocket frame broadcasts during normal simulation mode
 pub const WS_SNAPSHOT_INTERVAL_SIMULATION: u32 = 15;
+/// Interval to re-broadcast initial state so late clients can sync
+pub const WS_INITIAL_STATE_INTERVAL: u32 = 5000;
+/// Delay in milliseconds between UI updates to throttle at ~60fps
+pub const WS_THROTTLE_MS: u64 = 16;
 /// How many ticks a spike visually lingers on the UI before fading out completely
 pub const VISUAL_SPIKE_PERSISTENCE_TICKS: u32 = 25;
+/// Interval in ticks when we should yield the async executor
+pub const ASYNC_YIELD_INTERVAL: u32 = 50;
 
 /// Default number of ticks to run a standard headless simulation if not specified
 pub const DEFAULT_SIMULATION_TICKS: u32 = 5000;
@@ -29,6 +35,8 @@ pub const DEFAULT_BENCHMARK_TICKS: u32 = 50_000;
 pub const DEFAULT_BENCHMARK_NEURONS: usize = 1000;
 /// Default network size (synapses) for benchmarks
 pub const DEFAULT_BENCHMARK_SYNAPSES: usize = 25_000;
+/// Ticks during which the network receives nursery protection (ATP minimum)
+pub const NURSERY_PROTECTION_TICKS: u32 = 5000;
 
 // --- Stimulus & Pavlovian Conditioning ---
 /// Default tick interval between automated stimulus injections
@@ -240,3 +248,45 @@ pub const REWARD_DOPAMINE_MULTIPLIER: f32 = 5.0;
 pub const DOPAMINE_DECAY_RATE: f32 = 0.1;
 /// Number of training cycles before doing a test cycle (only bell, no meat)
 pub const TRAINING_CYCLES_BEFORE_TEST: u32 = 5;
+
+// --- Metrics & Data Scaling Constants ---
+/// ATP percentage threshold below which the neuron visually indicates low energy in UI
+pub const VISUAL_LOW_ATP_THRESHOLD: f32 = 25.0;
+/// Minimum ATP maintained by the nursery protection mechanism during startup ticks
+pub const NURSERY_MIN_ATP: f32 = 50.0;
+/// Conversion factor for seconds to milliseconds
+pub const SECONDS_TO_MS: f32 = 1000.0;
+/// Divisor for UI sampling intervals based on total elements
+pub const UI_SAMPLING_DIVISOR: f32 = 1000.0;
+/// Convert Bytes to Kilobytes
+pub const BYTES_TO_KB: f32 = 1024.0;
+/// Hardcoded interval at which we forcefully broadcast full synapse array to the UI
+pub const WS_SYNAPSE_FORCE_SYNC_INTERVAL: u32 = 500;
+
+// --- Network Generation Proportions ---
+/// Proportion of sensors in auto-generated networks
+pub const SENSOR_PROPORTION: f32 = 0.04;
+/// Proportion of motors in auto-generated networks
+pub const MOTOR_PROPORTION: f32 = 0.04;
+/// Proportion of pacemakers in auto-generated networks
+pub const PACEMAKER_PROPORTION: f32 = 0.02;
+/// Proportion of interneurons in auto-generated networks
+pub const INTERNEURON_PROPORTION: f32 = 0.15;
+
+// --- Physical Bounds & Constants ---
+/// Max bounds for coordinates mapped to UI Space 
+pub const COORD_MAX: u16 = 65535;
+/// Multiplier used to adjust the spatial clustering radius logic
+pub const SPATIAL_RADIUS_MULTIPLIER: f32 = 0.15;
+/// Scale modifier for base initial synapse weights
+pub const BASE_WEIGHT_MODIFIER: f32 = 2.0;
+/// The maximum number of dendritic branches available on a Pyramidal neuron
+pub const DENDRITIC_BRANCH_COUNT: u8 = 8;
+/// A standard semi-depolarized state voltage used to seed networks to avoid immediate flatlines
+pub const PRE_SEED_VOLTAGE: f32 = -30.0;
+
+// --- Benchmark Mode Default Arguments ---
+/// Number of ticks for scaling mode tests
+pub const SCALING_BENCHMARK_TICKS: u32 = 500;
+/// Density multiplier: how many synapses per neuron we request in the benchmark
+pub const SCALING_SYNAPSE_DENSITY: usize = 10;

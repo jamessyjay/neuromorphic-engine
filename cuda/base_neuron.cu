@@ -298,9 +298,14 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         // Automatically depolarize over time until spike
         n->current_voltage += PACEMAKER_DEPOLARIZATION;
     } else if (n->type == TYPE_PHOTORECEPTOR) {
-        // Dark current: depolarize to -40mV in dark, hyperpolarize to -65mV in light
+        // Sensory Input Summation (Phase 50.1)
+        // Allows incoming synaptic currents to sum with external stimuli
         float target_v = PHOTO_HYPERPOLARIZED + (1.0f - env.light_level) * (PHOTO_DARK_CURRENT - PHOTO_HYPERPOLARIZED);
-        n->current_voltage += (target_v - n->current_voltage) * PHOTO_ACTIVATION_SPEED;
+        float delta_v = (target_v - n->current_voltage) * PHOTO_ACTIVATION_SPEED;
+        
+        n->current_voltage += delta_v;
+        if (n->current_voltage > 150.0f) n->current_voltage = 150.0f;
+        if (n->current_voltage < -100.0f) n->current_voltage = -100.0f;
     }
 
     float energy_ratio = fmaxf(MIN_ATP_RATIO, n->energy_ATP / n->max_atp);

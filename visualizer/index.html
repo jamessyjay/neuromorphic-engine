@@ -162,11 +162,22 @@
         function initNetwork(data) {
             neuronMeshes.forEach(m => scene.remove(m.mesh));
             neuronMeshes = [];
-            if (synapseLines) scene.remove(synapseLines);
-            if (pulseSystem) scene.remove(pulseSystem);
+            if (synapseLines) {
+                scene.remove(synapseLines);
+                if (synapseLines.geometry) synapseLines.geometry.dispose();
+                if (synapseLines.material) synapseLines.material.dispose();
+                synapseLines = null;
+            }
+            if (pulseSystem) {
+                scene.remove(pulseSystem);
+                pulseSystem = null;
+            }
             nodeMap.clear();
             activePulses.length = 0;
+            
+            // Instant Dashboard Hydration (Phase 50.1)
             document.getElementById('synapses').innerText = data.total_synapses;
+            document.getElementById('neurons').innerText = data.total_neurons;
 
             const counts = {};
             data.neurons.forEach(n => counts[n[4]] = (counts[n[4]] || 0) + 1);
