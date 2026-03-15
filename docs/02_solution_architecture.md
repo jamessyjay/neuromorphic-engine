@@ -10,18 +10,34 @@ Our neurons are not just summation units, but living entities with limited resou
 
 Each neuron has an **ATP** charge (energy).
 
-- **Generation:** Depends on `global_oxygen_level` and `metabolic_wear` (mitochondrial wear).
+- **Generation:** Depends on `global_oxygen_level` and `metabolic_wear` (mitochondrial wear). Accelerated during early "wakefulness".
 - **Consumption:** Baseline leakage (`leak_coeff`) + massive consumption during a spike (`ATP_SPIKE_COST`).
-- **Death:** If ATP < 1.0, `die_gracefully()` is called, and the neuron ceases to function (Apoptosis).
+- **Shutdown & Death:** 
+  - If ATP drops below critical levels (`< 15.0`), the neuron enters a metabolic shutdown (State 4), unable to spike until ATP recovers.
+  - If ATP reaches `0.0`, or calcium toxicity gets too high, `die_gracefully()` is called.
+
+### The Phoenix Loop (Resurrection)
+
+To prevent permanent network degradation, death is not always final.
+- Dead neurons enter a coma state (`dead_ticks`). 
+- After 1000 ticks of rest, the neuron "resurrects" with a fully restored ATP pool, allowing the brain to heal dynamically over long simulations.
 
 ### Heterogeneity and Chaos (Spec 11)
 
 In nature, no two neurons are the same.
 
 - **Gaussian Heterogeneity:** Upon creation, parameters (`resting_voltage`, `threshold`, `max_atp`) are generated via a Gaussian distribution.
-- **Stochastic Noise:** Every tick, stochastic noise (Gaussian) is mixed into the voltage, simulating the thermal noise of ion channels.
+- **Thermal Noise:** Every tick, stochastic noise (PCG32-lite pseudo-randomness) is mixed into the voltage, simulating the thermal noise of ion channels. This prevents the network from freezing into permanent silence.
 
-## 2. Synaptic Dynamics (Chemical Delivery)
+## 2. Active Dendrites & HTM Predictive States
+
+The engine implements advanced dendritic logic inspired by the Thousand Brains Theory (HTM). Summation is non-linear across 8 independent dendritic branches.
+
+- **Proximal Dendrites (Branch 0):** Act as direct feedforward inputs. Exceeding the NMDA threshold here causes massive somatic depolarization (triggering a spike).
+- **Basal/Apical Dendrites (Branches 1-7):** Act as contextual predictors. Exceeding the NMDA threshold here does *not* depolarize the soma directly. Instead, it places the neuron into a **Predictive State** for 20 ticks.
+- **Coincidence Detection:** If a feedforward signal hits Branch 0 while the neuron is in a Predictive State, the required voltage threshold to trigger an action potential is significantly reduced (`+15.0 mV` virtual offset).
+
+## 3. Synaptic Dynamics (Chemical Delivery)
 
 ### Neurotransmitter Buffer (Spec 06)
 
@@ -38,22 +54,37 @@ A synapse has a conductance limit (number of receptors) determined by its `weigh
 - If there is more chemical in the buffer than the synapse can accept, the signal is limited (`receptor_limit`).
 - Excess remains in the buffer until the next tick.
 
-## 3. Plasticity (Learning)
+## 4. Plasticity & Lifelong Learning
 
-### Dopamine-Modulated STDP (Phases 13-14)
+### Dopamine-Modulated STDP
 
-Learning (weight change) occurs according to the STDP (Spike-Timing Dependent Plasticity) rule, but with a dopamine gate.
+Learning (weight change) occurs according to strict Spike-Timing Dependent Plasticity (STDP), gated by causality and dopamine.
 
-- Weight grows if the target spikes shortly after synapse activation.
-- The `dopamine_multiplier` scales this growth. At low dopamine, learning is "frozen".
+- **LTP (Potentiation):** Weight grows if the source spiked strictly *before* the target spiked. Simultaneous spikes do not cause instant potentiation to prevent paradoxical feedback loops.
+- **Dopamine Scaling:** The `dopamine_multiplier` scales this growth. At low dopamine, learning is "frozen". Reward stimuli (Pavlovian conditioning) trigger dopamine rushes.
 
-## 4. Homeostatic Plasticity
+### Neurogenesis (Structural Growth)
 
-If a neuron spikes too frequently, its `activation_threshold` dynamically increases (desensitization). If the neuron is "silent", the threshold slowly decreases, making the neuron more sensitive (sensitization).
+The network topology is not static. Highly active neurons in close spatial proximity (`CLUSTERING_RADIUS_SQ`) and with sufficient ATP reserves have a stochastic probability to grow new synaptic connections during the `Neurogenesis Service` tick.
 
-## 5. Wear & Aging
+### Microglia (Probabilistic Pruning)
+
+A background immune service that prunes weak or inactive synapses.
+- **Probabilistic Drop:** Soft pruning based on weight and ticks since the last activation. Weak synapses have a chance to survive instead of being instantly deleted.
+- **Competitive Retention:** A neuron is guaranteed to maintain at least `MIN_SYNAPSES_PER_NEURON` (e.g., 3), ensuring the network never fragments into completely isolated islands.
+
+### Nursery Protection Phase
+
+During the first 5000 ticks of a network's life, it undergoes a "Nursery" phase. `STDP_LEARNING_RATE` is doubled, and neurons are protected from complete starvation. This allows random initial weights to consolidate into functional cores before aggressive pruning begins.
+
+## 5. Global Cycles
+
+### Homeostatic Plasticity
+
+If a neuron spikes too frequently, its `activation_threshold` dynamically increases (desensitization) to prevent seizures. If the neuron is "silent", the threshold slowly decreases, making the neuron more sensitive (sensitization).
+
+### Wear & Aging
 
 **Mitochondrial Wear:** With each spike, the `metabolic_wear` parameter increases.
-
 - The higher the wear, the slower ATP regenerates.
-- This limits the maximum discharge frequency of the neuron over long periods and simulates biological fatigue.
+- This limits the maximum discharge frequency of the neuron over long periods and simulates biological fatigue. Sleep cycles periodically flush out this wear.
