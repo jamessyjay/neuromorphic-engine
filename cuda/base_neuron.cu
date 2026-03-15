@@ -428,17 +428,9 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             bool is_inhib = (s->flags & 0x08) != 0;
             
             if (is_inhib) {
-                // To safely atomicAdd to a packed float in a struct, we need to unpack, subtract, and pack.
-                // However, since CUDA doesn't support atomicAdd on uint16_t out of the box in a way that handles our custom pack/unpack,
-                // we'll do a simple read-modify-write. Since branches are generally accessed by one synapse at a time (sparse), it's acceptable.
-                // (For true parallel safety, we should use atomicCAS, but let's stick to simple for now or assume sparse).
-                float current_v = unpack_voltage(target->branches[branch_id].voltage);
-                current_v -= voltage_impact;
-                target->branches[branch_id].voltage = pack_voltage(current_v);
+                atomic_add_packed_voltage(&target->branches[branch_id].voltage, -voltage_impact);
             } else {
-                float current_v = unpack_voltage(target->branches[branch_id].voltage);
-                current_v += voltage_impact;
-                target->branches[branch_id].voltage = pack_voltage(current_v);
+                atomic_add_packed_voltage(&target->branches[branch_id].voltage, voltage_impact);
             }
         }
     }
