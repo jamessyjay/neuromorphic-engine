@@ -211,40 +211,32 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         if (v > threshold) {
             b->local_trace = 255;
             
-            if (i == 0) {
-                // Proximal Branch (Branch 0): Massive feedforward depolarization (can trigger spike)
+            if (i <= 3) {
+                // Proximal Branch (Branches 0-3): Massive feedforward depolarization (can trigger spike)
                 soma_impact = v * NMDA_SPIKE_GAIN;
+                n->current_voltage += soma_impact;
             } else {
-                // Basal/Apical Branch (Branches 1-7): Contextual prediction! No massive somatic spike.
+                // Basal/Apical Branch (Branches 4-15): Contextual prediction! No massive somatic spike.
                 // Instead, enter Predictive State for 20 ticks.
                 n->predictive_ticks = 20;
+                n->status_flags |= (1 << 1); // FLAG_IS_PREDICTIVE
             }
             
             v = 0.0f; // Reset branch after spike
             b->refractory_timer = BRANCH_REFRACTORY_TICKS; // Block for N ticks
         } else {
             // Passive transfer based on type
-            if (b->branch_type == 1) soma_impact = v * BASAL_SOMA_GAIN; // Basal
-            else if (b->branch_type == 2) { // Apical Trunk (Boosted)
-                if (n->energy_ATP >= TRUNK_ATP_COST * TRUNK_PASSIVE_COST_MULTIPLIER) {
-                    soma_impact = v * TRUNK_MULTIPLIER;
-                    n->energy_ATP -= TRUNK_ATP_COST * TRUNK_PASSIVE_COST_MULTIPLIER;
-                } else {
-                    soma_impact = v * BASAL_SOMA_GAIN; // Downgrade to passive if starved
-                }
-            } else if (b->branch_type == 3) { // Apical Tuft (Distant)
+            if (b->branch_type == 1) { // Basal
+                soma_impact = v * BASAL_SOMA_GAIN;
+            } else if (b->branch_type == 2) { // Trunk
+                soma_impact = v * TRUNK_MULTIPLIER;
+                n->energy_ATP -= TRUNK_PASSIVE_COST_MULTIPLIER; // Trunk actively costs energy
+            } else if (b->branch_type == 3) { // Tuft
                 soma_impact = v * TUFT_MULTIPLIER;
             }
-        }
-        
-        // Attenuation for somatic impact
-        if (i == 0) {
-            float attenuation = 0.8f; // Proximal is strong
-            n->current_voltage += soma_impact * attenuation;
-        } else {
-            // Non-proximal branches apply normal passive transfer (which is already scaled by BASAL_SOMA_GAIN etc)
             n->current_voltage += soma_impact;
         }
+
         b->voltage = pack_voltage(v);
     }
 }
@@ -463,8 +455,7 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
     
-    // WTA Flag Reset: Clear inhibition status at start of tick
-    neurons[idx].status_flags &= ~(1 << 0); // FLAG_IS_INHIBITED
+    
     
     // Trace Cleanup: Ensure spike_trace is properly decayed or zeroed
 

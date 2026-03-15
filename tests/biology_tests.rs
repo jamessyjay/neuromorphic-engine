@@ -1,3 +1,4 @@
+use neuromorphic_engine::engine::snapshot::BrainSnapshot;
 use neuromorphic_engine::network::graph::NetworkGraph;
 use neuromorphic_engine::engine::ffi::{Environment, NeuronType};
 
@@ -169,4 +170,28 @@ fn test_calcium_recovery_rate() {
     
     assert!(graph.neurons[id as usize].calcium_level < 1.0, "Calcium should have recovered fully after idle period.");
     assert_eq!(graph.neurons[id as usize].is_alive, 1, "Neuron should survive normal calcium load.");
+}
+
+#[test]
+fn test_l6_coord_persistence() {
+    let mut graph = NetworkGraph::new();
+    graph.add_neuron(NeuronType::Pyramidal);
+    
+    // Assign specific ref coords for L6 simulation
+    graph.neurons[0].ref_coord_x = 42.5;
+    graph.neurons[0].ref_coord_y = 13.37;
+    
+    // Save to disk
+    let test_file = "test_l6_save.bin";
+    BrainSnapshot::save_test_snapshot(100, &graph, test_file);
+    
+    // Load back
+    let snapshot = BrainSnapshot::load_from_disk(test_file).expect("Failed to load");
+    
+    // Verify persistence
+    assert_eq!(snapshot.graph.neurons[0].ref_coord_x, 42.5);
+    assert_eq!(snapshot.graph.neurons[0].ref_coord_y, 13.37);
+    
+    // Cleanup
+    let _ = std::fs::remove_file(test_file);
 }

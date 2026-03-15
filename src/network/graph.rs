@@ -437,6 +437,53 @@ impl NetworkGraph {
         self.optimize_memory_layout();
     }
 
+    // Cortical Column WTA Inhibition (v0.5.0)
+    pub fn apply_wta_inhibition(&mut self) {
+        for n in &mut self.neurons {
+            n.status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
+        }
+        // Collect spike data per minicolumn
+        // A minicolumn is defined by its column_id and minicolumn_id
+        use std::collections::HashMap;
+        
+        let mut minicolumn_winners: HashMap<(u16, u8), u32> = HashMap::new();
+        
+        // Find winners (highest voltage or first to spike)
+        for n in &self.neurons {
+            if n.is_alive == 0 { continue; }
+            
+            // Only pyramidal and interneurons participate in minicolumn WTA
+            if n.type_ != crate::engine::ffi::NeuronType::Pyramidal as u8 && 
+               n.type_ != crate::engine::ffi::NeuronType::Interneuron as u8 {
+                continue;
+            }
+            
+            if n.current_voltage > n.activation_threshold {
+                let key = (n.column_id, n.minicolumn_id);
+                // Simple WTA: First one found or highest voltage wins
+                let current_winner_v = minicolumn_winners.get(&key).map(|&id| self.neurons[id as usize].current_voltage).unwrap_or(-1000.0);
+                if n.current_voltage > current_winner_v {
+                    minicolumn_winners.insert(key, n.id);
+                }
+            }
+        }
+        
+        // Apply inhibition to losers
+        for n in &mut self.neurons {
+            if n.is_alive == 0 { continue; }
+            
+            let key = (n.column_id, n.minicolumn_id);
+            if let Some(&winner_id) = minicolumn_winners.get(&key) {
+                if n.id != winner_id {
+                    n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
+                    // Lateral inhibition hyperpolarizes the neuron
+                    n.current_voltage = n.resting_voltage - 10.0;
+                }
+            }
+        }
+    }
+
+
     pub fn grow_dendritic_tree(&mut self, neuron_id: u32) {
         let mut rng = rand::rng();
         let num_branches = rng.random_range(2..=4);

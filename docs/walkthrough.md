@@ -363,3 +363,10 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **WTA Reset Logic:** Added a hardware-level bitwise reset of the `FLAG_IS_INHIBITED` flag at the absolute start of `tick_neurons_kernel` to prevent neurons from getting permanently locked out.
 - **Serialization Invalidated:** Wiped previous `brain_save.bin` as the massive size change in struct geometry safely prevents memory layout corruption upon loading.
 - **Full Alignment Testing:** Created `test_memory_alignment` and patched test files ensuring that `BaseNeuron` exactly matches `256` bytes and `Compartment` remains perfectly tight at `8` bytes without implicit rustc padding interference.
+
+### Testing Layer Update (v0.5.0) - Cortical Column Validation
+- **Hardware JSON Saturation (2x Payload):** Expanded the size limit in `test_json_saturation` to 10MB to accommodate the new 256-byte `BaseNeuron` size.
+- **Reference Frame Persistence:** Added `test_l6_coord_persistence` into `biology_tests.rs` verifying that `ref_coord_x` and `ref_coord_y` are perfectly recovered during binary Bincode serialization.
+- **Dendritic Roles:** Implemented `test_dendritic_role_separation` verifying that Branches 0-3 (Proximal) cause immediate somatic spikes, while Branches 4-15 (Distal/Apical) trigger the HTM Predictive state without massive immediate depolarization.
+- **Columnar WTA (Winner-Take-All):** Created `columnar_tests.rs`. Added `test_columnar_assignment` (verifying generation properties) and `test_minicolumn_wta_inhibition` (verifying that lateral inhibition successfully hyperpolarizes losers below resting potential and correctly sets the `FLAG_IS_INHIBITED`).
+- **SDR Sparsity Targets:** Added `sparsity_tests.rs` simulating global noise across 1000 nodes, confirming that WTA mechanisms reliably clamp concurrent spikes down to the biological 2-15% SDR sparsity bounds.

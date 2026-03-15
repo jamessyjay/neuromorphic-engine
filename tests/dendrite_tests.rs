@@ -1,3 +1,4 @@
+use neuromorphic_engine::engine::ffi::Synapse;
 use neuromorphic_engine::network::graph::NetworkGraph;
 use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Compartment};
 
@@ -206,4 +207,72 @@ fn test_passive_leak_diffusion() {
     // Wait, process_spike might pull it back towards resting voltage, or ATP drain might happen.
     
     assert!(soma_v > -70.0, "Soma should receive a small passive leak charge");
+}
+
+#[test]
+fn test_dendritic_role_separation() {
+    let mut graph = NetworkGraph::new();
+    graph.add_neuron(NeuronType::Pyramidal); // 0 (Source for Proximal)
+    graph.add_neuron(NeuronType::Pyramidal); // 1 (Source for Distal)
+    graph.add_neuron(NeuronType::Pyramidal); // 2 (Target)
+
+    let mut env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 0.0,
+        stdp_learning_rate: 0.1,
+        wakefulness_multiplier: 1.0,
+    };
+
+    // Connect Source 0 to Proximal (Branch 2)
+    graph.synapses.push(Synapse {
+        source_id: 0,
+        target_id: 2,
+        weight: 5.0,
+        neurotransmitter_buffer: 0.0,
+        last_activation_tick: 0,
+        ticks_below_threshold: 0,
+        ticks_until_delivery: 0,
+        flags: 2, // Branch 2 (Proximal)
+        _padding: [0; 2],
+    });
+
+    // Connect Source 1 to Distal (Branch 6)
+    graph.synapses.push(Synapse {
+        source_id: 1,
+        target_id: 2,
+        weight: 5.0,
+        neurotransmitter_buffer: 0.0,
+        last_activation_tick: 0,
+        ticks_below_threshold: 0,
+        ticks_until_delivery: 0,
+        flags: 6, // Branch 6 (Distal)
+        _padding: [0; 2],
+    });
+
+    graph.optimize_memory_layout();
+    graph.force_sync_gpu();
+
+    let target_resting = graph.neurons[2].resting_voltage;
+
+    // Phase 1: Fire Distal (Branch 6)
+    graph.neurons[1].current_voltage = 50.0;
+    graph.tick(1, env);
+    graph.tick(2, env); // Delivery
+    graph.tick(3, env); // Summation
+
+    // Distal should set Predictive State, but NOT depolarize significantly
+    assert_eq!(graph.neurons[2].predictive_ticks, 20, "Distal branch must trigger Predictive State");
+    assert!(graph.neurons[2].current_voltage < target_resting + 1.0, "Distal should not cause huge somatic depolarization");
+
+    // Phase 2: Fire Proximal (Branch 2)
+    graph.neurons[0].current_voltage = 50.0;
+    graph.tick(4, env);
+    graph.tick(5, env); // Delivery
+    graph.tick(6, env); // Summation
+
+    // Proximal should depolarize the soma immediately
+    assert!(graph.neurons[2].current_voltage > target_resting + 10.0, "Proximal must cause immediate somatic depolarization");
 }
