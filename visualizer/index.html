@@ -166,6 +166,7 @@
             if (pulseSystem) scene.remove(pulseSystem);
             nodeMap.clear();
             activePulses.length = 0;
+            document.getElementById('synapses').innerText = data.total_synapses;
 
             const counts = {};
             data.neurons.forEach(n => counts[n[4]] = (counts[n[4]] || 0) + 1);
@@ -257,18 +258,25 @@
                         document.getElementById('v-glucose').innerText = data.global_glucose.toFixed(2);
                         document.getElementById('prog-glucose').value = data.global_glucose;
                     }
+                    if (data.synapse_count !== undefined) {
+                        document.getElementById('synapses').innerText = data.synapse_count;
+                    }
                     let spikesToday = 0, deadToday = 0;
                     data.neurons.forEach(n => {
                         const nData = nodeMap.get(n[0]);
                         if (nData) {
-                            if (n[1] >= 3.0 && nData.isAlive) {
+                            const state = n[1];
+                            if (state >= 3.0 && nData.isAlive) {
                                 nData.isAlive = false;
-                                deadToday++;
-                                if (n[1] === 3.0) nData.deathReason = 'calcium';
-                                else if (n[1] === 4.0) nData.deathReason = 'atp';
+                                if (state === 3.0) nData.deathReason = 'calcium';
+                                else if (state === 4.0) nData.deathReason = 'atp';
                                 else nData.deathReason = 'regen';
+                            } else {
+                                nData.isAlive = true;
+                                nData.visualActivity = (state === 1.0) ? 1.0 : nData.visualActivity;
                             }
-                            if (n[1] === 1.0 && nData.isAlive) {
+                            nData.atp = n[2];
+                            if (state === 1.0 && nData.isAlive) {
                                 spikesToday++; nData.visualActivity = 1.0;
                                 if (activePulses.length < MAX_PULSES) {
                                     nData.outgoing.forEach(syn => {
@@ -285,6 +293,7 @@
                     document.getElementById('dead-count').innerText = parseInt(document.getElementById('dead-count').innerText) + deadToday;
                     document.getElementById('tick').innerText = `Tick: ${data.tick}`;
                     document.getElementById('neurons').innerText = nodeMap.size;
+                    document.getElementById('synapses').innerText = data.synapse_count;
                     updateLegendCounts();
                 }
             };

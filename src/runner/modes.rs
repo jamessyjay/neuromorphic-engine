@@ -299,8 +299,11 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         telemetry.update(tick);
 
         let elapsed_ms = tick_start.elapsed().as_secs_f32() * 1000.0;
-        if use_dynamic_homeostasis {
+        if use_dynamic_homeostasis && tick > 5000 {
             current_env = regulator.update_and_get(elapsed_ms, tick, &current_env);
+        } else {
+            current_env.global_oxygen_level = 1.0;
+            current_env.global_glucose_level = 1.0;
         }
         if tick % TELEMETRY_PRINT_INTERVAL == 0 {
             let dead_count = graph.neurons.iter().filter(|n| n.is_alive == 0).count();
@@ -488,8 +491,11 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
         data.synapse_w.push(graph.synapses[0].neurotransmitter_buffer);
         
         let elapsed_ms = tick_start.elapsed().as_secs_f32() * 1000.0;
-        if use_dynamic_homeostasis {
+        if use_dynamic_homeostasis && tick > 5000 {
             current_env = regulator.update_and_get(elapsed_ms, tick, &current_env);
+        } else {
+            current_env.global_oxygen_level = 1.0;
+            current_env.global_glucose_level = 1.0;
         }
     }
 
