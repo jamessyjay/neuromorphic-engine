@@ -8,8 +8,6 @@
 #include <curand_kernel.h>
 #endif
 
-// --- PHASE 13, 14 & 18 REFINEMENT: THE BIOLOGICAL REALISM & PERFORMANCE UPDATE ---
-
 // Simple PRNG for Mock CPU (Xorshift)
 static float get_random_float_01(uint32_t* seed) {
     *seed ^= *seed << 13;
@@ -42,8 +40,6 @@ static inline __device__ __host__ uint16_t pack_voltage(float v) {
     if (shifted > MAX_U16_FLOAT / VOLTAGE_SCALE) shifted = MAX_U16_FLOAT / VOLTAGE_SCALE;
     return (uint16_t)(shifted * VOLTAGE_SCALE);
 }
-
-
 
 
 static inline __device__ __host__ float unpack_voltage(uint16_t v) {
@@ -346,27 +342,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
         s->weight += delta_w * env.dopamine_multiplier * branch_activity;
     }
-    
-    // Legacy LTP/LTD updates commented out to rely on pure STDP
-    /*
-    float learning_rate = STDP_LEARNING_RATE * env.dopamine_multiplier;
-    
-    // LTP: Potentiation + Thickness Growth (Phase 30)
-    if (s->last_activation_tick > 0 && target->last_spike_tick == current_tick) {
-        if (current_tick - s->last_activation_tick <= LTP_TIME_WINDOW) {
-            s->weight += learning_rate;
-            s->last_activation_tick = 0; // Consumption
-        }
-    }
-    
-    // LTD: Depression + Thinning (Phase 30)
-    if (s->last_activation_tick > 0 && current_tick - s->last_activation_tick >= LTD_TIME_WINDOW) {
-        if (target->last_spike_tick < s->last_activation_tick) {
-            s->weight -= learning_rate * LTD_PENALTY_MULTIPLIER;
-            s->last_activation_tick = 0; // Reset after depression
-        }
-    }
-    */
+
     
     // Homeostatic Scaling of Weights (Phase 23)
     if (target->spikes_in_last_window > SYNAPSE_SCALING_HIGH) {
