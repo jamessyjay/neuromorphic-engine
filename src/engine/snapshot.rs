@@ -13,6 +13,22 @@ pub struct BrainSnapshot {
 }
 
 impl BrainSnapshot {
+    pub fn save_test_snapshot(tick: u32, graph: &NetworkGraph, save_file: &str) {
+        Self {
+            current_tick: tick,
+            environment: Environment { 
+                global_oxygen_level: 1.0, 
+                global_glucose_level: 1.0, 
+                dopamine_multiplier: 1.0, 
+                toxin_levels: 0.0, 
+                light_level: 0.0, 
+                stdp_learning_rate: 0.1, 
+                wakefulness_multiplier: 1.0 
+            },
+            graph: graph.clone()
+        }.save_to_disk(save_file);
+    }
+    
     pub fn save_to_disk(&self, filename: &str) {
         unsafe { crate::engine::ffi::synchronize_device(); }
 

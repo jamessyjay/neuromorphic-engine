@@ -312,3 +312,21 @@ pub const TOTAL_TEST_TICKS: u32 = 3000;
 pub const TOTAL_LONG_TEST_TICKS: u32 = 50000;
 /// Hypoxic trigger for oxygen deprivation tests
 pub const HYPOXIA_TICK_TRIGGER: u32 = 300;
+
+// --- Light Cycle Testing Constants ---
+/// The duration (in ticks) of one full light/dark phase in reflex testing
+pub const LIGHT_CYCLE_DURATION: u32 = 50;
+
+// --- Test Durations ---
+/// Duration for medium length testing scenarios
+pub const MEDIUM_TEST_TICKS: u32 = 2000;
+/// Duration for long running test scenarios (e.g. stress tests)
+pub const LONG_TEST_TICKS: u32 = 5000;
+
+// --- Dopamine Rush Test Intervals ---
+/// End tick for the low dopamine phase
+pub const DOPAMINE_PHASE_1_END: u32 = 200;
+/// End tick for the high dopamine phase
+pub const DOPAMINE_PHASE_2_END: u32 = 600;
+/// End tick for the recovery phase
+pub const DOPAMINE_PHASE_3_END: u32 = 1000;

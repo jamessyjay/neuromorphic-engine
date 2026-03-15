@@ -622,7 +622,15 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     if spike_count_conc > spike_count_dist {
         println!("VERDICT: Dendritic non-linearity confirmed! 🧠✨");
     }
-    BrainSnapshot { current_tick: 50, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 50, 
+                    environment: Environment { global_oxygen_level: 1.0, 
+                                               global_glucose_level: 1.0, 
+                                               dopamine_multiplier: 1.0, 
+                                               toxin_levels: 0.0, 
+                                               light_level: 0.0, 
+                                               stdp_learning_rate: 0.1, 
+                                               wakefulness_multiplier: 1.0 }, 
+                    graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
@@ -671,7 +679,15 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         println!("✅ FIX 3 PASS: Refractory period effectively blocked incoming signal.");
     }
 
-    BrainSnapshot { current_tick: _total_ticks, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: _total_ticks, 
+                    environment: Environment { global_oxygen_level: 1.0, 
+                                               global_glucose_level: 1.0, 
+                                               dopamine_multiplier: 1.0, 
+                                               toxin_levels: 0.0, 
+                                               light_level: 0.0, 
+                                               stdp_learning_rate: 0.1, 
+                                               wakefulness_multiplier: 1.0 }, 
+                    graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
@@ -713,16 +729,32 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
             graph.initiate_sleep_cycle();
             let post_sleep_snapshot = graph.snapshot_synapses();
             NetworkGraph::diff_synapses(&pre_sleep_snapshot, &post_sleep_snapshot);
-            BrainSnapshot { current_tick: tick, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+            BrainSnapshot { current_tick: tick, 
+                            environment: Environment { global_oxygen_level: 1.0, 
+                                                       global_glucose_level: 1.0, 
+                                                       dopamine_multiplier: 1.0, 
+                                                       toxin_levels: 0.0, 
+                                                       light_level: 0.0, 
+                                                       stdp_learning_rate: 0.1, 
+                                                       wakefulness_multiplier: 1.0 }, 
+                            graph: graph.clone() }.save_to_disk("brain_save.bin");
             return Ok(());
         }
     }
-    BrainSnapshot { current_tick: crate::engine::constants::TOTAL_LONG_TEST_TICKS, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: crate::engine::constants::TOTAL_LONG_TEST_TICKS, 
+                    environment: Environment { global_oxygen_level: 1.0, 
+                                               global_glucose_level: 1.0, 
+                                               dopamine_multiplier: 1.0, 
+                                               toxin_levels: 0.0, 
+                                               light_level: 0.0, 
+                                               stdp_learning_rate: 0.1, 
+                                               wakefulness_multiplier: 1.0 }, 
+                    graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 3000;
+    let _total_ticks = crate::engine::constants::TOTAL_TEST_TICKS;
     println!("--- EXECUTING INHIBITION LOOP SCENARIO (Phase 19) ---");
     let mut graph = NetworkGraph::new();
     let p = graph.add_neuron(NeuronType::Pyramidal);
@@ -761,12 +793,20 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_inhibition_chart(&history, "graphs/inhibition_loop.png")?;
-    BrainSnapshot { current_tick: _total_ticks, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: _total_ticks, 
+                    environment: Environment { global_oxygen_level: 1.0, 
+                                               global_glucose_level: 1.0, 
+                                               dopamine_multiplier: 1.0, 
+                                               toxin_levels: 0.0, 
+                                               light_level: 0.0, 
+                                               stdp_learning_rate: 0.1, 
+                                               wakefulness_multiplier: 1.0 }, 
+                    graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 3000;
+    let _total_ticks = crate::engine::constants::TOTAL_TEST_TICKS;
     println!("--- EXECUTING REFLEX ARC (Phase 11) ---");
     let mut graph = NetworkGraph::new();
     let eye = graph.add_neuron(NeuronType::Photoreceptor);
@@ -788,7 +828,7 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut history = vec![];
 
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
-        env.light_level = if (tick / 50) % 2 == 0 { LIGHT_HIGH } else { LIGHT_LOW };
+        env.light_level = if (tick / crate::engine::constants::LIGHT_CYCLE_DURATION) % 2 == 0 { LIGHT_HIGH } else { LIGHT_LOW };
         if (300..=800).contains(&tick) {
             env.dopamine_multiplier = BOOSTED_DOPAMINE;
         } else {
@@ -819,7 +859,7 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 5000;
+    let _total_ticks = crate::engine::constants::LONG_TEST_TICKS;
     println!("--- EXECUTING STRESS-TEST (Phase 13) ---");
     let mut graph = NetworkGraph::new();
     let mut env = Environment { 
@@ -868,7 +908,7 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 3000;
+    let _total_ticks = crate::engine::constants::TOTAL_TEST_TICKS;
     println!("--- EXECUTING DOPAMINE RUSH (Phase 14) ---");
     let mut graph = NetworkGraph::new();
     let mut current_env = Environment { 
@@ -887,22 +927,15 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut weight_history = vec![];
     
-    current_env.dopamine_multiplier = LOW_DOPAMINE;
-    for tick in 0..200 {
-        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
-        graph.tick(tick as u32, current_env);
-        weight_history.push((tick as u32, graph.synapses[0].weight, current_env.dopamine_multiplier));
-    }
+    for tick in 0..crate::engine::constants::DOPAMINE_PHASE_3_END {
+        if tick < crate::engine::constants::DOPAMINE_PHASE_1_END {
+            current_env.dopamine_multiplier = LOW_DOPAMINE;
+        } else if tick < crate::engine::constants::DOPAMINE_PHASE_2_END {
+            current_env.dopamine_multiplier = HIGH_DOPAMINE;
+        } else {
+            current_env.dopamine_multiplier = DEFAULT_DOPAMINE;
+        }
 
-    current_env.dopamine_multiplier = HIGH_DOPAMINE;
-    for tick in 200..600 {
-        stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
-        graph.tick(tick as u32, current_env);
-        weight_history.push((tick as u32, graph.synapses[0].weight, current_env.dopamine_multiplier));
-    }
-
-    current_env.dopamine_multiplier = DEFAULT_DOPAMINE;
-    for tick in 600..1000 {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
         graph.tick(tick as u32, current_env);
         weight_history.push((tick as u32, graph.synapses[0].weight, current_env.dopamine_multiplier));
@@ -914,7 +947,7 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 2000;
+    let _total_ticks = crate::engine::constants::MEDIUM_TEST_TICKS;
     println!("--- EXECUTING FREQUENCY DISCRIMINATION TEST (Phase 23) ---");
     let mut graph = NetworkGraph::new();
     let eye = graph.add_neuron(NeuronType::Photoreceptor);
