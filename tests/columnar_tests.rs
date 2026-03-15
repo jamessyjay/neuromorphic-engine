@@ -38,7 +38,7 @@ fn test_minicolumn_wta_inhibition() {
         graph.neurons[id].minicolumn_id = 1;
     }
     
-    let mut env = Environment {
+    let env = Environment {
         global_oxygen_level: 1.0,
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,

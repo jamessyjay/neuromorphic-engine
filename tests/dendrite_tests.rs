@@ -216,7 +216,7 @@ fn test_dendritic_role_separation() {
     graph.add_neuron(NeuronType::Pyramidal); // 1 (Source for Distal)
     graph.add_neuron(NeuronType::Pyramidal); // 2 (Target)
 
-    let mut env = Environment {
+    let env = Environment {
         global_oxygen_level: 1.0,
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,

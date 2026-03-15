@@ -1,6 +1,5 @@
 use neuromorphic_engine::network::graph::NetworkGraph;
 use neuromorphic_engine::engine::ffi::{Environment, NeuronType};
-use neuromorphic_engine::engine::constants;
 
 #[test]
 fn test_sdr_activity_limit() {

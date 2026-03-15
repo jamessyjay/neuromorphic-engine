@@ -45,7 +45,7 @@ fn test_metabolic_sink() {
 #[test]
 fn test_atp_recovery_asymptote() {
     let mut graph = NetworkGraph::new();
-    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let _id = graph.add_neuron(NeuronType::Pyramidal);
         let id = graph.neurons.len() - 1;
         graph.neurons[id].column_id = id as u16;
         graph.neurons[id].minicolumn_id = 1;
@@ -151,7 +151,7 @@ fn test_oxygen_deprivation() {
 #[test]
 fn test_calcium_overdose() {
     let mut graph = NetworkGraph::new();
-    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let _id = graph.add_neuron(NeuronType::Pyramidal);
         let id = graph.neurons.len() - 1;
         graph.neurons[id].column_id = id as u16;
         graph.neurons[id].minicolumn_id = 1;
@@ -176,7 +176,7 @@ fn test_calcium_overdose() {
 #[test]
 fn test_calcium_recovery_rate() {
     let mut graph = NetworkGraph::new();
-    let id = graph.add_neuron(NeuronType::Pyramidal);
+    let _id = graph.add_neuron(NeuronType::Pyramidal);
         let id = graph.neurons.len() - 1;
         graph.neurons[id].column_id = id as u16;
         graph.neurons[id].minicolumn_id = 1;
