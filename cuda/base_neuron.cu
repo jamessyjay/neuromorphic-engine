@@ -89,7 +89,8 @@ static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t cu
 }
 
 // Atomic function: Apoptosis / Death Handler
-static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
+static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason, uint32_t current_tick) {
+    if (current_tick < 500) return;
     n->is_alive = 0;
     n->death_reason = reason;
     n->current_voltage = 0.0f;
@@ -100,7 +101,7 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason) {
 }
 
 // Atomic function: metabolism
-static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) {
+static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, uint32_t current_tick) {
 
     if (!n->is_alive) {
         n->dead_ticks += 1;
@@ -143,21 +144,23 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env) 
         n->energy_ATP += 0.2f;
     }
 
-    // Death by starvation (Only if hypoxic, otherwise just coma/silence)
+    // Death by starvation/hypoxia
     if (n->energy_ATP <= 0.0f) {
         n->energy_ATP = 0.0f;
         if (env.global_oxygen_level < 0.5f) {
-            die_gracefully(n, DEATH_ATP_LOW);
+            die_gracefully(n, DEATH_ATP_LOW, current_tick);
+        } else if (env.global_glucose_level < 0.1f) {
+            die_gracefully(n, DEATH_GLUCOSE_STARVATION, current_tick);
         }
     }
 }
 
-static inline __device__ void update_calcium(BaseNeuron* n) {
+static inline __device__ void update_calcium(BaseNeuron* n, uint32_t current_tick) {
     if (n->calcium_level > 0.0f) {
         n->calcium_level -= CALCIUM_RECOVERY_RATE; // Slower recovery
         if (n->calcium_level < 0.0f) n->calcium_level = 0.0f;
     }
-    if (n->calcium_level >= FATAL_CALCIUM_LEVEL) die_gracefully(n, DEATH_CALCIUM_HIGH);
+    if (n->calcium_level >= FATAL_CALCIUM_LEVEL) die_gracefully(n, DEATH_CALCIUM_HIGH, current_tick);
 }
 
 static inline __device__ void evaluate_branches(BaseNeuron* n) {
@@ -248,7 +251,9 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     // EMERGENCY GUARD 2.0: Explicit ATP check
     if (n->energy_ATP < EMERGENCY_ATP_THRESHOLD) {
         if (env.global_oxygen_level < 0.5f) {
-            die_gracefully(n, DEATH_ATP_LOW);
+            die_gracefully(n, DEATH_ATP_LOW, current_tick);
+        } else if (env.global_glucose_level < 0.1f) {
+            die_gracefully(n, DEATH_GLUCOSE_STARVATION, current_tick);
         } else {
             n->current_voltage = n->resting_voltage; // Sleep mode
         }
@@ -464,8 +469,8 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
 
     
 
-    update_metabolism(&neurons[idx], env);
-    update_calcium(&neurons[idx]);
+    update_metabolism(&neurons[idx], env, current_tick);
+    update_calcium(&neurons[idx], current_tick);
     evaluate_branches(&neurons[idx]);
     process_spike(&neurons[idx], env, current_tick);
     
@@ -545,8 +550,8 @@ extern "C" {
 
         
 
-        update_metabolism(neuron, env);
-        update_calcium(neuron);
+        update_metabolism(neuron, env, current_tick);
+        update_calcium(neuron, current_tick);
         evaluate_branches(neuron);
         process_spike(neuron, env, current_tick);
         

@@ -123,7 +123,11 @@
             0: new THREE.Color(0x00aaff), 1: new THREE.Color(0x44ff44),
             2: new THREE.Color(0xffaa00), 3: new THREE.Color(0xff00ff),
             4: new THREE.Color(0xff4444), 5: new THREE.Color(0xffff00),
-            6: new THREE.Color(0x00ffff), dead: new THREE.Color(0x220000)
+            6: new THREE.Color(0x00ffff), 
+            dead_calcium: new THREE.Color(0xff2222), // Red for calcium overload
+            dead_atp: new THREE.Color(0x2222ff),     // Blue for hypoxia/starvation
+            dead_regen: new THREE.Color(0x22ff22),   // Green for regenerating (Phoenix)
+            dead: new THREE.Color(0x220000)
         };
 
         const MAX_PULSES = 3000, PULSE_SPEED = 0.015, VISUAL_SAMPLING = 0.3;
@@ -276,7 +280,12 @@
                     const mData = neuronMeshes.find(mesh => mesh.type === n.type);
                     if (mData && mData.mesh === m.mesh) {
                         n.visualActivity *= 0.94;
-                        if (!n.isAlive) _tempColor.copy(TYPE_COLORS.dead);
+                        if (!n.isAlive) {
+                            if (n.deathReason === 'calcium') _tempColor.copy(TYPE_COLORS.dead_calcium);
+                            else if (n.deathReason === 'atp') _tempColor.copy(TYPE_COLORS.dead_atp);
+                            else if (n.deathReason === 'regen') _tempColor.copy(TYPE_COLORS.dead_regen);
+                            else _tempColor.copy(TYPE_COLORS.dead);
+                        }
                         else _tempColor.copy(TYPE_COLORS[n.type]).lerp(new THREE.Color(1,1,1), n.visualActivity);
                         m.mesh.setColorAt(n.meshIdx, _tempColor);
                     }
@@ -303,7 +312,7 @@
         function buildLegend() {
             const container = document.getElementById('legend-content');
             container.innerHTML = '';
-            const names = {0:"PYRAMIDAL", 1:"BIPOLAR", 2:"INTERNEURON", 3:"PACEMAKER", 4:"PURKINJE", 5:"PHOTORECEPTOR", 6:"NOCICEPTOR", dead:"DEAD NEURON"};
+            const names = {0:"PYRAMIDAL", 1:"BIPOLAR", 2:"INTERNEURON", 3:"PACEMAKER", 4:"PURKINJE", 5:"PHOTORECEPTOR", 6:"NOCICEPTOR", dead_calcium:"DEAD (CALCIUM)", dead_atp:"DEAD (STARVED)", dead_regen:"REGENERATING", dead:"DEAD (OTHER)"};
             Object.keys(TYPE_COLORS).forEach(k => {
                 const item = document.createElement('div'); item.className = 'legend-item';
                 item.innerHTML = `<div class="color-dot" style="background-color: #${TYPE_COLORS[k].getHexString()}"></div>

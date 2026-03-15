@@ -22,7 +22,8 @@ fn test_metabolic_sink() {
     let mut env = default_env();
     env.global_oxygen_level = 0.4;
 
-    for tick in 1..=200 {
+    // Grace period protects neurons until tick 500
+    for tick in 501..=700 {
         for n in &mut graph.neurons {
             if n.is_alive == 1 {
                 n.current_voltage = 100.0; 
