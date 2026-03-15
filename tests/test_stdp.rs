@@ -48,7 +48,7 @@ fn test_stdp_trace_decay() {
 fn test_stdp_ltp_causal_firing() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
-    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal); graph.neurons[src as usize].column_id = 0; graph.neurons[tgt as usize].column_id = 1;
     let env = default_env();
     
     // Disable homeostatic scaling to purely test STDP
@@ -91,7 +91,7 @@ fn test_stdp_ltp_causal_firing() {
 fn test_stdp_ltd_acausal_firing() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
-    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal); graph.neurons[src as usize].column_id = 0; graph.neurons[tgt as usize].column_id = 1;
     let env = default_env();
     
     graph.neurons[tgt as usize].spikes_in_last_window = 10;
@@ -135,7 +135,7 @@ fn test_stdp_dopamine_scaling() {
     let run_ltp = |dopamine: f32| -> f32 {
         let mut graph = NetworkGraph::new();
         let src = graph.add_neuron(NeuronType::Pyramidal);
-        let tgt = graph.add_neuron(NeuronType::Pyramidal);
+        let tgt = graph.add_neuron(NeuronType::Pyramidal); graph.neurons[src as usize].column_id = 0; graph.neurons[tgt as usize].column_id = 1;
         let mut env = default_env();
         env.dopamine_multiplier = dopamine;
         
@@ -180,7 +180,7 @@ fn test_stdp_dopamine_scaling() {
 fn test_stdp_weight_clamping() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
-    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal); graph.neurons[src as usize].column_id = 0; graph.neurons[tgt as usize].column_id = 1;
     let mut env = default_env();
     env.stdp_learning_rate = 50.0; // High rate to ensure clamp
     

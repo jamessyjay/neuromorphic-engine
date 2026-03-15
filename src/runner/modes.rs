@@ -367,13 +367,16 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
                 let target_id = candidates[k].0 as u32;
                 // Add to outgoing_synapses to prevent next checks from reusing it if logic changes
                 outgoing_synapses[i].push(target_id); 
-                new_synapses.push((i as u32, target_id, 2.5));
+                
+                let is_inhib = graph.neurons[i].type_ == crate::engine::ffi::NeuronType::Interneuron as u8;
+                let w = if is_inhib { -2.5 } else { 2.5 };
+                new_synapses.push((i as u32, target_id, w, is_inhib));
             }
         }
     }
     
-    for (src, tgt, w) in new_synapses {
-        graph.connect(src, tgt, w, 0, false, false);
+    for (src, tgt, w, is_inhib) in new_synapses {
+        graph.connect(src, tgt, w, 0, is_inhib, false);
     }
     
     // Re-optimize memory layout after adding new orphan-saving synapses
