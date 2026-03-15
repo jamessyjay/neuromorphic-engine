@@ -294,7 +294,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             5 => assert!(n.z >= LAYER_5_Z_MIN && n.z <= LAYER_5_Z_MAX, "L5 Z mismatch"),
             4 => assert!(n.z >= LAYER_4_Z_MIN && n.z <= LAYER_4_Z_MAX, "L4 Z mismatch"),
             2 => assert!(n.z >= LAYER_2_3_Z_MIN && n.z <= LAYER_2_3_Z_MAX, "L2/3 Z mismatch"),
-            1 => assert!(n.z >= 60001 && n.z <= 65535, "L1 Z mismatch"),
+            1 => assert!(n.z >= 60001, "L1 Z mismatch"), // Note: n.z is u16, so it is inherently <= 65535
             _ => panic!("Unknown layer ID {}", n.layer_id),
         }
     }

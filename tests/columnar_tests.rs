@@ -79,7 +79,7 @@ fn test_z_boundaries() {
             5 => assert!(n.z >= LAYER_5_Z_MIN && n.z <= LAYER_5_Z_MAX, "L5 neuron {} has z {} out of bounds", n.id, n.z),
             4 => assert!(n.z >= LAYER_4_Z_MIN && n.z <= LAYER_4_Z_MAX, "L4 neuron {} has z {} out of bounds", n.id, n.z),
             2 => assert!(n.z >= LAYER_2_3_Z_MIN && n.z <= LAYER_2_3_Z_MAX, "L2/3 neuron {} has z {} out of bounds", n.id, n.z),
-            1 => assert!(n.z >= 60001 && n.z <= 65535, "L1 neuron {} has z {} out of bounds", n.id, n.z),
+            1 => assert!(n.z >= 60001, "L1 neuron {} has z {} out of bounds", n.id, n.z), // Note: n.z is u16, so it is inherently <= 65535
             _ => panic!("Unknown layer ID {}", n.layer_id),
         }
     }
@@ -88,7 +88,7 @@ fn test_z_boundaries() {
 #[test]
 fn test_radial_clustering() {
     let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 100);
-    use neuromorphic_engine::engine::constants::*;
+    
     
     let column_centers_x: Vec<f32> = (0..5).map(|i| (i as f32) * 12000.0 + 10000.0).collect();
     let column_centers_y: Vec<f32> = (0..2).map(|i| (i as f32) * 20000.0 + 10000.0).collect();
@@ -221,7 +221,7 @@ fn test_wta_suppression() {
     let mut graph = NetworkGraph::new();
     
     // Create a minicolumn with 2 neurons (Pyramidal)
-    for i in 0..2 {
+    for _i in 0..2 {
         graph.add_neuron(NeuronType::Pyramidal);
         let id = graph.neurons.len() - 1;
         graph.neurons[id].column_id = 1;
