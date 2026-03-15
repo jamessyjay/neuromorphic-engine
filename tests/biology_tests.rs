@@ -20,7 +20,8 @@ fn test_metabolic_sink() {
     }
     
     let mut env = default_env();
-    env.global_oxygen_level = 0.4;
+    env.global_oxygen_level = 0.2;
+    env.wakefulness_multiplier = 0.0; // Disable recovery so passive drain and spike cost can kill them
 
     // Grace period protects neurons until tick 5000
     for tick in 5001..=5200 {
@@ -41,9 +42,12 @@ fn test_metabolic_sink() {
 fn test_atp_recovery_asymptote() {
     let mut graph = NetworkGraph::new();
     let id = graph.add_neuron(NeuronType::Pyramidal);
-    let env = default_env();
-    
-    graph.neurons[id as usize].energy_atp = 0.1;
+    let mut env = default_env();
+    env.global_oxygen_level = 1.0;
+    env.global_glucose_level = 1.0;
+
+    // Drain some ATP first
+    graph.neurons[id as usize].energy_atp = 50.0;
     
     let mut recovery_rates = vec![];
     
@@ -68,7 +72,7 @@ fn test_mitochondrial_failure() {
     
     let mut env = default_env();
     env.global_glucose_level = 0.05; // Critical glucose
-    env.global_oxygen_level = 0.4; // Hypoxia required for death
+    env.global_oxygen_level = 0.2; // Hypoxia required for death
     env.wakefulness_multiplier = 0.0; // Disable recovery so passive drain can kill them
 
     for tick in 5001..=5500 {

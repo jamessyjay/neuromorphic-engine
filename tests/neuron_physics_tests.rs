@@ -67,7 +67,8 @@ fn test_atp_gating_starvation_filter() {
     n_fed.current_voltage += gap + 1.0;
     n_starving.current_voltage += gap + 1.0;
     
-    let env = default_env();
+    let mut env = default_env();
+    env.wakefulness_multiplier = 0.0; // Disable recovery so starving stays starving
     
     unsafe {
         tick_neuron_cpu(&mut n_fed, env.clone(), 1);
@@ -75,6 +76,7 @@ fn test_atp_gating_starvation_filter() {
     }
     
     assert!(n_fed.current_voltage <= n_fed.resting_voltage + 5.0 || n_fed.refractory_time_left > 0.0, "Fed neuron should have spiked!");
+    println!("Starving V: {}", n_starving.current_voltage);
     assert!((n_starving.current_voltage - n_starving.resting_voltage).abs() < 5.0, "Starving neuron should have entered metabolic coma (returning near resting voltage due to thermal noise)");
 }
 
@@ -342,6 +344,8 @@ fn test_htm_predictive_state_coincidence() {
         init_neuron(&mut neuron, 1, NeuronType::Pyramidal, 42);
     }
     
+    neuron.energy_atp = neuron.max_atp; // Prevent metabolic coma
+
     let env = default_env();
     
     // Set up branch 3 (Basal/Context) and branch 0 (Proximal/Trigger)
@@ -366,10 +370,10 @@ fn test_htm_predictive_state_coincidence() {
     // Since activation is ~ -40mV and resting is ~ -70mV, a 10mV bump goes to -60mV. 
     // Wait, activation is -40, resting -70. Gap is 30mV.
     // The predictive state adds 15mV offset.
-    // So we need a weak signal of 20mV (resting + 20 = -50mV).
-    // With predictive boost (+15mV), it becomes -35mV > -40mV (SPIKE!).
+    // So we need a weak signal of 10mV (resting + 10 = -60mV).
+    // With predictive boost (+15mV), it becomes -45mV > -52mV (SPIKE!).
     
-    neuron.current_voltage = neuron.resting_voltage + 20.0;
+    neuron.current_voltage = neuron.resting_voltage + 10.0;
     
     unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 2); }
     
@@ -383,8 +387,8 @@ fn test_htm_predictive_state_coincidence() {
     
     assert_eq!(neuron.predictive_ticks, 0, "Predictive state should have worn off");
     
-    // Phase 3: Send the exact same weak signal (20mV) without predictive state
-    neuron.current_voltage = neuron.resting_voltage + 20.0;
+    // Phase 3: Send the exact same weak signal (10mV) without predictive state
+    neuron.current_voltage = neuron.resting_voltage + 10.0;
     unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 61); }
     
     assert_ne!(neuron.last_spike_tick, 61, "Neuron MUST NOT SPIKE from weak signal without predictive context");

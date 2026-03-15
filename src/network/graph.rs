@@ -286,9 +286,13 @@ impl NetworkGraph {
             }
             // Unsafe block is fine here because we just checked the bounds
             unsafe {
-                let src_alive = (*neurons_ptr.add(s.source_id as usize)).is_alive;
-                let dst_alive = (*neurons_ptr.add(s.target_id as usize)).is_alive;
-                src_alive == 1 && dst_alive == 1
+                let src = &*neurons_ptr.add(s.source_id as usize);
+                let dst = &*neurons_ptr.add(s.target_id as usize);
+                
+                let src_valid = src.is_alive == 1 || src.dead_ticks > 0;
+                let dst_valid = dst.is_alive == 1 || dst.dead_ticks > 0;
+                
+                src_valid && dst_valid
             }
         });
     }

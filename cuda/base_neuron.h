@@ -37,17 +37,18 @@ extern "C" {
 #define ACTION_POTENTIAL_PEAK 40.0f
 
 // Metabolic parameters (Phase 40)
-#define ATP_RECOVERY_RATE 1.5f
+#define ATP_RECOVERY_RATE 7.5f
 #define ATP_SPIKE_COST 25.0f
 #define GLUCOSE_CONVERSION_RATE 0.2f
 #define MIN_GLUCOSE_LEVEL 0.1f
 #define GLUCOSE_CONVERT_ATP_RATIO 0.5f
 #define MIN_ATP_RATIO 0.01f
-#define MIN_OXYGEN_LEVEL 0.5f
+#define MIN_OXYGEN_LEVEL 0.3f
 
 // Refractory and Recovery
 #define ABSOLUTE_REFRACTORY_PERIOD 2.0f
 #define VOLTAGE_DECAY_RATE 0.1f // Membrane leak
+#define BASELINE_LEAK_RATE 0.0025f
 #define CALCIUM_SPIKE_GAIN 5.0f
 #define FATAL_CALCIUM_LEVEL 1000.0f
 #define MAX_SYNAPSE_WEIGHT 5.0f
@@ -82,7 +83,6 @@ extern "C" {
 #define HOMEOSTATIC_PENALTY 0.5f
 #define HOMEOSTATIC_RECOVERY 0.1f
 
-#define BASELINE_LEAK_RATE 0.005f
 #define LOW_ATP_LEAK_MULTIPLIER 1.1f
 #define ATP_STRESS_THRESHOLD 30.0f
 // MMN v1.1: Hunger sensitivity. Controls how much the activation threshold increases when ATP is low.

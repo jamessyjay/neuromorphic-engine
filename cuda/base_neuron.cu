@@ -159,11 +159,16 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
 
     // Death by starvation/hypoxia
     if (n->energy_ATP <= 0.0f) {
-        n->energy_ATP = 0.0f;
-        if (env.global_oxygen_level < MIN_OXYGEN_LEVEL) {
+        if (env.global_oxygen_level < 0.3f) {
+            n->energy_ATP = 0.0f;
             die_gracefully(n, DEATH_ATP_LOW, current_tick);
         } else if (env.global_glucose_level < MIN_GLUCOSE_LEVEL) {
+            n->energy_ATP = 0.0f;
             die_gracefully(n, DEATH_GLUCOSE_STARVATION, current_tick);
+        } else {
+            // Comatose state
+            n->energy_ATP = 0.0f;
+            n->current_voltage = n->resting_voltage;
         }
     }
 }
@@ -262,7 +267,7 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
 
     // EMERGENCY GUARD 2.0: Explicit ATP check
     if (n->energy_ATP <= 0.0f) {
-        if (env.global_oxygen_level < MIN_OXYGEN_LEVEL) {
+        if (env.global_oxygen_level < 0.3f) {
             die_gracefully(n, DEATH_ATP_LOW, current_tick);
         } else if (env.global_glucose_level < MIN_GLUCOSE_LEVEL) {
             die_gracefully(n, DEATH_GLUCOSE_STARVATION, current_tick);
@@ -273,9 +278,9 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     }
 
     // Phase 18 Fix: "Metabolic Coma" (Safety Valve)
-    if (n->energy_ATP < 20.0f) {
+    if (n->energy_ATP < 15.0f) {
         n->current_voltage = n->resting_voltage; // Go to sleep
-        return; // CANNOT fire if energy is below 20
+        return; // CANNOT fire if energy is below 15%
     }
 
     // Specialized cell behaviors in idle state
