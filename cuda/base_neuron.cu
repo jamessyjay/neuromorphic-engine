@@ -118,7 +118,7 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
             // Phoenix Resurrection
             n->is_alive = 1;
             n->calcium_level = 0.0f;
-            n->energy_ATP = n->max_atp;
+            n->energy_ATP = n->max_atp; // Phoenix Energy Boost (v0.4.7) - Guaranteed full charge
             n->current_voltage = n->resting_voltage;
             n->dead_ticks = 0;
             n->death_reason = 0;
@@ -279,10 +279,18 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         return;
     }
 
-    // Phase 18 Fix: "Metabolic Coma" (Safety Valve)
+    // Metabolic Hysteresis (State Sync v0.4.7)
     if (n->energy_ATP < 15.0f) {
-        n->current_voltage = n->resting_voltage; // Go to sleep
-        return; // CANNOT fire if energy is below 15%
+        n->death_reason = STATE_METABOLIC_SHUTDOWN;
+    }
+    
+    if (n->death_reason == STATE_METABOLIC_SHUTDOWN) {
+        if (n->energy_ATP >= 40.0f) {
+            n->death_reason = DEATH_NONE;
+        } else {
+            n->current_voltage = n->resting_voltage; // Go to sleep
+            return; // CANNOT fire while in shutdown
+        }
     }
 
     // Specialized cell behaviors in idle state
@@ -459,7 +467,7 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
             // Phoenix Resurrection
             neurons[idx].is_alive = true;
             neurons[idx].calcium_level = 0.0f;
-            neurons[idx].energy_ATP = neurons[idx].max_atp;
+            neurons[idx].energy_ATP = neurons[idx].max_atp; // Phoenix Energy Boost (v0.4.7) - Guaranteed full charge
             neurons[idx].current_voltage = neurons[idx].resting_voltage;
             neurons[idx].dead_ticks = 0;
             neurons[idx].death_reason = 0;
@@ -540,7 +548,7 @@ extern "C" {
                 // Phoenix Resurrection
                 neuron->is_alive = 1;
                 neuron->calcium_level = 0.0f;
-                neuron->energy_ATP = neuron->max_atp;
+                neuron->energy_ATP = neuron->max_atp; // Phoenix Energy Boost (v0.4.7) - Guaranteed full charge
                 neuron->current_voltage = neuron->resting_voltage;
                 neuron->dead_ticks = 0;
                 neuron->death_reason = 0;

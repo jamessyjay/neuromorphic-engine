@@ -180,6 +180,15 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         let tick_start = Instant::now();
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
 
+        // Nursery Protection Improvement (v0.4.7)
+        if tick < 5000 {
+            for n in &mut graph.neurons {
+                if n.energy_atp < 50.0 {
+                    n.energy_atp = 50.0;
+                }
+            }
+        }
+
         // Accumulate spikes from all neurons that spiked in THIS tick
         for n in &graph.neurons {
             if n.last_spike_tick == tick {
@@ -250,9 +259,10 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
                         match n.death_reason {
                             2 => 3.0, // Calcium (Red)
                             1 | 3 => 4.0, // ATP/Glucose (Blue)
+                            4 => 4.0, // Metabolic Shutdown (Dark Blue/Black) - same as ATP for now until UI is updated, or can be 4.0
                             _ => 5.0, // Regenerating/Other (Green)
                         }
-                    } else if is_spiking_now || spiked_recently { 1.0 } else if atp_pct < 25.0 { 2.0 } else { 0.0 };
+                    } else if is_spiking_now || spiked_recently { 1.0 } else if n.death_reason == 4 || atp_pct < 25.0 { 2.0 } else { 0.0 };
 
                     update.neurons.push((n.id, visual_state, atp_pct));
                 }
@@ -396,6 +406,16 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
     for tick in (start_tick + 1)..=(start_tick + total_ticks) {
         let tick_start = Instant::now();
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
+        
+        // Nursery Protection Improvement (v0.4.7)
+        if tick < 5000 {
+            for n in &mut graph.neurons {
+                if n.energy_atp < 50.0 {
+                    n.energy_atp = 50.0;
+                }
+            }
+        }
+        
         graph.tick(tick, current_env);
         
         if let Some(ref tx) = tx {
@@ -454,9 +474,10 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
                         match n.death_reason {
                             2 => 3.0, // Calcium (Red)
                             1 | 3 => 4.0, // ATP/Glucose (Blue)
+                            4 => 4.0, // Metabolic Shutdown (Dark Blue/Black) - same as ATP for now until UI is updated, or can be 4.0
                             _ => 5.0, // Regenerating/Other (Green)
                         }
-                    } else if is_spiking_now || spiked_recently { 1.0 } else if atp_pct < 25.0 { 2.0 } else { 0.0 };
+                    } else if is_spiking_now || spiked_recently { 1.0 } else if n.death_reason == 4 || atp_pct < 25.0 { 2.0 } else { 0.0 };
 
                     update.neurons.push((n.id, visual_state, atp_pct));
                 }
@@ -1221,15 +1242,20 @@ use crate::engine::ffi::Environment;
                     synapse_count: graph.synapses.len(),
                 };
                 for n in &graph.neurons {
-                    let state = if n.is_alive == 0 {
+                    let atp_pct = (n.energy_atp / n.max_atp) * crate::engine::constants::METRIC_MAX_F32;
+                    let is_spiking_now = n.current_voltage > n.activation_threshold;
+                    let spiked_recently = tick.saturating_sub(n.last_spike_tick) < crate::engine::constants::VISUAL_SPIKE_PERSISTENCE_TICKS;
+                    
+                    let visual_state = if n.is_alive == 0 {
                         match n.death_reason {
                             2 => 3.0, // Calcium (Red)
                             1 | 3 => 4.0, // ATP/Glucose (Blue)
+                            4 => 4.0, // Metabolic Shutdown (Dark Blue/Black) - same as ATP for now until UI is updated, or can be 4.0
                             _ => 5.0, // Regenerating/Other (Green)
                         }
-                    } else if n.current_voltage >= 30.0 { 2.0 } else if n.current_voltage > -50.0 { 1.0 } else { 0.0 };
-                    let atp_percent = n.energy_atp / n.max_atp * 100.0;
-                    update.neurons.push((n.id, state, atp_percent));
+                    } else if is_spiking_now || spiked_recently { 1.0 } else if n.death_reason == 4 || atp_pct < 25.0 { 2.0 } else { 0.0 };
+
+                    update.neurons.push((n.id, visual_state, atp_pct));
                 }
                 
                 let msg = crate::monitor::streamer::StreamMessage::TickUpdate(update);

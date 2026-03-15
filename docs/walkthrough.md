@@ -302,3 +302,9 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Rust `Drop` Trait:** Implemented `impl Drop for NetworkGraph` to ensure that before any Host vectors are deleted, `crate::engine::ffi::synchronize_device()` is called. This guarantees the GPU has completely finished reading/writing the memory before Rust reclaims it.
 - **CUDA Cleanup API:** Exposed a safe `cleanup_gpu_resources` C++ function through FFI with built-in null-pointer checks (`if (ptr == nullptr) return;`) and safe `#ifdef USE_CUDA` wrappers to prevent invalid free crashes on macOS mocks while ensuring zero VRAM leaks on Jetson hardware.
 - **Validation Test:** Created a destructive test `test_resource_cleanup_no_double_free` that instantiates and drops `NetworkGraph` 100 times sequentially, verifying complete memory stability without segfaults.
+
+## Phase 50: Metabolic Hysteresis & State Sync (v0.4.7)
+- **Unified Visual State Mapping**: Updated `run_ui_test` in `modes.rs` to use the same logic as `run_simulation` and `run_benchmark_mode` for determining the visual state of neurons. State 4.0 is now explicitly used for Metabolic Shutdown.
+- **CUDA Metabolic Hysteresis**: Added a new state `STATE_METABOLIC_SHUTDOWN` in `base_neuron.h`. In `base_neuron.cu`, if ATP drops below 15.0, the neuron enters shutdown and cannot spike until ATP recovers to 40.0.
+- **Phoenix Energy Boost**: When a neuron resurrects after death (Phoenix cycle), its ATP is instantly fully replenished (`energy_ATP = max_atp`) so it can start functioning immediately.
+- **Nursery Protection**: Added a protection mechanism in `modes.rs` (for ticks < 5000) where ATP is artificially maintained at a minimum of 50.0 to ensure successful network initialization.
