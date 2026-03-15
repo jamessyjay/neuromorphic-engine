@@ -130,6 +130,9 @@ fn test_pavlovian_success_rate() {
     let relay = graph.add_neuron(NeuronType::Pyramidal);
     let motor = graph.add_neuron(NeuronType::Pyramidal);
     let mut env = default_env();
+    graph.neurons[sensor as usize].column_id = 0;
+    graph.neurons[relay as usize].column_id = 1;
+    graph.neurons[motor as usize].column_id = 2;
     
     graph.synapses.push(Synapse {
         source_id: sensor,

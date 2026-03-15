@@ -48,16 +48,16 @@ fn test_minicolumn_wta_inhibition() {
         wakefulness_multiplier: 1.0,
     };
     
-    // Force spike on Neuron 1
+    // Force spike on Neuron 1 and make it predictive
     graph.force_sync_gpu();
     graph.neurons[1].current_voltage = 50.0;
+    graph.neurons[1].status_flags |= constants::FLAG_IS_PREDICTIVE;
+    graph.neurons[1].predictive_ticks = 10;
     
     // Partially excite Neuron 2, but less than Neuron 1
     graph.neurons[2].current_voltage = 40.0;
     
-    // Run tick (WTA lateral inhibition applies BEFORE physics)
-    graph.apply_wta_inhibition();
-    println!("Before tick, Loser: v={}", graph.neurons[2].current_voltage);
+    // Run tick (WTA lateral inhibition applies during physics phase 2)
     graph.tick(1, env);
     
     // Neuron 1 should have won and spiked, Neuron 2 should have been inhibited
@@ -240,9 +240,11 @@ fn test_wta_suppression() {
         wakefulness_multiplier: 1.0,
     };
     
-    // Force spike on Neuron A
+    // Force spike on Neuron A and make it predictive to trigger WTA instead of Bursting
     graph.force_sync_gpu();
     graph.neurons[0].current_voltage = 50.0; // Above threshold to trigger spike in phase 1
+    graph.neurons[0].status_flags |= constants::FLAG_IS_PREDICTIVE;
+    graph.neurons[0].predictive_ticks = 10;
     
     // Run tick 1
     graph.tick(1, env);

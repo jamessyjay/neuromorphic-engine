@@ -227,40 +227,57 @@ impl NetworkGraph {
         {
             // MacOS CPU Fallback using Rayon Multi-Threading
             self.neurons.par_iter_mut().for_each(|n| {
-                // To avoid changing tick_neuron_cpu signature again, pass null for all_neurons
-                unsafe { crate::engine::ffi::tick_neuron_cpu(n, std::ptr::null_mut(), 0, env, current_tick); }
+                unsafe { crate::engine::ffi::tick_neuron_prepare_cpu(n, env, current_tick); }
             });
 
-            // Phase 2: Broadcast (WTA)
-            use std::collections::HashMap;
+            // Phase 2: WTA and Bursting
+            use std::collections::{HashMap, HashSet};
             let mut minicolumn_winners: HashMap<(u16, u8), u32> = HashMap::new();
+            let mut predictive_crossed: HashSet<(u16, u8)> = HashSet::new();
+            
             for n in &self.neurons {
-                if n.is_alive == 1 && n.last_spike_tick == current_tick && (n.type_ == 0 || n.type_ == 2) {
+                if n.is_alive == 1 && n.current_voltage > n.activation_threshold && (n.type_ == 0 || n.type_ == 2) {
                     let key = (n.column_id, n.minicolumn_id);
-                    let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
-                    if n.id < *current_winner {
-                        *current_winner = n.id;
+                    let is_pred = (n.status_flags & crate::engine::constants::FLAG_IS_PREDICTIVE) != 0;
+                    
+                    if is_pred {
+                        predictive_crossed.insert(key);
+                        let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
+                        if n.id < *current_winner {
+                            *current_winner = n.id;
+                        }
+                    } else if !predictive_crossed.contains(&key) {
+                        let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
+                        if n.id < *current_winner {
+                            *current_winner = n.id;
+                        }
                     }
                 }
             }
 
             for n in &mut self.neurons {
-                if n.is_alive == 1 {
+                if n.is_alive == 1 && (n.type_ == 0 || n.type_ == 2) {
                     let key = (n.column_id, n.minicolumn_id);
                     if let Some(&winner_id) = minicolumn_winners.get(&key) {
-                        if n.id != winner_id {
-                            n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
-                            n.current_voltage = n.resting_voltage;
-                            n.refractory_time_left = 5.0;
-                            if n.last_spike_tick == current_tick {
-                                // Rollback spike for suppressed losers
-                                n.last_spike_tick = current_tick.saturating_sub(1);
-                                n.spikes_in_last_window = n.spikes_in_last_window.saturating_sub(1);
+                        if predictive_crossed.contains(&key) {
+                            if n.id != winner_id {
+                                n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
+                                n.current_voltage = n.resting_voltage - 10.0;
+                                n.refractory_time_left = 5.0;
+                            }
+                        } else {
+                            // Bursting
+                            if n.current_voltage <= n.activation_threshold {
+                                n.current_voltage = n.activation_threshold + 5.0;
                             }
                         }
                     }
                 }
             }
+            
+            self.neurons.par_iter_mut().for_each(|n| {
+                unsafe { crate::engine::ffi::tick_neuron_spike_cpu(n, env, current_tick); }
+            });
 
             // Convert pointer to usize to make it trivially Send+Sync
             let neurons_ptr_usize = self.neurons.as_mut_ptr() as usize;

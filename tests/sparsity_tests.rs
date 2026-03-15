@@ -21,6 +21,10 @@ fn test_sdr_activity_limit() {
     // Blast them all with massive excitation (noise)
     for i in 0..1000 {
         graph.neurons[i].current_voltage = 50.0 + (i % 20) as f32;
+        if i % 10 == 0 {
+            // Make one neuron per minicolumn predictive so we trigger WTA instead of Bursting
+            graph.neurons[i].status_flags |= 2; // FLAG_IS_PREDICTIVE
+        }
     }
     
     let env = Environment {

@@ -529,6 +529,10 @@
                         } else {
                             if (n.statusFlags & FLAG_IS_INHIBITED) {
                                 _tempColor.copy(baseColor).multiplyScalar(0.1);
+                            } else if (n.statusFlags & FLAG_IS_PREDICTIVE) {
+                                // Predictive State: Magenta/Neon Pink (0xff00ff)
+                                const predColor = new THREE.Color(0xff00ff);
+                                _tempColor.copy(predColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
                             } else {
                                 _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
                             }
@@ -551,6 +555,9 @@
                 for (let i = 0; i < MAX_PULSES; i++) {
                     const idx = i*3;
                     if (i < activePulses.length) {
+                        // Check for bursting (represented by column-wide flash)
+                        // If we wanted pure vertical flash, we could spawn special pulses, but for now we just 
+                        // rely on the massive spike wave triggering many activePulses automatically.
                         const p = activePulses[i]; p.p += PULSE_SPEED;
                         if (p.p >= 1.0) { activePulses.splice(i, 1); i--; continue; }
                         pos[idx]=p.s.x+(p.t.x-p.s.x)*p.p; pos[idx+1]=p.s.y+(p.t.y-p.s.y)*p.p; pos[idx+2]=p.s.z+(p.t.z-p.s.z)*p.p;

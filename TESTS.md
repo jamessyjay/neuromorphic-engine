@@ -162,3 +162,13 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 
 **Location:** `tests/sparsity_tests.rs`
 **Purpose:** Verify Sparse Distributed Representation (SDR) tuning mechanism. Proves that if Layer 4 activity exceeds the target sparsity of 5%, homeostatic scaling dynamically raises the activation threshold to enforce sparsity.
+
+### 74. `test_sequence_learning`
+
+**Location:** `tests/htm_tests.rs`
+**Purpose:** Verify HTM sequential memory. Repeatedly firing Pattern A followed by Pattern B causes Pattern B's neurons to enter a Predictive State upon seeing Pattern A alone.
+
+### 75. `test_column_bursting`
+
+**Location:** `tests/htm_tests.rs`
+**Purpose:** Validate Minicolumn Bursting. When a new, unpredicted stimulus arrives at a minicolumn and no neuron is in a Predictive State, the entire minicolumn fires simultaneously (Bursting).

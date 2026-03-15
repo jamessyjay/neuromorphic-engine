@@ -243,6 +243,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
         // Rules of connectivity v0.5
         let mut prob;
 
+        let mut target_distal = false;
         if n_source.column_id == n_target.column_id {
             if n_source.minicolumn_id == n_target.minicolumn_id {
                 prob = 0.90; // Minicolumnar vertical stitch
@@ -255,9 +256,11 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
                 }
             }
         } else if n_source.layer_id == 2 && n_target.layer_id == 2 {
-            prob = 0.05; // Horizontal L1/L2/3 voting
+            prob = 0.05; // Horizontal L2/3 voting
+            target_distal = true; // Voting targets distal dendrites
         } else {
             prob = 0.01; // Ultra sparse random long-range
+            target_distal = true; // Long-range context targets distal
         }
 
         // Ban: L6 cannot directly fire to L5
@@ -270,7 +273,12 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             let is_inhib = n_source.type_ == NeuronType::Interneuron as u8;
             let weight = if is_inhib { -base_weight } else { base_weight };
             let is_myelin = rand::RngExt::random_bool(&mut rng, MYELIN_PROB);
-            let branch_id = rand::RngExt::random_range(&mut rng, 0..DENDRITIC_BRANCH_COUNT);
+            
+            let branch_id = if target_distal {
+                rand::RngExt::random_range(&mut rng, 4..12) // Distal branches (4-11)
+            } else {
+                rand::RngExt::random_range(&mut rng, 0..4)  // Proximal branches (0-3)
+            };
 
             graph.connect(source_idx as u32, target_idx as u32, weight, branch_id, is_inhib, is_myelin);
             actual_synapses += 1;
@@ -365,6 +373,12 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             
             for k in 0..needed.min(candidates.len()) {
                 let target_id = candidates[k].0 as u32;
+                
+                // Extra safety: Enforce L6->L5 ban even during orphan saving
+                if graph.neurons[i].layer_id == 6 && graph.neurons[candidates[k].0].layer_id == 5 {
+                    continue;
+                }
+
                 // Add to outgoing_synapses to prevent next checks from reusing it if logic changes
                 outgoing_synapses[i].push(target_id); 
                 

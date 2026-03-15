@@ -255,8 +255,13 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     // HTM Predictive State: Temporary depolarization offset (Phase 49)
     if (n->predictive_ticks > 0) {
         // Boost voltage to trigger easier
-        n->current_voltage += PREDICTIVE_VOLTAGE_BOOST;
+        if (n->current_voltage < n->resting_voltage + PREDICTIVE_VOLTAGE_BOOST) {
+            n->current_voltage = n->resting_voltage + PREDICTIVE_VOLTAGE_BOOST;
+        }
         n->predictive_ticks--;
+        if (n->predictive_ticks == 0) {
+            n->status_flags &= ~FLAG_IS_PREDICTIVE;
+        }
     }
 
     // EMERGENCY GUARD 2.0: Explicit ATP check
@@ -451,42 +456,94 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
 
 #ifdef USE_CUDA
 // Optimized Kernel 1: Only Neuron Biology (Metabolism, Calcium, Spiking)
-__global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
+__global__ void tick_neurons_prepare_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
-    
-    // Phase 3: Reset WTA Inhibition Flag at the start of the tick
-    neurons[idx].status_flags &= ~FLAG_IS_INHIBITED;
-    
-    // Trace Cleanup: Ensure spike_trace is properly decayed or zeroed
-    if (!neurons[idx].is_alive) {
-        neurons[idx].spike_trace = 0.0f;
-        neurons[idx].dead_ticks += 1;
-        if (neurons[idx].dead_ticks >= RESURRECTION_TICK_DELAY) {
-            // Phoenix Resurrection
-            neurons[idx].is_alive = true;
-            neurons[idx].calcium_level = 0.0f;
-            neurons[idx].energy_ATP = neurons[idx].max_atp;
-            neurons[idx].current_voltage = neurons[idx].resting_voltage;
-            neurons[idx].dead_ticks = 0;
-            neurons[idx].death_reason = 0;
+
+    BaseNeuron* n = &neurons[idx];
+    n->status_flags &= ~FLAG_IS_INHIBITED;
+
+    if (!n->is_alive) {
+        n->spike_trace = 0.0f;
+        n->predictive_ticks = 0;
+        n->dead_ticks += 1;
+        if (n->dead_ticks >= RESURRECTION_TICK_DELAY) {
+            n->is_alive = 1;
+            n->calcium_level = 0.0f;
+            n->energy_ATP = n->max_atp;
+            n->current_voltage = n->resting_voltage;
+            n->dead_ticks = 0;
+            n->death_reason = 0;
         }
         return;
     }
 
-    update_metabolism(&neurons[idx], env, current_tick);
-    update_calcium(&neurons[idx], current_tick);
-    evaluate_branches(&neurons[idx]);
-    process_spike(&neurons[idx], env, current_tick);
+    update_metabolism(n, env, current_tick);
+    update_calcium(n, current_tick);
+    evaluate_branches(n);
     
-    // Thermal Noise (Phase 48)
-    neurons[idx].current_voltage += get_thermal_noise(neurons[idx].id, current_tick);
+    // Thermal Noise
+    n->current_voltage += get_thermal_noise(n->id, current_tick);
 }
 
-// Optimized Kernel 1.5: WTA Lateral Inhibition Broadcast (Phase 2)
-// Since this is GPU, an O(N^2) naive loop per minicolumn is slow but functional for 10k. 
-// A better way is each thread = 1 neuron. If it spiked, it suppresses others in its minicolumn.
-__global__ void wta_broadcast_kernel(BaseNeuron* neurons, int count, uint32_t current_tick) {
+__global__ void wta_and_burst_kernel(BaseNeuron* neurons, int count, uint32_t current_tick) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= count) return;
+
+    BaseNeuron* n = &neurons[idx];
+    if (!n->is_alive) return;
+
+    if (n->type != TYPE_PYRAMIDAL && n->type != TYPE_INTERNEURON) return;
+
+    bool any_crossed = false;
+    bool any_predictive_crossed = false;
+    uint32_t best_pred_id = 0xFFFFFFFF;
+    float best_pred_v = -1000.0f;
+
+    for (int i = 0; i < count; i++) {
+        BaseNeuron* other = &neurons[i];
+        if (other->column_id == n->column_id && other->minicolumn_id == n->minicolumn_id && other->is_alive) {
+            if (other->current_voltage > other->activation_threshold) {
+                any_crossed = true;
+                bool is_pred = (other->status_flags & FLAG_IS_PREDICTIVE) != 0;
+                if (is_pred) {
+                    any_predictive_crossed = true;
+                    if (other->current_voltage > best_pred_v || (other->current_voltage == best_pred_v && other->id < best_pred_id)) {
+                        best_pred_v = other->current_voltage;
+                        best_pred_id = other->id;
+                    }
+                }
+            }
+        }
+    }
+
+    if (any_crossed) {
+        if (any_predictive_crossed) {
+            if (n->id != best_pred_id) {
+                n->status_flags |= FLAG_IS_INHIBITED;
+                n->current_voltage = n->resting_voltage - 10.0f;
+                n->refractory_time_left = 5.0f;
+            }
+        } else {
+            // Bursting!
+            if (n->current_voltage <= n->activation_threshold) {
+                n->current_voltage = n->activation_threshold + 5.0f;
+            }
+        }
+    }
+}
+
+__global__ void tick_neurons_spike_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= count) return;
+    
+    BaseNeuron* n = &neurons[idx];
+    if (!n->is_alive) return;
+
+    process_spike(n, env, current_tick);
+}
+
+// Optimized Kernel 2(BaseNeuron* neurons, int count, uint32_t current_tick) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
 
@@ -576,21 +633,19 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 #ifndef USE_CUDA
 extern "C" {
 
-    void tick_neuron_cpu(BaseNeuron* neuron, BaseNeuron* all_neurons, int count, Environment env, uint32_t current_tick) {
-        (void)all_neurons;
-        (void)count;
-        
-        // Phase 3 (WTA reset) and SDR threshold happen in Rust tick() loop before this
-        
+
+    
+    void tick_neuron_prepare_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
+        neuron->status_flags &= ~FLAG_IS_INHIBITED;
+
         if (!neuron->is_alive) {
             neuron->spike_trace = 0.0f;
             neuron->predictive_ticks = 0;
             neuron->dead_ticks += 1;
             if (neuron->dead_ticks >= RESURRECTION_TICK_DELAY) {
-                // Phoenix Resurrection
                 neuron->is_alive = 1;
                 neuron->calcium_level = 0.0f;
-                neuron->energy_ATP = neuron->max_atp; // Phoenix Energy Boost (v0.4.7) - Guaranteed full charge
+                neuron->energy_ATP = neuron->max_atp; 
                 neuron->current_voltage = neuron->resting_voltage;
                 neuron->dead_ticks = 0;
                 neuron->death_reason = 0;
@@ -598,16 +653,16 @@ extern "C" {
             return;
         }
 
-        
-
         update_metabolism(neuron, env, current_tick);
         update_calcium(neuron, current_tick);
         evaluate_branches(neuron);
-        process_spike(neuron, env, current_tick);
         
-        // Thermal Noise (Phase 48)
         neuron->current_voltage += get_thermal_noise(neuron->id, current_tick);
+    }
 
+    void tick_neuron_spike_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
+        if (!neuron->is_alive) return;
+        process_spike(neuron, env, current_tick);
     }
 
     void tick_synapse_cpu(Synapse* synapse, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
