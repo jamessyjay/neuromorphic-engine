@@ -27,7 +27,6 @@
 extern "C" {
 
 // Physical Constants (From specs/02_neuron_spec.md & 07_network_and_limits.md)
-// --- Magic Numbers extracted from Phase 35 Cleanup ---
 #define MAX_U16_FLOAT 65535.0f
 #define VOLTAGE_SHIFT 100.0f
 #define VOLTAGE_SCALE 100.0f
@@ -40,6 +39,11 @@ extern "C" {
 // Metabolic parameters (Phase 40)
 #define ATP_RECOVERY_RATE 0.05f
 #define ATP_SPIKE_COST 25.0f
+#define GLUCOSE_CONVERSION_RATE 0.2f
+#define MIN_GLUCOSE_LEVEL 0.1f
+#define GLUCOSE_CONVERT_ATP_RATIO 0.5f
+#define MIN_ATP_RATIO 0.01f
+#define MIN_OXYGEN_LEVEL 0.5f
 
 // Refractory and Recovery
 #define ABSOLUTE_REFRACTORY_PERIOD 2.0f
@@ -52,6 +56,8 @@ extern "C" {
 #define DEATH_ATP_LOW 1
 #define DEATH_CALCIUM_HIGH 2
 #define DEATH_GLUCOSE_STARVATION 3
+#define RESURRECTION_TICK_DELAY 1000
+#define NETWORK_GRACE_PERIOD_TICKS 500
 
 // Dendritic Tree Physics (Phase 33/34)
 #define BRANCH_LEAK_COEFF 0.9f
@@ -60,6 +66,7 @@ extern "C" {
 #define TRUNK_MULTIPLIER 2.0f
 #define TRUNK_ATP_COST 5.0f
 #define TUFT_MULTIPLIER 0.5f
+#define PREDICTIVE_VOLTAGE_BOOST 15.0f
 
 // Metabolic & Homeostatic Constants
 #define METABOLIC_FLOOR 0.6f
@@ -127,21 +134,27 @@ extern "C" {
 #define SYNAPSE_RELIABILITY_THRESHOLD 0.5f
 #define SYNAPSE_RELIABILITY_PENALTY 0.8f
 
+// Phase Resonance Magic Numbers
+#define THERMAL_NOISE_MAGIC_A 747796405u
+#define THERMAL_NOISE_MAGIC_B 2891336453u
+#define THERMAL_NOISE_MAGIC_C 277803737u
+#define THERMAL_NOISE_SCALE 2.5f
+
 // Structural Defaults
 #define DEFAULT_VOLTAGE_VAR 2.0f
 #define PURKINJE_RESTING -65.0f
 #define PURKINJE_THRESHOLD -50.0f
 #define NOCICEPTOR_RESTING -70.0f
-#define DEFAULT_ATP_VAR 10.0f
-#define DEFAULT_LEAK_VAR 0.2f
+#define DEFAULT_ATP_VAR 5.0f
+#define DEFAULT_LEAK_VAR 0.05f
 #define DEFAULT_SIZE_VAR 0.2f
-#define DEFAULT_VESICLES_VAR 20.0f
+#define DEFAULT_VESICLES_VAR 10.0f
 #define DEFAULT_COORD_VAR 20.0f
 #define DEFAULT_COORD_CENTER 50.0f
 #define MAX_COORD 100.0f
 
 // Initialization & Defaults
-#define INIT_LEAK_COEFF_MEAN 1.2f
+#define INIT_LEAK_COEFF_MEAN 1.0f
 #define INIT_SIZE_MEAN 1.0f
 
 #define PYRAMIDAL_THRESHOLD -52.0f

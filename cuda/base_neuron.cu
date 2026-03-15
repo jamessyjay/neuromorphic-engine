@@ -80,17 +80,17 @@ static inline void atomic_add_packed_voltage(uint16_t* address, float voltage_im
 
 // Fast stateless PRNG (PCG32-lite) for Thermal Noise
 static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t current_tick) {
-    uint32_t state = (neuron_id ^ current_tick) * 747796405u + 2891336453u;
-    uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    uint32_t state = (neuron_id ^ current_tick) * THERMAL_NOISE_MAGIC_A + THERMAL_NOISE_MAGIC_B;
+    uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * THERMAL_NOISE_MAGIC_C;
     uint32_t rand_int = (word >> 22u) ^ word;
     // Map to [-1.0, 1.5]
     float normalized = (float)(rand_int % 10000) / 10000.0f; 
-    return (normalized * 2.5f) - 1.0f;
+    return (normalized * THERMAL_NOISE_SCALE) - 1.0f;
 }
 
 // Atomic function: Apoptosis / Death Handler
 static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason, uint32_t current_tick) {
-    if (current_tick < 500) return;
+    if (current_tick < NETWORK_GRACE_PERIOD_TICKS) return;
     n->is_alive = 0;
     n->death_reason = reason;
     n->current_voltage = 0.0f;
@@ -105,7 +105,7 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
 
     if (!n->is_alive) {
         n->dead_ticks += 1;
-        if (n->dead_ticks >= 1000) {
+        if (n->dead_ticks >= RESURRECTION_TICK_DELAY) {
             // Phoenix Resurrection
             n->is_alive = 1;
             n->calcium_level = 0.0f;
@@ -132,7 +132,7 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
 
     // Base passive drain + severe hypoxic penalty
     float hypoxia_penalty = 0.0f;
-    if (env.global_oxygen_level < 0.5f) {
+    if (env.global_oxygen_level < MIN_OXYGEN_LEVEL) {
         // As oxygen drops below 0.5, penalty scales up dramatically (up to 0.5 ATP per tick)
         hypoxia_penalty = (0.5f - env.global_oxygen_level) * 1.0f; 
     }
@@ -140,16 +140,16 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     n->energy_ATP -= passive_drain;
 
     // Glucose processing
-    if (env.global_glucose_level > 0.1f && n->energy_ATP < n->max_atp * 0.5f) {
-        n->energy_ATP += 0.2f;
+    if (env.global_glucose_level > MIN_GLUCOSE_LEVEL && n->energy_ATP < n->max_atp * GLUCOSE_CONVERT_ATP_RATIO) {
+        n->energy_ATP += GLUCOSE_CONVERSION_RATE;
     }
 
     // Death by starvation/hypoxia
     if (n->energy_ATP <= 0.0f) {
         n->energy_ATP = 0.0f;
-        if (env.global_oxygen_level < 0.5f) {
+        if (env.global_oxygen_level < MIN_OXYGEN_LEVEL) {
             die_gracefully(n, DEATH_ATP_LOW, current_tick);
-        } else if (env.global_glucose_level < 0.1f) {
+        } else if (env.global_glucose_level < MIN_GLUCOSE_LEVEL) {
             die_gracefully(n, DEATH_GLUCOSE_STARVATION, current_tick);
         }
     }
@@ -168,7 +168,7 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         Compartment* b = &n->branches[i];
         if (b->branch_type == 0) continue;
 
-        // Fix 3: Eternal High Bug (Refractory period for branch)
+        // Refractory period for branch
         if (b->refractory_timer > 0) {
             b->refractory_timer--;
             b->voltage = pack_voltage(0.0f);
@@ -181,7 +181,7 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         // Branch Signal Decay (Phase 33/34)
         v *= BRANCH_LEAK_COEFF;
         
-        // Fix 2: Passive Leak Gap (Small percentage leak every tick)
+        // Passive Leak Gap (Small percentage leak every tick)
         float passive_leak = v * PASSIVE_LEAK_PERCENT;
         n->current_voltage += passive_leak;
         v -= passive_leak;
@@ -242,17 +242,16 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
 
     // HTM Predictive State: Temporary depolarization offset (Phase 49)
     if (n->predictive_ticks > 0) {
-        // Boost voltage but only virtually or temporarily to trigger easier
-        // Actually, let's just add the voltage and decrement
-        n->current_voltage += 15.0f;
+        // Boost voltage to trigger easier
+        n->current_voltage += PREDICTIVE_VOLTAGE_BOOST;
         n->predictive_ticks--;
     }
 
     // EMERGENCY GUARD 2.0: Explicit ATP check
     if (n->energy_ATP < EMERGENCY_ATP_THRESHOLD) {
-        if (env.global_oxygen_level < 0.5f) {
+        if (env.global_oxygen_level < MIN_OXYGEN_LEVEL) {
             die_gracefully(n, DEATH_ATP_LOW, current_tick);
-        } else if (env.global_glucose_level < 0.1f) {
+        } else if (env.global_glucose_level < MIN_GLUCOSE_LEVEL) {
             die_gracefully(n, DEATH_GLUCOSE_STARVATION, current_tick);
         } else {
             n->current_voltage = n->resting_voltage; // Sleep mode
@@ -270,7 +269,7 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         n->current_voltage += (target_v - n->current_voltage) * PHOTO_ACTIVATION_SPEED;
     }
 
-    float energy_ratio = fmaxf(0.01f, n->energy_ATP / n->max_atp);
+    float energy_ratio = fmaxf(MIN_ATP_RATIO, n->energy_ATP / n->max_atp);
     float dynamic_threshold = n->activation_threshold * (1.0f - ATP_HUNGER_BETA * (1.0f - energy_ratio));
 
     if (n->current_voltage > dynamic_threshold) {
@@ -385,11 +384,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
             // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
             uint32_t expected_delivery_delay = ((s->flags & 0x10) != 0) ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
-            // Since delivery is handled by ticking down ticks_until_delivery starting from delay,
-            // at the moment of arrival, current_tick - source->last_spike_tick == expected_delivery_delay + 1.
-            // But wait, the source might have spiked *again* before delivery. Let's just check if it spiked recently.
-            // We arrived! Check if source spiked recently enough
-            if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= expected_delivery_delay + 2) {
+                                                            if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= expected_delivery_delay + 2) {
                 // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
                 // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
                 // In acausal firing (LTD territory), target fired, then source fired, so target->last_spike_tick <= source->last_spike_tick
@@ -399,9 +394,8 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
                 }
             } 
 
-            // 1. Reliability Check (Phase 30/31): Thin synapses are unreliable
-            // 1. Reliability Check: (Simplified since thickness is gone from struct)
-            // We use weight as a proxy for maturity
+            // Reliability Check (Phase 30/31)
+                        // We use weight as a proxy for maturity
             if (s->weight < SYNAPSE_RELIABILITY_THRESHOLD) {
                 float failure_roll = (float)((current_tick + s->source_id + s->target_id) % RANDOM_MODULO_BASE) / (float)RANDOM_MODULO_BASE;
                 if (failure_roll > SYNAPSE_RELIABILITY_THRESHOLD) {
@@ -455,7 +449,7 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     if (!neurons[idx].is_alive) {
         neurons[idx].spike_trace = 0.0f;
         neurons[idx].dead_ticks += 1;
-        if (neurons[idx].dead_ticks >= 1000) {
+        if (neurons[idx].dead_ticks >= RESURRECTION_TICK_DELAY) {
             // Phoenix Resurrection
             neurons[idx].is_alive = true;
             neurons[idx].calcium_level = 0.0f;
@@ -487,7 +481,7 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
     Synapse* s = &synapses[idx];
     
 #if __CUDA_ARCH__ >= 350
-    // Instruction 1.3 C: Use __ldg() for read-only access to neurons array
+    // Use __ldg() for read-only access to neurons array
     uint8_t src_alive = __ldg((const uint8_t*)&neurons[s->source_id].is_alive);
     uint8_t tgt_alive = __ldg((const uint8_t*)&neurons[s->target_id].is_alive);
 #else
@@ -536,7 +530,7 @@ extern "C" {
             neuron->spike_trace = 0.0f;
             neuron->predictive_ticks = 0;
             neuron->dead_ticks += 1;
-            if (neuron->dead_ticks >= 1000) {
+            if (neuron->dead_ticks >= RESURRECTION_TICK_DELAY) {
                 // Phoenix Resurrection
                 neuron->is_alive = 1;
                 neuron->calcium_level = 0.0f;
