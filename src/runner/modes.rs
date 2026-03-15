@@ -115,15 +115,20 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
         }
     }
 
+    // Force memory coalescing after generation
+    graph.optimize_memory_layout();
+
     println!("Network generation complete.");
     graph
 }
 
 pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>, _shared_env: Arc<Mutex<crate::engine::ffi::Environment>>, use_dynamic_homeostasis: bool) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
+    let mut start_tick = 0;
     let mut graph = if let Some(loaded_snapshot) = BrainSnapshot::load_from_disk("brain_save.bin") {
         let loaded_graph = loaded_snapshot.graph;
         if loaded_graph.neurons.len() == neurons_count {
-            println!("Awakening network from brain_save.bin...");
+            println!("Awakening network from brain_save.bin (Tick {})...", loaded_snapshot.current_tick);
+            start_tick = loaded_snapshot.current_tick;
             loaded_graph
         } else {
             println!("Saved network size ({}) does not match requested size ({}). Generating new network...", loaded_graph.neurons.len(), neurons_count);
@@ -167,7 +172,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
     let mut accumulated_spikes = 0;
     let mut regulator = EnvironmentRegulator::new();
 
-    for tick in 1..=total_ticks {
+    for tick in (start_tick + 1)..=(start_tick + total_ticks) {
         let tick_start = Instant::now();
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
 
