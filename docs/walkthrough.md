@@ -352,3 +352,6 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Competitive Pruning:** Introduced `MIN_SYNAPSES_PER_NEURON` constraint (`3` by default) into the Microglia service ensuring neurons don't get completely disconnected and orphaned from the core network graph. Microglia skip pruning completely for neurons with `< 3` synapses.
 - **Nursery Phase Adaptations:** Dynamic adjustment of `STDP_LEARNING_RATE` added inside `apply_nursery_protection`. The learning rate gets amplified by 2x during the initial 5000 Nursery Ticks to give structures the chance to solidify before pruning rules take effect.
 - **Persistence Layer Synchronization:** Discarded all raw occurrences of manually built `BrainSnapshot` at the end of runtime methods (`run_benchmark_mode` and `run_simulation`), defaulting to the static `BrainSnapshot::save_test_snapshot` helper or `finalize_and_save_snapshot` to stop accidental overriding of actual progression ticks down to tick 3. Tests consistently recover gracefully without data loss.
+
+### Documentation Sync
+- **Project Structure Rewrite:** Complete overhaul of `docs/PROJECT_STRUCTURE.md` to accurately reflect the Domain-Driven Rust/CUDA Neuromorphic Engine architecture, rather than the old template contents.
