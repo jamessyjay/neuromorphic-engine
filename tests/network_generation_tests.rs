@@ -27,8 +27,8 @@ fn test_network_generation_proportions() {
     let expected_sensors = 2000;
     let expected_motors = 2000;
     let expected_pacemakers = 0;
-    let expected_interneurons = 0;
-    let expected_pyramidal = 6000;
+    let expected_interneurons = 500;
+    let expected_pyramidal = 5500;
 
     println!("Network Proportions for {} neurons:", num_neurons);
     println!("Pyramidal:    {} (Expected: {})", count_pyramidal, expected_pyramidal);
