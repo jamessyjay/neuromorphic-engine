@@ -93,6 +93,17 @@
             </div>
         </div>
 
+        <div class="panel">
+            <div class="label">LAYER VISIBILITY:</div>
+            <div id="layer-filters" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px;">
+                <label><input type="checkbox" checked onchange="toggleLayer(6)"> L6 - Location</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(5)"> L5 - Output</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(4)"> L4 - Input</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(2)"> L2/3 - Feature</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(1)"> L1 - Comm</label>
+            </div>
+        </div>
+
         <div class="panel" id="log-container">
             <div id="logs"></div>
         </div>
@@ -113,11 +124,17 @@
 
     <script>
         
-        let colorMode = 'type'; 
+        let colorMode = 'type';
         let selectedNeuronId = null;
         let retinaCtx = null;
         const FLAG_IS_INHIBITED = 1;
         const FLAG_IS_PREDICTIVE = 2;
+
+        const layerVisibility = { 1: true, 2: true, 4: true, 5: true, 6: true };
+
+        function toggleLayer(layer) {
+            layerVisibility[layer] = !layerVisibility[layer];
+        }
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -192,6 +209,16 @@
             document.getElementById('np-layer').innerText = getLayerName(node.layerId);
             document.getElementById('np-minicolumn').innerText = node.minicolumnId;
             updatePassportStatus(node);
+
+            const interColumnLinks = node.outgoing.filter(syn => {
+                const target = nodeMap.get(syn.targetId);
+                return target && target.columnId !== node.columnId;
+            }).length;
+
+            document.getElementById('np-links').innerHTML = `
+                Connections: <span style="color: #fff;">${node.outgoing.length}</span><br>
+                Inter-Column (Voting): <span style="color: #4ade80;">${interColumnLinks}</span>
+            `;
         }
 
         function updatePassportStatus(node) {
@@ -453,9 +480,31 @@
         function animate() {
             requestAnimationFrame(animate);
             neuronMeshes.forEach(m => {
+                let matrixUpdated = false;
                 nodeMap.forEach(n => {
                     const mData = neuronMeshes.find(mesh => mesh.type === n.type);
                     if (mData && mData.mesh === m.mesh) {
+                        if (!layerVisibility[n.layerId]) {
+                            if (n.isVisible !== false) {
+                                _dummy.position.set(n.x, n.y, n.z);
+                                _dummy.scale.set(0, 0, 0);
+                                _dummy.updateMatrix();
+                                m.mesh.setMatrixAt(n.meshIdx, _dummy.matrix);
+                                n.isVisible = false;
+                                matrixUpdated = true;
+                            }
+                            return; // Skip drawing when hidden
+                        } else {
+                            if (n.isVisible === false) {
+                                _dummy.position.set(n.x, n.y, n.z);
+                                _dummy.scale.set(1, 1, 1);
+                                _dummy.updateMatrix();
+                                m.mesh.setMatrixAt(n.meshIdx, _dummy.matrix);
+                                n.isVisible = true;
+                                matrixUpdated = true;
+                            }
+                        }
+
                         n.visualActivity *= 0.94;
 
                         let baseColor;
@@ -492,6 +541,9 @@
                     }
                 });
                 m.mesh.instanceColor.needsUpdate = true;
+                if (matrixUpdated) {
+                    m.mesh.instanceMatrix.needsUpdate = true;
+                }
             });
 
             if (pulseSystem && activePulses.length > 0) {
@@ -555,6 +607,7 @@
         <div>Layer: [<span id="np-layer" style="color: white;">-</span>]</div>
         <div>Minicolumn: [<span id="np-minicolumn" style="color: white;">-</span>]</div>
         <div style="margin-top: 5px; color: #aaa;">Status: <span id="np-status" style="color: white;">-</span></div>
+        <div id="np-links" style="margin-top: 5px;"></div>
     </div>
 
     <!-- Color Mode Toggle -->
