@@ -128,13 +128,18 @@ pub fn broadcast_tick_update(
 }
 
 // Helper: Apply Nursery Protection
-pub fn apply_nursery_protection(graph: &mut NetworkGraph, tick: u32) {
+pub fn apply_nursery_protection(graph: &mut NetworkGraph, current_env: &mut Environment, tick: u32) {
     if tick < crate::engine::constants::NURSERY_PROTECTION_TICKS {
         for n in &mut graph.neurons {
             if n.energy_atp < crate::engine::constants::NURSERY_MIN_ATP {
                 n.energy_atp = crate::engine::constants::NURSERY_MIN_ATP;
             }
         }
+        // Boost STDP Learning Rate during Nursery phase to solidify connections before pruning
+        current_env.stdp_learning_rate = 0.2; 
+    } else {
+        // Revert to baseline learning rate after Nursery
+        current_env.stdp_learning_rate = 0.1;
     }
 }
 
@@ -166,19 +171,7 @@ pub fn finalize_and_save_snapshot(
     let mut telemetry = Telemetry::new();
     telemetry.update(tick);
     telemetry.export_simulation_report(&graph.neurons, &graph.synapses, report_name);
-    crate::engine::snapshot::BrainSnapshot { 
-        current_tick: tick, 
-        environment: Environment { 
-            global_oxygen_level: 1.0, 
-            global_glucose_level: 1.0, 
-            dopamine_multiplier: 1.0, 
-            toxin_levels: 0.0, 
-            light_level: 0.0, 
-            stdp_learning_rate: 0.1, 
-            wakefulness_multiplier: 1.0 
-        }, 
-        graph: graph.clone() 
-    }.save_to_disk(save_file);
+    crate::engine::snapshot::BrainSnapshot::save_test_snapshot(tick, &graph, save_file);
 }
 
 pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph {
@@ -325,7 +318,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
 
         // Nursery Protection Improvement (v0.4.7)
-        apply_nursery_protection(&mut graph, tick);
+        apply_nursery_protection(&mut graph, &mut current_env, tick);
 
         // Accumulate spikes from all neurons that spiked in THIS tick
         for n in &graph.neurons {
@@ -493,7 +486,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         
         // Nursery Protection Improvement (v0.4.7)
-        apply_nursery_protection(&mut graph, tick);
+        apply_nursery_protection(&mut graph, &mut current_env, tick);
         
         graph.tick(tick, current_env);
         
@@ -621,15 +614,7 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     if spike_count_conc > spike_count_dist {
         println!("VERDICT: Dendritic non-linearity confirmed! 🧠✨");
     }
-    BrainSnapshot { current_tick: 50, 
-                    environment: Environment { global_oxygen_level: 1.0, 
-                                               global_glucose_level: 1.0, 
-                                               dopamine_multiplier: 1.0, 
-                                               toxin_levels: 0.0, 
-                                               light_level: 0.0, 
-                                               stdp_learning_rate: 0.1, 
-                                               wakefulness_multiplier: 1.0 }, 
-                    graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot::save_test_snapshot(50, &graph, "brain_save.bin");
     Ok(())
 }
 
@@ -678,15 +663,7 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         println!("✅ FIX 3 PASS: Refractory period effectively blocked incoming signal.");
     }
 
-    BrainSnapshot { current_tick: _total_ticks, 
-                    environment: Environment { global_oxygen_level: 1.0, 
-                                               global_glucose_level: 1.0, 
-                                               dopamine_multiplier: 1.0, 
-                                               toxin_levels: 0.0, 
-                                               light_level: 0.0, 
-                                               stdp_learning_rate: 0.1, 
-                                               wakefulness_multiplier: 1.0 }, 
-                    graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
 
@@ -728,27 +705,11 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
             graph.initiate_sleep_cycle();
             let post_sleep_snapshot = graph.snapshot_synapses();
             NetworkGraph::diff_synapses(&pre_sleep_snapshot, &post_sleep_snapshot);
-            BrainSnapshot { current_tick: tick, 
-                            environment: Environment { global_oxygen_level: 1.0, 
-                                                       global_glucose_level: 1.0, 
-                                                       dopamine_multiplier: 1.0, 
-                                                       toxin_levels: 0.0, 
-                                                       light_level: 0.0, 
-                                                       stdp_learning_rate: 0.1, 
-                                                       wakefulness_multiplier: 1.0 }, 
-                            graph: graph.clone() }.save_to_disk("brain_save.bin");
+            BrainSnapshot::save_test_snapshot(tick, &graph, "brain_save.bin");
             return Ok(());
         }
     }
-    BrainSnapshot { current_tick: crate::engine::constants::TOTAL_LONG_TEST_TICKS, 
-                    environment: Environment { global_oxygen_level: 1.0, 
-                                               global_glucose_level: 1.0, 
-                                               dopamine_multiplier: 1.0, 
-                                               toxin_levels: 0.0, 
-                                               light_level: 0.0, 
-                                               stdp_learning_rate: 0.1, 
-                                               wakefulness_multiplier: 1.0 }, 
-                    graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot::save_test_snapshot(crate::engine::constants::TOTAL_LONG_TEST_TICKS, &graph, "brain_save.bin");
     Ok(())
 }
 
@@ -792,15 +753,7 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_inhibition_chart(&history, "graphs/inhibition_loop.png")?;
-    BrainSnapshot { current_tick: _total_ticks, 
-                    environment: Environment { global_oxygen_level: 1.0, 
-                                               global_glucose_level: 1.0, 
-                                               dopamine_multiplier: 1.0, 
-                                               toxin_levels: 0.0, 
-                                               light_level: 0.0, 
-                                               stdp_learning_rate: 0.1, 
-                                               wakefulness_multiplier: 1.0 }, 
-                    graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
 
@@ -853,7 +806,7 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_reflex_arc_chart(&history, "graphs/reflex_arc_boosted.png")?;
-    BrainSnapshot { current_tick: _total_ticks, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
 
@@ -941,7 +894,7 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_plasticity_chart(&weight_history, "graphs/dopamine_rush_results.png")?;
-    BrainSnapshot { current_tick: _total_ticks, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
 
@@ -983,7 +936,7 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_frequency_chart(&history, "graphs/frequency_learning.png")?;
-    BrainSnapshot { current_tick: _total_ticks, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
 

@@ -295,27 +295,61 @@ impl NetworkGraph {
     }
 
     // Background Service: Microglia (Immune System / Firewall / Pruning)
-    pub fn run_microglia_service(&mut self, _current_tick: u32) {
+    pub fn run_microglia_service(&mut self, current_tick: u32) {
         let neurons_ptr = self.neurons.as_ptr();
         
-        // Retain only synapses where both endpoints are alive.
-        // We use standard retain since we need mutable access to the vector, but we optimize the lookup.
         let num_neurons = self.neurons.len();
+        let mut rng = rand::rng();
+        
+        // O(1) Pre-compute outgoing synapse counts to support competitive pruning
+        let mut outgoing_counts = vec![0; num_neurons];
+        for s in &self.synapses {
+            if (s.source_id as usize) < num_neurons {
+                outgoing_counts[s.source_id as usize] += 1;
+            }
+        }
+
         self.synapses.retain(|s| {
             // Safety Guard: Prevent out-of-bounds segfaults if the graph is modified
             if s.source_id as usize >= num_neurons || s.target_id as usize >= num_neurons {
                 return false;
             }
-            // Unsafe block is fine here because we just checked the bounds
-            unsafe {
-                let src = &*neurons_ptr.add(s.source_id as usize);
+
+            let src_id = s.source_id as usize;
+
+            // Retain only synapses where both endpoints are alive.
+            let (src_valid, dst_valid) = unsafe {
+                let src = &*neurons_ptr.add(src_id);
                 let dst = &*neurons_ptr.add(s.target_id as usize);
-                
-                let src_valid = src.is_alive == 1 || src.dead_ticks > 0;
-                let dst_valid = dst.is_alive == 1 || dst.dead_ticks > 0;
-                
-                src_valid && dst_valid
+                (src.is_alive == 1 || src.dead_ticks > 0, dst.is_alive == 1 || dst.dead_ticks > 0)
+            };
+            
+            if !src_valid || !dst_valid {
+                return false;
             }
+
+            // Competitive Pruning: Ensure neuron maintains MIN_SYNAPSES_PER_NEURON
+            if outgoing_counts[src_id] <= crate::engine::constants::MIN_SYNAPSES_PER_NEURON {
+                return true;
+            }
+
+            // Probabilistic Pruning Logic
+            let time_since_spike = current_tick.saturating_sub(s.last_activation_tick);
+            
+            let p_drop = if s.weight < 0.1 && time_since_spike > 10000 {
+                1.0
+            } else if s.weight < crate::engine::constants::PRUNING_THRESHOLD {
+                0.05
+            } else {
+                0.0
+            };
+
+            if p_drop > 0.0 && rng.random_bool(p_drop) {
+                outgoing_counts[src_id] -= 1;
+                return false; // Prune
+            }
+
+            true
         });
     }
 

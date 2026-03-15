@@ -358,3 +358,11 @@ pub const BENCHMARK_SCALING_SIZES: [usize; 5] = [1000, 2000, 4000, 8000, 16000];
 pub const BENCHMARK_SCALING_TICKS: u32 = 50;
 /// List of benchmark IO intervals to run serialization stress tests against
 pub const BENCHMARK_IO_INTERVALS: [u32; 5] = [100, 50, 10, 5, 1];
+
+// --- Microglia & Pruning Constants (v0.4.9) ---
+/// The weight threshold below which synapses are considered weak and can be probablistically pruned
+pub const PRUNING_THRESHOLD: f32 = 0.25;
+/// Execution interval for the Microglia background service
+pub const MICROGLIA_INTERVAL: u32 = 500;
+/// The absolute minimum number of outgoing synapses a neuron must retain to prevent network fragmentation
+pub const MIN_SYNAPSES_PER_NEURON: usize = 3;
