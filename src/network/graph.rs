@@ -189,14 +189,22 @@ impl NetworkGraph {
             y: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             z: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
             dead_ticks: 0,
+            column_id: 0,
+            minicolumn_id: 0,
+            layer_id: 0,
+            status_flags: 0,
+            _pad_block1: [0; 32],
+            ref_coord_x: 0.0,
+            ref_coord_y: 0.0,
+            _pad_block2: [0; 16],
             branches: [crate::engine::ffi::Compartment {
                 branch_type: 0,
                 refractory_timer: 0,
                 voltage: 0,
                 nmda_threshold: 0,
                 local_trace: 0,
-            _pad: 0,
-            }; 8],
+                _pad: 0,
+            }; 16],
         };
         
         // Let C++ engine initialize the neuron biology exactly per Spec 05 & 11

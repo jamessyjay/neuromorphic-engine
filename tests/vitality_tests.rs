@@ -14,9 +14,17 @@ fn create_test_neuron(id: u32, type_: NeuronType) -> BaseNeuron {
         energy_atp: 0.0, max_atp: 0.0, leak_coeff: 0.0, calcium_level: 0.0, vesicles_pool: 0.0,
         refractory_time_left: 0.0, last_spike_tick: 0, spikes_in_last_window: 0, predictive_ticks: 0, metabolic_wear: 0,
         x: 0, y: 0, z: 0, dead_ticks: 0,
+        column_id: 0,
+        minicolumn_id: 0,
+        layer_id: 0,
+        status_flags: 0,
+        _pad_block1: [0; 32],
+        ref_coord_x: 0.0,
+        ref_coord_y: 0.0,
+        _pad_block2: [0; 16],
         branches: [Compartment { 
-branch_type: 0, refractory_timer: 0, voltage: 0, nmda_threshold: 0, local_trace: 0, _pad: 0 
-        }; 8],
+            branch_type: 0, refractory_timer: 0, voltage: 0, nmda_threshold: 0, local_trace: 0, _pad: 0 
+        }; 16],
     };
     unsafe { init_neuron(&mut n, id, type_, 42); }
     n

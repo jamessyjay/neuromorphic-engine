@@ -1,0 +1,56 @@
+import re
+
+with open("cuda/base_neuron.h", "r") as f:
+    content = f.read()
+
+# Replace the struct
+new_struct = """typedef struct alignas(64) {
+    // --- Block 1 (0-63 bytes): Identification and Physics ---
+    uint32_t id;
+    uint8_t type;             // NeuronType
+    uint8_t death_reason;
+    uint8_t is_alive;
+    uint8_t internal_phase;
+    
+    uint16_t column_id;
+    uint8_t minicolumn_id;
+    uint8_t layer_id;
+    uint32_t status_flags;
+    
+    float current_voltage;
+    float activation_threshold;
+    float resting_voltage;
+    float spike_trace;
+    
+    uint8_t _pad_block1[32];
+    
+    // --- Block 2 (64-127 bytes): Biochemistry and Reference Frames ---
+    float energy_ATP;
+    float max_atp;
+    float leak_coeff;
+    float calcium_level;
+    
+    float vesicles_pool;
+    float refractory_time_left;
+    float ref_coord_x;
+    float ref_coord_y;
+    
+    uint16_t x, y, z;
+    uint16_t dead_ticks;
+    
+    uint16_t metabolic_wear;
+    uint8_t spikes_in_last_window;
+    uint8_t predictive_ticks;
+    uint32_t last_spike_tick;
+    
+    uint8_t _pad_block2[16];
+    
+    // --- Blocks 3-4 (128-255 bytes): Expanded Dendritic Array ---
+    Compartment branches[16];
+} BaseNeuron;"""
+
+pattern = r'typedef struct alignas\(64\) \{[\s\S]*?Compartment branches\[8\]; // 8 \* 8 = 64 bytes\n\} BaseNeuron; // Total: 64 \(base\) \+ 64 \(branches\) = 128 bytes \(exactly 2 cache lines\)'
+content = re.sub(pattern, new_struct, content)
+
+with open("cuda/base_neuron.h", "w") as f:
+    f.write(content)

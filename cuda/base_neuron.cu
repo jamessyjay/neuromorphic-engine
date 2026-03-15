@@ -463,6 +463,9 @@ __global__ void tick_neurons_kernel(BaseNeuron* neurons, int count, Environment 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
     
+    // WTA Flag Reset: Clear inhibition status at start of tick
+    neurons[idx].status_flags &= ~(1 << 0); // FLAG_IS_INHIBITED
+    
     // Trace Cleanup: Ensure spike_trace is properly decayed or zeroed
 
     if (!neurons[idx].is_alive) {

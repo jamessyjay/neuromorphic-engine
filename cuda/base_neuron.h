@@ -197,40 +197,49 @@ typedef struct {
 } Compartment;
 
 typedef struct alignas(64) {
+    // --- Block 1 (0-63 bytes): Identification and Physics ---
     uint32_t id;
-    uint8_t type;             // 1 byte: NeuronType
-    uint8_t death_reason;     // 1 byte
-    uint8_t is_alive;         // 1 byte (1=true, 0=false)            // 1 byte
-    uint8_t internal_phase;   // 1 byte: Internal clock for phase resonance
+    uint8_t type;             // NeuronType
+    uint8_t death_reason;
+    uint8_t is_alive;
+    uint8_t internal_phase;
     
-    float spike_trace;
+    uint16_t column_id;
+    uint8_t minicolumn_id;
+    uint8_t layer_id;
+    uint32_t status_flags;
+    
     float current_voltage;
-    
-    // Adaptive thresholds
-    float activation_threshold;  
+    float activation_threshold;
     float resting_voltage;
-
+    float spike_trace;
+    
+    uint8_t _pad_block1[32];
+    
+    // --- Block 2 (64-127 bytes): Biochemistry and Reference Frames ---
     float energy_ATP;
     float max_atp;
     float leak_coeff;
-    
-    // Biological States
     float calcium_level;
+    
     float vesicles_pool;
     float refractory_time_left;
+    float ref_coord_x;
+    float ref_coord_y;
     
-    // Evolution & Adaptation
-    uint32_t last_spike_tick;
+    uint16_t x, y, z;
+    uint16_t dead_ticks;
+    
+    uint16_t metabolic_wear;
     uint8_t spikes_in_last_window;
     uint8_t predictive_ticks;
-    uint16_t metabolic_wear; // Packed 0.0-1.0 to 0-65535
-
-    uint16_t x, y, z;        // Packed 0.0-100.0 to 0-65535
-    uint16_t dead_ticks;     // Replaces _pad2 for Phoenix loop
+    uint32_t last_spike_tick;
     
-    // Dendritic Tree (Phase 33)
-    Compartment branches[8]; // 8 * 8 = 64 bytes
-} BaseNeuron; // Total: 64 (base) + 64 (branches) = 128 bytes (exactly 2 cache lines)
+    uint8_t _pad_block2[16];
+    
+    // --- Blocks 3-4 (128-255 bytes): Expanded Dendritic Array ---
+    Compartment branches[16];
+} BaseNeuron;
 
 // Environment Singleton Representation
 typedef struct {
