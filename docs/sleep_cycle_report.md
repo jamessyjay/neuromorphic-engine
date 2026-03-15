@@ -6,30 +6,33 @@ Implemented a biological "Sleep Cycle" where the neuromorphic engine pauses acti
 
 ## Architectural Features
 
-1. **Serialization Layer (Serde + Bincode):**
+1. **True Brain Snapshots (Serde + Bincode):**
    - Derived `Serialize` and `Deserialize` on all fixed-memory FFI structs (`BaseNeuron`, `Compartment`, `Synapse`, `Environment`).
    - The memory geometry `[Compartment; 8]` and manual paddings are flawlessly serialized as direct raw bytes, ensuring compatibility between C++ execution and Rust I/O without any overhead.
+   - Using the `BrainSnapshot` wrapper, the engine serializes not only the `NetworkGraph` but also the `Environment` state and the `current_tick`, guaranteeing perfectly seamless resumption of homeostasis and phase dynamics without resetting biological time.
 
 2. **Fatigue Threshold Monitoring:**
    - The graph calculates `avg_wear` across the network. If the average `metabolic_wear` exceeds `40,000` (out of `65,535` max limits), the network signals the need for sleep.
 
 3. **Sleep Cycle Sequence:**
-   - **Pruning:** Any synapse with a weight `< 0.05` is garbage-collected. This mimics synaptic pruning during REM sleep.
+   - **Pruning (Microglia Acceleration):** Any synapse with a weight `< 0.05` is garbage-collected. This mimics aggressive synaptic pruning during REM sleep to free up memory for the next day.
    - **Metabolic Recovery:** All `metabolic_wear` metrics are reset to 0, `energy_atp` is fully replenished, and `calcium_level` is cleared.
+   - **Circadian Wakefulness:** Upon completing sleep, the `wakefulness_multiplier` is reset to 1.0 (highest energy production rate), gradually decaying over the simulation until the next sleep cycle.
    - **Binary Snapshot:** The network is written to `brain_save.bin` using high-speed binary encoding.
 
 4. **Network Awakening:**
-   - Upon engine initialization, `NetworkGraph::load_from_disk()` attempts to read `brain_save.bin`.
+   - Upon engine initialization, `BrainSnapshot::load_from_disk("brain_save.bin")` attempts to read the state file.
    - If found, it bypasses the heavy initialization process (calculating Gaussian distributions, resolving initial random seeds) and directly loads the matured network memory state.
+   - **GPU Synchronization:** The `force_sync_gpu` method is immediately invoked upon load to push the deserialized Rust `Vec` contents directly into the CUDA Unified Memory space before the physics kernels attempt to read them.
 
-## Validation Results (`--sleep-test`)
+## Validation Results (`run_sleep_test`)
 
 1. **Initial Run:**
    - Generated an infant network of 1,000 neurons and 10,000 random synapses.
    - Artificially accelerated metabolic wear to force the fatigue limit rapidly.
-   - Output confirmed entering the Sleep Cycle, pruning weak synapses, and serializing.
+   - Output confirmed entering the Sleep Cycle, pruning weak synapses, and saving the `BrainSnapshot` with an accurate biological tick.
 
 2. **Subsequent Run:**
-   - Execution explicitly output: `Awakening network from brain_save.bin...`
+   - Execution explicitly output: `Awakening network from brain_save.bin for simulation (Tick X)...`
    - Bypassed the `Generating Infant Network...` phase.
-   - Resumed testing from the saved structural state, demonstrating total success of the biological sleep save states.
+   - Resumed testing from the exact saved structural state and tick counter, demonstrating total success of the biological sleep save states and preventing "Amnesia".
