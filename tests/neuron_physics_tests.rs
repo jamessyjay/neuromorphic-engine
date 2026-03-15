@@ -157,7 +157,7 @@ fn test_precise_stdp_targeted_dendritic_learning() {
     
     // Artificial branch activity traces
     target.branches[0].local_trace = 255;
-    target.branches[1].local_trace = 0;
+    target.branches[4].local_trace = 0;
     
     // Setup synapses
     let mut syn1 = unsafe { std::mem::zeroed::<Synapse>() };
@@ -213,12 +213,12 @@ fn test_nmda_multiplexing_logical_and() {
     
     // Set branches as basal dendrites (type 1)
     n_dist.branches[0].branch_type = 1;
-    n_dist.branches[1].branch_type = 1;
+    n_dist.branches[4].branch_type = 1;
     n_focus.branches[0].branch_type = 1;
     
     // Set NMDA thresholds
     n_dist.branches[0].nmda_threshold = pack_voltage(-30.0);
-    n_dist.branches[1].nmda_threshold = pack_voltage(-30.0);
+    n_dist.branches[4].nmda_threshold = pack_voltage(-30.0);
     n_focus.branches[0].nmda_threshold = pack_voltage(-30.0);
     
     // We need a sub-threshold stimulus.
@@ -230,14 +230,14 @@ fn test_nmda_multiplexing_logical_and() {
     // So if v is 35.0, and threshold is 40.0.
     
     n_dist.branches[0].nmda_threshold = pack_voltage(40.0);
-    n_dist.branches[1].nmda_threshold = pack_voltage(40.0);
+    n_dist.branches[4].nmda_threshold = pack_voltage(40.0);
     n_focus.branches[0].nmda_threshold = pack_voltage(40.0);
     
     let sub_stimulus = 25.0; // Two of these is 50.0 (> 40.0)
     
     // Action A (Distributed)
     n_dist.branches[0].voltage = pack_voltage(sub_stimulus);
-    n_dist.branches[1].voltage = pack_voltage(sub_stimulus);
+    n_dist.branches[4].voltage = pack_voltage(sub_stimulus);
     
     // Action B (Focused)
     n_focus.branches[0].voltage = pack_voltage(sub_stimulus * 2.0);
@@ -349,11 +349,11 @@ fn test_htm_predictive_state_coincidence() {
     let env = default_env();
     
     // Set up branch 3 (Basal/Context) and branch 0 (Proximal/Trigger)
-    neuron.branches[3].branch_type = 1;
+    neuron.branches[4].branch_type = 1;
     neuron.branches[0].branch_type = 1;
 
     // Phase 1: Context arrives on Basal branch 3
-    neuron.branches[3].voltage = pack_voltage(15.0); // Over NMDA threshold
+    neuron.branches[4].voltage = pack_voltage(15.0); // Over NMDA threshold
     
     unsafe { tick_neuron_cpu(&mut neuron, env.clone(), 1); }
     

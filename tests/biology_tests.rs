@@ -18,6 +18,9 @@ fn test_metabolic_sink() {
     let mut graph = NetworkGraph::new();
     for _ in 0..100 {
         graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     }
     
     let mut env = default_env();
@@ -43,6 +46,9 @@ fn test_metabolic_sink() {
 fn test_atp_recovery_asymptote() {
     let mut graph = NetworkGraph::new();
     let id = graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     let mut env = default_env();
     env.global_oxygen_level = 1.0;
     env.global_glucose_level = 1.0;
@@ -69,6 +75,9 @@ fn test_mitochondrial_failure() {
     let mut graph = NetworkGraph::new();
     for _ in 0..100 {
         graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     }
     
     let mut env = default_env();
@@ -97,6 +106,9 @@ fn test_metabolic_floor_leak() {
     let mut graph = NetworkGraph::new();
     for _ in 0..100 {
         graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     }
     
     let env = default_env();
@@ -114,6 +126,9 @@ fn test_oxygen_deprivation() {
     let mut graph = NetworkGraph::new();
     for _ in 0..100 {
         graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     }
     
     let mut env = default_env();
@@ -137,6 +152,9 @@ fn test_oxygen_deprivation() {
 fn test_calcium_overdose() {
     let mut graph = NetworkGraph::new();
     let id = graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     let env = default_env();
     
     for tick in 5001..=5500 {
@@ -159,6 +177,9 @@ fn test_calcium_overdose() {
 fn test_calcium_recovery_rate() {
     let mut graph = NetworkGraph::new();
     let id = graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     let env = default_env();
     
     // Induce a single spike manually
@@ -176,6 +197,9 @@ fn test_calcium_recovery_rate() {
 fn test_l6_coord_persistence() {
     let mut graph = NetworkGraph::new();
     graph.add_neuron(NeuronType::Pyramidal);
+        let id = graph.neurons.len() - 1;
+        graph.neurons[id].column_id = id as u16;
+        graph.neurons[id].minicolumn_id = 1;
     
     // Assign specific ref coords for L6 simulation
     graph.neurons[0].ref_coord_x = 42.5;

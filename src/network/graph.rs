@@ -218,6 +218,7 @@ impl NetworkGraph {
     }
 
     pub fn tick(&mut self, current_tick: u32, env: crate::engine::ffi::Environment) {
+        self.apply_wta_inhibition();
         #[cfg(target_os = "macos")]
         {
             // MacOS CPU Fallback using Rayon Multi-Threading

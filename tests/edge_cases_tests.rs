@@ -54,12 +54,12 @@ fn test_sequence_recall() {
     graph.add_neuron(NeuronType::Pyramidal); // A (0)
     graph.add_neuron(NeuronType::Pyramidal); // B (1)
     graph.add_neuron(NeuronType::Pyramidal); // C (2)
-    graph.neurons[1].branches[1].branch_type = 1;
-    graph.neurons[2].branches[1].branch_type = 1;
+    graph.neurons[1].branches[4].branch_type = 1;
+    graph.neurons[2].branches[4].branch_type = 1;
 
     // Connect via basal dendrites (Branch 1)
-    for _ in 0..10 { graph.connect(0, 1, 10.0, 1, false, false); }
-    for _ in 0..10 { graph.connect(1, 2, 10.0, 1, false, false); }
+    for _ in 0..10 { graph.connect(0, 1, 10.0, 4, false, false); }
+    for _ in 0..10 { graph.connect(1, 2, 10.0, 4, false, false); }
 
     let mut env = Environment {
         global_oxygen_level: 1.0,
@@ -85,7 +85,7 @@ fn test_sequence_recall() {
             graph.tick(current_tick, env);
 
         
-        println!("Tick {}: A.last_spike = {}, B.last_spike = {}, B.predictive_ticks = {}, B.branch1_v = {}", current_tick, graph.neurons[0].last_spike_tick, graph.neurons[1].last_spike_tick, graph.neurons[1].predictive_ticks, ((graph.neurons[1].branches[1].voltage as f32) / 100.0) - 100.0);
+        println!("Tick {}: A.last_spike = {}, B.last_spike = {}, B.predictive_ticks = {}, B.branch4_v = {}", current_tick, graph.neurons[0].last_spike_tick, graph.neurons[1].last_spike_tick, graph.neurons[1].predictive_ticks, ((graph.neurons[1].branches[4].voltage as f32) / 100.0) - 100.0);
 
 
         }
@@ -121,13 +121,13 @@ fn test_sequence_recall() {
         graph.tick(current_tick, env);
 
         
-        println!("Tick {}: A.last_spike = {}, B.last_spike = {}, B.predictive_ticks = {}, B.branch1_v = {}", current_tick, graph.neurons[0].last_spike_tick, graph.neurons[1].last_spike_tick, graph.neurons[1].predictive_ticks, ((graph.neurons[1].branches[1].voltage as f32) / 100.0) - 100.0);
+        println!("Tick {}: A.last_spike = {}, B.last_spike = {}, B.predictive_ticks = {}, B.branch4_v = {}", current_tick, graph.neurons[0].last_spike_tick, graph.neurons[1].last_spike_tick, graph.neurons[1].predictive_ticks, ((graph.neurons[1].branches[4].voltage as f32) / 100.0) - 100.0);
 
 
 
         // B should be predictive at A_spike + delay (10 ticks)
-        println!("Tick 11: B.predictive_ticks = {}, B.voltage = {}, B.branch1_v = {}", graph.neurons[1].predictive_ticks, graph.neurons[1].current_voltage, ((graph.neurons[1].branches[1].voltage as f32) / 100.0) - 100.0);
-        println!("Tick {}: B.predictive_ticks = {}, B.voltage = {}, B.branch1_v = {}", current_tick, graph.neurons[1].predictive_ticks, graph.neurons[1].current_voltage, ((graph.neurons[1].branches[1].voltage as f32) / 100.0) - 100.0);
+        println!("Tick 11: B.predictive_ticks = {}, B.voltage = {}, B.branch4_v = {}", graph.neurons[1].predictive_ticks, graph.neurons[1].current_voltage, ((graph.neurons[1].branches[4].voltage as f32) / 100.0) - 100.0);
+        println!("Tick {}: B.predictive_ticks = {}, B.voltage = {}, B.branch4_v = {}", current_tick, graph.neurons[1].predictive_ticks, graph.neurons[1].current_voltage, ((graph.neurons[1].branches[4].voltage as f32) / 100.0) - 100.0);
         if t == 11 {
             assert!(graph.neurons[1].predictive_ticks > 0, "Neuron B did not enter predictive state!");
         }
