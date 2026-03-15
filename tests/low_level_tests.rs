@@ -184,7 +184,7 @@ fn test_serialization_backpressure() {
                     synapses: Vec::with_capacity(graph.synapses.len()),
                 };
                 for n in &graph.neurons {
-                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_ as u8));
+                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_, n.column_id, n.layer_id, n.minicolumn_id));
                 }
                 for s in &graph.synapses {
                     snapshot.synapses.push((s.source_id, s.target_id, s.weight));
