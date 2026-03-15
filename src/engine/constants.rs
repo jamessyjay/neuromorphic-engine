@@ -220,6 +220,26 @@ pub const MAX_COORD: f32 = 100.0; // Spatial boundary size (100x100x100)
 pub const COORD_SCALE: f32 = 655.35; // 65535.0 / 100.0 (maps 0.0..100.0 to 0..65535)
 pub const ZERO_VOLTAGE_PACKED: u16 = 10000; // (0.0 + 100.0) * 100.0
 pub const NMDA_THRESHOLD_PACKED: u16 = 10500; // (5.0 + 100.0) * 100.0
+// --- Topology & Columnar Architecture Constants (v0.5.0) ---
+pub const COLUMNS_COUNT: u16 = 10;
+pub const NEURONS_PER_COLUMN: u32 = 1000;
+
+// Z-axis boundaries for cortical layers (0 to 65535)
+pub const LAYER_6_Z_MIN: u16 = 0;
+pub const LAYER_6_Z_MAX: u16 = 10000;   // Location (Reference Frames)
+
+pub const LAYER_5_Z_MIN: u16 = 10001;
+pub const LAYER_5_Z_MAX: u16 = 25000;   // Motor (Output)
+
+pub const LAYER_4_Z_MIN: u16 = 25001;
+pub const LAYER_4_Z_MAX: u16 = 40000;   // Sensory (Input)
+
+pub const LAYER_2_3_Z_MIN: u16 = 40001;
+pub const LAYER_2_3_Z_MAX: u16 = 60000; // Identity (Objects)
+
+pub const LAYER_1_Z_MIN: u16 = 60001;
+pub const LAYER_1_Z_MAX: u16 = 65535;   // Feedback (Commutation)
+
 // --- Modes & UI Testing Constants ---
 
 /// Number of ticks to wait before ending the UI visualizer test (300 seconds * 10 ticks/sec roughly)

@@ -178,80 +178,125 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     let mut graph = NetworkGraph::new();
     let mut rng = rand::rng();
 
-    println!("Generating Benchmark Network (Gaussian weights): {} neurons, {} synapses...", neurons_count, synapses_count);
+    println!("Generating Benchmark Network (Cortical Columns v0.5.0): {} neurons, {} synapses...", neurons_count, synapses_count);
 
-    let num_sensors = (neurons_count as f32 * crate::engine::constants::SENSOR_PROPORTION) as usize;
-    let num_motors = (neurons_count as f32 * crate::engine::constants::MOTOR_PROPORTION) as usize;
-    let num_pacemakers = (neurons_count as f32 * crate::engine::constants::PACEMAKER_PROPORTION) as usize;
-    let num_interneurons = (neurons_count as f32 * crate::engine::constants::INTERNEURON_PROPORTION) as usize;
-    let motor_start_idx = neurons_count.saturating_sub(num_motors);
+    use crate::engine::constants::*;
 
-    for i in 0..neurons_count {
-        let n_type = if i < num_sensors {
-            NeuronType::Photoreceptor // Type 5
-        } else if i >= motor_start_idx {
-            NeuronType::Purkinje // Type 4 (Motor)
-        } else if i >= num_sensors && i < num_sensors + num_pacemakers {
-            NeuronType::Pacemaker // Type 3
-        } else if i >= num_sensors + num_pacemakers && i < num_sensors + num_pacemakers + num_interneurons {
-            NeuronType::Interneuron // Type 2
-        } else {
-            NeuronType::Pyramidal // Type 0 (Remaining ~75%)
-        };
+    // Validate that we are generating exactly what the architecture expects (if possible),
+    // but we'll adapt to user arguments if they differ (for tests).
+    // The specification mandates 10 columns * 1000 neurons, but for flexibility
+    // we'll use the requested neurons_count and distribute them across COLUMNS_COUNT.
+    let columns = COLUMNS_COUNT as usize;
+    let neurons_per_col = neurons_count / columns;
+    let minicolumns_per_col = 50;
 
-        graph.add_neuron(n_type);
-        
-        let n = &mut graph.neurons[i];
-        if i < num_sensors {
-            n.x = 0; // Force sensors to left edge
-        } else if i >= motor_start_idx {
-            n.x = crate::engine::constants::COORD_MAX; // Force motors to right edge
+    let spacing = COORD_SCALE / 5.0; 
+    let column_centers_x: Vec<f32> = (0..5).map(|i| 20000.0 + (i as f32 * spacing * 100.0)).collect(); // 5x2 grid
+    let column_centers_y: Vec<f32> = (0..2).map(|i| 20000.0 + (i as f32 * spacing * 100.0)).collect();
+
+    for col_idx in 0..columns {
+        let center_x = column_centers_x[col_idx % 5];
+        let center_y = column_centers_y[col_idx / 5];
+
+        for i in 0..neurons_per_col {
+            let (n_type, layer_id, z_min, z_max) = if i < 200 {
+                (NeuronType::Photoreceptor, 4, LAYER_4_Z_MIN, LAYER_4_Z_MAX) // L4
+            } else if i < 500 {
+                (NeuronType::Pyramidal, 6, LAYER_6_Z_MIN, LAYER_6_Z_MAX)     // L6
+            } else if i < 700 {
+                (NeuronType::Purkinje, 5, LAYER_5_Z_MIN, LAYER_5_Z_MAX)      // L5
+            } else {
+                (NeuronType::Pyramidal, 2, LAYER_2_3_Z_MIN, LAYER_2_3_Z_MAX) // L2/3
+            };
+
+            let _id = graph.add_neuron(n_type);
+            let n_id = {
+                let n = graph.neurons.last_mut().unwrap();
+
+                n.column_id = col_idx as u16;
+                n.layer_id = layer_id as u8;
+                n.minicolumn_id = (i % minicolumns_per_col) as u8;
+
+                // Coordinates (Cylinder)
+                let dx = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 5000.0;
+                let dy = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 5000.0;
+                
+                n.x = (center_x + dx).clamp(0.0, 65535.0) as u16;
+                n.y = (center_y + dy).clamp(0.0, 65535.0) as u16;
+                n.z = rand::RngExt::random_range(&mut rng, z_min..=z_max);
+                
+                n.id
+            };
+
+            graph.grow_dendritic_tree(n_id);
         }
-        
-        graph.grow_dendritic_tree(i as u32);
     }
 
-    let local_radius_sq = (crate::engine::constants::COORD_SCALE * crate::engine::constants::SPATIAL_RADIUS_MULTIPLIER).powi(2);
     let mut actual_synapses = 0;
-    // Do not force minimum to 30000. Let it be what the user requested.
-    let target_synapses = synapses_count; 
-    while actual_synapses < target_synapses {
-        let source_idx = rand::RngExt::random_range(&mut rng, 0..neurons_count);
-        let target_idx = rand::RngExt::random_range(&mut rng, 0..neurons_count);
+    while actual_synapses < synapses_count {
+        let source_idx = rand::RngExt::random_range(&mut rng, 0..graph.neurons.len());
+        let target_idx = rand::RngExt::random_range(&mut rng, 0..graph.neurons.len());
         if source_idx == target_idx { continue; }
-        
+
         let n_source = &graph.neurons[source_idx];
         let n_target = &graph.neurons[target_idx];
 
-        let dx = (n_source.x as f32 - n_target.x as f32).abs();
-        let dy = (n_source.y as f32 - n_target.y as f32).abs();
-        let dz = (n_source.z as f32 - n_target.z as f32).abs();
-        let dist_sq = dx*dx + dy*dy + dz*dz;
+        // Rules of connectivity v0.5
+        let mut prob;
 
-        if dist_sq < local_radius_sq || rand::RngExt::random_bool(&mut rng, LONG_RANGE_PROB) {
-            let base_weight = get_gaussian(&mut rng, DEFAULT_WEIGHT * crate::engine::constants::BASE_WEIGHT_MODIFIER, WEIGHT_SIGMA).max(0.5).min(10.0);
-            let is_interneuron = n_source.type_ == NeuronType::Interneuron as u8;
-            
-            let (weight, is_inhib) = if is_interneuron {
-                (-base_weight, true) // Interneurons strictly create inhibitory (negative weight) synapses
+        if n_source.column_id == n_target.column_id {
+            if n_source.minicolumn_id == n_target.minicolumn_id {
+                prob = 0.90; // Minicolumnar vertical stitch
             } else {
-                (base_weight, false) // Other types create excitatory (positive weight) synapses
-            };
+                let layer_diff = (n_source.layer_id as i32 - n_target.layer_id as i32).abs();
+                if layer_diff == 1 || layer_diff == 2 {
+                    prob = 0.80; // Vertical intra-columnar connections
+                } else {
+                    prob = 0.10; // Sparse random inside column
+                }
+            }
+        } else if n_source.layer_id == 2 && n_target.layer_id == 2 {
+            prob = 0.05; // Horizontal L1/L2/3 voting
+        } else {
+            prob = 0.01; // Ultra sparse random long-range
+        }
 
-            let is_myelin = rand::RngExt::random_bool(&mut rng, MYELIN_PROB); 
-            let branch_id = rand::RngExt::random_range(&mut rng, 0..crate::engine::constants::DENDRITIC_BRANCH_COUNT);
+        // Ban: L6 cannot directly fire to L5
+        if n_source.layer_id == 6 && n_target.layer_id == 5 {
+            prob = 0.0;
+        }
+
+        if rand::RngExt::random_bool(&mut rng, prob as f64) {
+            let base_weight = crate::runner::modes::get_gaussian(&mut rng, DEFAULT_WEIGHT * BASE_WEIGHT_MODIFIER, WEIGHT_SIGMA).max(0.5).min(10.0);
+            let is_inhib = n_source.type_ == NeuronType::Interneuron as u8;
+            let weight = if is_inhib { -base_weight } else { base_weight };
+            let is_myelin = rand::RngExt::random_bool(&mut rng, MYELIN_PROB);
+            let branch_id = rand::RngExt::random_range(&mut rng, 0..DENDRITIC_BRANCH_COUNT);
+
             graph.connect(source_idx as u32, target_idx as u32, weight, branch_id, is_inhib, is_myelin);
             actual_synapses += 1;
         }
     }
 
-    for i in 0..neurons_count {
+    for n in &mut graph.neurons {
         if rand::RngExt::random_bool(&mut rng, 0.1) {
-            graph.neurons[i].current_voltage = crate::engine::constants::PRE_SEED_VOLTAGE;
+            n.current_voltage = PRE_SEED_VOLTAGE;
         }
-        // Phase 14: Metabolic Calibration - Glucose Injection at birth
-        graph.neurons[i].energy_atp = graph.neurons[i].max_atp;
-        graph.neurons[i].calcium_level = 0.0;
+        n.energy_atp = n.max_atp;
+        n.calcium_level = 0.0;
+    }
+
+    // --- Validation (Checklist) ---
+    assert_eq!(graph.neurons.len(), neurons_count, "Validation Failed: Incorrect total neurons count.");
+    for n in &graph.neurons {
+        assert!(n.column_id < COLUMNS_COUNT, "Validation Failed: column_id {} is out of bounds!", n.column_id);
+        match n.layer_id {
+            6 => assert!(n.z >= LAYER_6_Z_MIN && n.z <= LAYER_6_Z_MAX, "L6 Z mismatch"),
+            5 => assert!(n.z >= LAYER_5_Z_MIN && n.z <= LAYER_5_Z_MAX, "L5 Z mismatch"),
+            4 => assert!(n.z >= LAYER_4_Z_MIN && n.z <= LAYER_4_Z_MAX, "L4 Z mismatch"),
+            2 => assert!(n.z >= LAYER_2_3_Z_MIN && n.z <= LAYER_2_3_Z_MAX, "L2/3 Z mismatch"),
+            _ => panic!("Unknown layer ID {}", n.layer_id),
+        }
     }
 
     // Force memory coalescing after generation
