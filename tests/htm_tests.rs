@@ -29,7 +29,7 @@ fn test_sequence_learning() {
     graph.neurons[0].column_id = 0;
     graph.neurons[0].minicolumn_id = 0;
     
-    for i in 1..=20 {
+    for _ in 1..=20 {
         let n = graph.add_neuron(NeuronType::Pyramidal);
         graph.neurons[n as usize].column_id = 1;
         graph.neurons[n as usize].minicolumn_id = 1;
@@ -93,7 +93,7 @@ fn test_sequence_learning() {
 fn test_column_bursting() {
     let mut graph = NetworkGraph::new();
     
-    for i in 0..20 {
+    for _ in 0..20 {
         let n = graph.add_neuron(NeuronType::Pyramidal);
         graph.neurons[n as usize].column_id = 1;
         graph.neurons[n as usize].minicolumn_id = 1;
