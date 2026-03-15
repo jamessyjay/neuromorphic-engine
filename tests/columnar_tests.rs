@@ -66,3 +66,76 @@ fn test_minicolumn_wta_inhibition() {
     assert!(graph.neurons[2].current_voltage < 30.0, "Loser should be hyperpolarized. Voltage was: {}", graph.neurons[2].current_voltage);
     assert_eq!((graph.neurons[2].status_flags & constants::FLAG_IS_INHIBITED) > 0, true, "Loser must have FLAG_IS_INHIBITED");
 }
+
+#[test]
+fn test_z_boundaries() {
+    let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 100);
+    
+    use neuromorphic_engine::engine::constants::*;
+
+    for n in &graph.neurons {
+        match n.layer_id {
+            6 => assert!(n.z >= LAYER_6_Z_MIN && n.z <= LAYER_6_Z_MAX, "L6 neuron {} has z {} out of bounds", n.id, n.z),
+            5 => assert!(n.z >= LAYER_5_Z_MIN && n.z <= LAYER_5_Z_MAX, "L5 neuron {} has z {} out of bounds", n.id, n.z),
+            4 => assert!(n.z >= LAYER_4_Z_MIN && n.z <= LAYER_4_Z_MAX, "L4 neuron {} has z {} out of bounds", n.id, n.z),
+            2 => assert!(n.z >= LAYER_2_3_Z_MIN && n.z <= LAYER_2_3_Z_MAX, "L2/3 neuron {} has z {} out of bounds", n.id, n.z),
+            _ => panic!("Unknown layer ID {}", n.layer_id),
+        }
+    }
+}
+
+#[test]
+fn test_radial_clustering() {
+    let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 100);
+    use neuromorphic_engine::engine::constants::*;
+    
+    let spacing = COORD_SCALE / 5.0; 
+    let column_centers_x: Vec<f32> = (0..5).map(|i| 10000.0 + (i as f32 * spacing * 100.0)).collect();
+    let column_centers_y: Vec<f32> = (0..2).map(|i| 10000.0 + (i as f32 * spacing * 100.0)).collect();
+
+    for n in &graph.neurons {
+        let center_x = column_centers_x[(n.column_id % 5) as usize];
+        let center_y = column_centers_y[(n.column_id / 5) as usize];
+        
+        let dx = n.x as f32 - center_x;
+        let dy = n.y as f32 - center_y;
+        
+        // Assert that the neuron is within a radius of 5000 from the column center
+        assert!(dx.abs() <= 5000.0, "Neuron {} X coordinate {} drifted too far from center {}", n.id, n.x, center_x);
+        assert!(dy.abs() <= 5000.0, "Neuron {} Y coordinate {} drifted too far from center {}", n.id, n.y, center_y);
+    }
+}
+
+#[test]
+fn test_minicolumn_distribution() {
+    let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 100);
+    
+    use std::collections::HashMap;
+    let mut minicol_counts: HashMap<(u16, u8), usize> = HashMap::new();
+    
+    for n in &graph.neurons {
+        *minicol_counts.entry((n.column_id, n.minicolumn_id)).or_insert(0) += 1;
+    }
+    
+    for count in minicol_counts.values() {
+        assert_eq!(*count, 20, "Each minicolumn should contain exactly 20 neurons (1000 per column / 50 minicolumns)");
+    }
+}
+
+#[test]
+fn test_connectivity_enforcement() {
+    let graph = neuromorphic_engine::runner::modes::setup_benchmark(1000, 10000); // Small dense network
+    
+    let mut l6_to_l5_count = 0;
+    
+    for syn in &graph.synapses {
+        let n_source = &graph.neurons[syn.source_id as usize];
+        let n_target = &graph.neurons[syn.target_id as usize];
+        
+        if n_source.layer_id == 6 && n_target.layer_id == 5 {
+            l6_to_l5_count += 1;
+        }
+    }
+    
+    assert_eq!(l6_to_l5_count, 0, "L6 must NOT directly connect to L5! Connectivity ban failed.");
+}

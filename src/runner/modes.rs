@@ -191,8 +191,8 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     let minicolumns_per_col = 50;
 
     let spacing = COORD_SCALE / 5.0; 
-    let column_centers_x: Vec<f32> = (0..5).map(|i| 20000.0 + (i as f32 * spacing * 100.0)).collect(); // 5x2 grid
-    let column_centers_y: Vec<f32> = (0..2).map(|i| 20000.0 + (i as f32 * spacing * 100.0)).collect();
+    let column_centers_x: Vec<f32> = (0..5).map(|i| 10000.0 + (i as f32 * spacing * 100.0)).collect(); // 5x2 grid
+    let column_centers_y: Vec<f32> = (0..2).map(|i| 10000.0 + (i as f32 * spacing * 100.0)).collect();
 
     for col_idx in 0..columns {
         let center_x = column_centers_x[col_idx % 5];
