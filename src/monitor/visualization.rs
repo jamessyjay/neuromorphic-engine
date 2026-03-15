@@ -66,10 +66,13 @@ pub fn render_benchmark_chart(data: &BenchmarkData, filename: &str) -> Result<()
     chart2.configure_mesh().y_desc("Avg ATP (%)").draw()?;
     chart2.configure_secondary_axes().y_desc("Avg Calcium").draw()?;
     
-    chart2.draw_series(LineSeries::new(data.ticks.iter().zip(data.avg_atp.iter()).map(|(&x, &y)| (x as f32, y)), &GREEN))?
-        .label("Avg ATP").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], GREEN));
-    chart2.draw_secondary_series(LineSeries::new(data.ticks.iter().zip(data.avg_calcium.iter()).map(|(&x, &y)| (x as f32, y)), &YELLOW.mix(0.8)))?
-        .label("Avg Calcium").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], YELLOW));
+    // Data is now scalar (total_atp_sum / samples_count). We can't plot it over time, so we just add a dummy line to keep legends if needed, or leave blank.
+    let avg_atp_val = if data.samples_count > 0 { (data.total_atp_sum / data.samples_count as f64) as f32 } else { 0.0 };
+    let avg_calc_val = if data.samples_count > 0 { (data.total_calcium_sum / data.samples_count as f64) as f32 } else { 0.0 };
+    chart2.draw_series(LineSeries::new(vec![(0.0, avg_atp_val), (data.ticks.last().copied().unwrap_or(0) as f32, avg_atp_val)], &GREEN))?
+        .label(format!("Avg ATP: {:.2}", avg_atp_val)).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], GREEN));
+    chart2.draw_secondary_series(LineSeries::new(vec![(0.0, avg_calc_val), (data.ticks.last().copied().unwrap_or(0) as f32, avg_calc_val)], &YELLOW.mix(0.8)))?
+        .label(format!("Avg Calcium: {:.2}", avg_calc_val)).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], YELLOW));
     chart2.configure_series_labels().background_style(WHITE.mix(0.8)).border_style(BLACK).draw()?;
 
     // Panel 3: Performance (FFI vs Rust)

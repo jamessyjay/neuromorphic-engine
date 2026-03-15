@@ -19,8 +19,9 @@ pub struct BenchmarkData {
     pub ffi_times: Vec<f32>,
     pub rust_times: Vec<f32>,
     pub total_spikes: Vec<u32>,
-    pub avg_atp: Vec<f32>,
-    pub avg_calcium: Vec<f32>,
+    pub total_atp_sum: f64,
+    pub total_calcium_sum: f64,
+    pub samples_count: u32,
 }
 
 pub struct SimulationData {
@@ -30,10 +31,9 @@ pub struct SimulationData {
     pub synapse_w: Vec<f32>,
 }
 
-pub fn get_gaussian(mu: f32, sigma: f32) -> f32 {
-    let mut rng = rand::rng();
-    let u1: f32 = rand::RngExt::random(&mut rng);
-    let u2: f32 = rand::RngExt::random(&mut rng);
+pub fn get_gaussian(rng: &mut rand::rngs::ThreadRng, mu: f32, sigma: f32) -> f32 {
+    let u1: f32 = rand::RngExt::random(rng);
+    let u2: f32 = rand::RngExt::random(rng);
     let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
     mu + sigma * z
 }
@@ -93,7 +93,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
         let dist_sq = dx*dx + dy*dy + dz*dz;
 
         if dist_sq < local_radius_sq || rand::RngExt::random_bool(&mut rng, LONG_RANGE_PROB) {
-            let base_weight = get_gaussian(DEFAULT_WEIGHT * 2.0, WEIGHT_SIGMA).max(0.5).min(10.0);
+            let base_weight = get_gaussian(&mut rng, DEFAULT_WEIGHT * 2.0, WEIGHT_SIGMA).max(0.5).min(10.0);
             let is_interneuron = n_source.type_ == NeuronType::Interneuron as u8;
             
             let (weight, is_inhib) = if is_interneuron {
@@ -146,13 +146,19 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
     
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
 
+    let total_elements = graph.neurons.len() + graph.synapses.len();
+    let sampling_interval = (total_elements as f32 / 1000.0).ceil() as u32;
+    let sampling_interval = if sampling_interval < 1 { 1 } else { sampling_interval };
+    let expected_capacity = (total_ticks / sampling_interval) as usize + 1;
+
     let mut data = BenchmarkData {
-        ticks: Vec::with_capacity(total_ticks as usize),
-        ffi_times: Vec::with_capacity(total_ticks as usize),
-        rust_times: Vec::with_capacity(total_ticks as usize),
-        total_spikes: Vec::with_capacity(total_ticks as usize),
-        avg_atp: Vec::with_capacity(total_ticks as usize),
-        avg_calcium: Vec::with_capacity(total_ticks as usize),
+        ticks: Vec::with_capacity(expected_capacity),
+        ffi_times: Vec::with_capacity(expected_capacity),
+        rust_times: Vec::with_capacity(expected_capacity),
+        total_spikes: Vec::with_capacity(expected_capacity),
+        total_atp_sum: 0.0,
+        total_calcium_sum: 0.0,
+        samples_count: 0,
     };
 
     let mut total_ffi_time = std::time::Duration::new(0, 0);
@@ -278,8 +284,9 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         data.ffi_times.push(ffi_elapsed.as_secs_f32() * 1000.0);
         data.rust_times.push(tick_rust_time.as_secs_f32() * 1000.0);
         data.total_spikes.push(spikes);
-        data.avg_atp.push(atp_sum / num_neurons as f32);
-        data.avg_calcium.push(calcium_sum / num_neurons as f32);
+        data.total_atp_sum += (atp_sum / num_neurons as f32) as f64;
+        data.total_calcium_sum += (calcium_sum / num_neurons as f32) as f64;
+        data.samples_count += 1;
     }
 
     println!("--- BENCHMARK RESULTS (macOS Mock CPU) ---");
@@ -287,7 +294,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
     println!("Rust Services Time: {:?}", total_rust_time);
     
     telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/simulation_report.json");
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
 
     Ok(data)
 }
@@ -329,11 +336,16 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_env: Option<Environment>, total_ticks: u32, tx: Option<broadcast::Sender<String>>, use_dynamic_homeostasis: bool) -> SimulationData {
+    let total_elements = graph.neurons.len() + graph.synapses.len();
+    let sampling_interval = (total_elements as f32 / 1000.0).ceil() as u32;
+    let sampling_interval = if sampling_interval < 1 { 1 } else { sampling_interval };
+    let expected_capacity = (total_ticks / sampling_interval) as usize + 1;
+
     let mut data = SimulationData {
-        ticks: Vec::with_capacity(total_ticks as usize),
-        source_v: Vec::with_capacity(total_ticks as usize),
-        target_v: Vec::with_capacity(total_ticks as usize),
-        synapse_w: Vec::with_capacity(total_ticks as usize),
+        ticks: Vec::with_capacity(expected_capacity),
+        source_v: Vec::with_capacity(expected_capacity),
+        target_v: Vec::with_capacity(expected_capacity),
+        synapse_w: Vec::with_capacity(expected_capacity),
     };
 
     println!("Executing {} ticks...", total_ticks);
@@ -438,7 +450,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
     let mut telemetry = Telemetry::new();
     telemetry.update(total_ticks);
     telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/simulation_report.json");
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
 
     data
 }
@@ -511,11 +523,12 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     if spike_count_conc > spike_count_dist {
         println!("VERDICT: Dendritic non-linearity confirmed! 🧠✨");
     }
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 3;
     println!("--- EXECUTING PASSIVE LEAK & REFRACTORY TEST (Fix 2 & 3 Validation) ---");
     let mut graph = NetworkGraph::new();
     let target = graph.add_neuron(NeuronType::Pyramidal);
@@ -559,11 +572,12 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         println!("✅ FIX 3 PASS: Refractory period effectively blocked incoming signal.");
     }
 
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 5000;
     println!("--- EXECUTING SLEEP CYCLE TEST (Phase 35 Validation) ---");
     let mut graph = if let Some(loaded_snapshot) = BrainSnapshot::load_from_disk("brain_save.bin") {
         let loaded_graph = loaded_snapshot.graph;
@@ -598,15 +612,16 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
             graph.initiate_sleep_cycle();
             let post_sleep_snapshot = graph.snapshot_synapses();
             NetworkGraph::diff_synapses(&pre_sleep_snapshot, &post_sleep_snapshot);
-            BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+            BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
             return Ok(());
         }
     }
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 3000;
     println!("--- EXECUTING INHIBITION LOOP SCENARIO (Phase 19) ---");
     let mut graph = NetworkGraph::new();
     let p = graph.add_neuron(NeuronType::Pyramidal);
@@ -645,11 +660,12 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_inhibition_chart(&history, "graphs/inhibition_loop.png")?;
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 3000;
     println!("--- EXECUTING REFLEX ARC (Phase 11) ---");
     let mut graph = NetworkGraph::new();
     let eye = graph.add_neuron(NeuronType::Photoreceptor);
@@ -697,11 +713,12 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_reflex_arc_chart(&history, "graphs/reflex_arc_boosted.png")?;
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 5000;
     println!("--- EXECUTING STRESS-TEST (Phase 13) ---");
     let mut graph = NetworkGraph::new();
     let mut env = Environment { 
@@ -747,11 +764,12 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut telemetry = Telemetry::new();
     telemetry.update(results.last().map(|r| r.0).unwrap_or(0));
     telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/stress_report.json");
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 3000;
     println!("--- EXECUTING DOPAMINE RUSH (Phase 14) ---");
     let mut graph = NetworkGraph::new();
     let mut current_env = Environment { 
@@ -792,11 +810,12 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_plasticity_chart(&weight_history, "graphs/dopamine_rush_results.png")?;
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 2000;
     println!("--- EXECUTING FREQUENCY DISCRIMINATION TEST (Phase 23) ---");
     let mut graph = NetworkGraph::new();
     let eye = graph.add_neuron(NeuronType::Photoreceptor);
@@ -833,11 +852,12 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_frequency_chart(&history, "graphs/frequency_learning.png")?;
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 3000;
     println!("--- EXECUTING EMERGENCE FROM CHAOS (Phase 29) ---");
     let mut graph = NetworkGraph::new();
     for _ in 0..500 { graph.add_neuron(NeuronType::Pyramidal); }
@@ -872,11 +892,12 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut telemetry = Telemetry::new();
     telemetry.update(3000);
     telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/emergence_report.json");
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
 pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
+    let _total_ticks = 3000;
     println!("--- EXECUTING SYNAPTIC MORPHOLOGY AUDIT (Phase 30) ---");
     let mut graph = NetworkGraph::new();
     let source = graph.add_neuron(NeuronType::Pyramidal);
@@ -915,7 +936,7 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     let mut telemetry = Telemetry::new();
     telemetry.update(3000);
     telemetry.export_simulation_report(&graph.neurons, &graph.synapses, "reports/morphology_report.json");
-    BrainSnapshot { current_tick: 0, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: 3, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
 
     Ok(())
 }

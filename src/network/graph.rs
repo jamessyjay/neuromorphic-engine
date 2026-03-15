@@ -219,6 +219,15 @@ impl NetworkGraph {
         if is_inhibitory { flags |= 0x08; } // Bit 3
         if is_myelinated { flags |= 0x10; } // Bit 4
 
+        // Prevent duplicates (same source, target, and branch)
+        for synapse in &mut self.synapses {
+            if synapse.source_id == source_id && synapse.target_id == target_id && (synapse.flags & 0x07) == branch_id {
+                // If exists, just augment the weight and return
+                synapse.weight += weight;
+                return;
+            }
+        }
+
         let synapse = Synapse {
             source_id,
             target_id,

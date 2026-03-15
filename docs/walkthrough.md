@@ -279,3 +279,11 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Pre-computed Partitioning:** Sensor IDs are split into `bell_group` and `meat_group` during initialization instead of allocating and parsing vectors dynamically on every tick.
 - **Zombie Protection:** Added `graph.neurons[idx].is_alive == 1` checks to the `StimulusService`. The engine no longer wastes forced spikes on dead neurons.
 - **Consistent Causality:** Moved the `training_mode` test toggle to the start of `process_tick` to ensure that a single tick doesn't experience "half-training, half-test" states.
+
+## Phase 52: Core Hardening Final (Dynamic Telemetry & Memory Coalescing)
+
+**Summary:** 
+- **Dynamic Telemetry Sampling:** Overhauled `BenchmarkData` and `SimulationData` to sample stats strictly based on network scale (`1 sample per N ticks`). Replaced RAM-heavy scalar vectors (`avg_atp`, `avg_calcium`) with running `f64` accumulators to absolutely obliterate OOM issues on giant 100k+ neuron runs. Visualizer adjusted accordingly.
+- **True Snapshot Progression:** Corrected hardcoded `current_tick: 0` during saves. The engine now respects exactly which tick the simulation was paused on, saving `BrainSnapshot` with the accurate `tick` value, ensuring time isn't reset on a resume.
+- **RNG Initialization Optimization:** Passed `rand::rng` as a reference to `get_gaussian` and into generation functions to eliminate extremely heavy and redundant PRNG structural allocations during network generation.
+- **Strict Duplicate Pruning:** Hardened the `graph.connect()` method to scan `self.synapses` before insertion. If an identical pathway (`source_id`, `target_id`, `branch_id`) already exists, the function simply adds `weight` to the existing synapse instead of cloning a duplicate.
