@@ -113,7 +113,7 @@
 
     <script>
         
-        let colorMode = 'type'; // 'type' or 'layer'
+        let colorMode = 'type'; 
         let selectedNeuronId = null;
         let retinaCtx = null;
         const FLAG_IS_INHIBITED = 1;
@@ -150,11 +150,6 @@
             document.getElementById('current-color-mode').innerText = colorMode.toUpperCase();
             document.getElementById('legend-type').style.display = colorMode === 'type' ? 'block' : 'none';
             document.getElementById('legend-layer').style.display = colorMode === 'layer' ? 'block' : 'none';
-            
-            // Re-color all instances
-            if (window.lastTickData) {
-                updateVisuals(window.lastTickData);
-            }
         }
 
         window.addEventListener('click', (event) => {
@@ -162,7 +157,6 @@
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
-            // We need to raycast against all neuronMeshes
             let closest = null;
             let closestDist = Infinity;
 
@@ -177,7 +171,6 @@
             }
 
             if (closest) {
-                // Find nodeMap entry by matching mesh and instanceId (we need to store instanceId in nodeMap)
                 for (const [id, node] of nodeMap.entries()) {
                     if (node.mesh === closest.mesh && node.instanceId === closest.instanceId) {
                         selectedNeuronId = id;
@@ -216,7 +209,7 @@
             if (canvas) retinaCtx = canvas.getContext('2d');
         });
 
-let ws;
+        let ws;
         let currentEnv = { dopamine: 1.0, lr: 0.1 };
         const nodeMap = new Map();
         let neuronMeshes = [];
@@ -294,28 +287,16 @@ let ws;
                 neuronMeshes.push({ type: parseInt(t), mesh, currentIndex: 0 });
             });
 
-            
             data.neurons.forEach(n => {
                 const id = n[0], type = n[4];
-                const columnId = n[5], layerId = n[6], minicolumnId = n[7];
-                // Map coordinates: Z scale x2 to make it look like a cylinder cake
-                let x = (n[1]/65535)*200-100;
-                let y = (n[2]/65535)*200-100;
-                let z = (n[3]/65535)*400-200;
-                
+                let x = (n[1]/65535)*100-50, y = (n[2]/65535)*100-50, z = (n[3]/65535)*100-50;
+                if(type===5) x=-75; else if(type===4) x=75;
                 const mData = neuronMeshes.find(m => m.type === type);
                 if(mData) {
                     _dummy.position.set(x,y,z); _dummy.updateMatrix();
                     mData.mesh.setMatrixAt(mData.currentIndex, _dummy.matrix);
-                    
-                    nodeMap.set(id, { 
-                        id, x, y, z, type, 
-                        columnId, layerId, minicolumnId,
-                        mesh: mData.mesh, 
-                        instanceId: mData.currentIndex,
-                        statusFlags: 0,
-                        vState: 0
-                    });
+                    mData.mesh.setColorAt(mData.currentIndex, TYPE_COLORS[type]);
+                    nodeMap.set(id, { x, y, z, type, meshIdx: mData.currentIndex, outgoing: [], visualActivity: 0, isAlive: true });
                     mData.currentIndex++;
                 }
             });
@@ -388,13 +369,15 @@ let ws;
                     if (data.synapse_count !== undefined) {
                         document.getElementById('synapses').innerText = data.synapse_count;
                     }
-                    let spikesToday = 0, deadToday = 0;
+                    
+                    let spikesToday = 0, deadToday = 0, activeCount = 0;
                     data.neurons.forEach(n => {
-                        const nData = nodeMap.get(n[0]);
+                        const id = n[0], state = n[1], atp = n[2], flags = n[3] || 0;
+                        const nData = nodeMap.get(id);
                         if (nData) {
-                            const state = n[1];
                             if (state >= 3.0 && nData.isAlive) {
                                 nData.isAlive = false;
+                                deadToday++;
                                 if (state === 3.0) nData.deathReason = 'calcium';
                                 else if (state === 4.0) nData.deathReason = 'atp';
                                 else nData.deathReason = 'regen';
@@ -402,9 +385,14 @@ let ws;
                                 nData.isAlive = true;
                                 nData.visualActivity = (state === 1.0) ? 1.0 : nData.visualActivity;
                             }
-                            nData.atp = n[2];
+                            nData.atp = atp;
+                            nData.vState = state;
+                            nData.statusFlags = flags;
+
                             if (state === 1.0 && nData.isAlive) {
-                                spikesToday++; nData.visualActivity = 1.0;
+                                spikesToday++; 
+                                activeCount++;
+                                nData.visualActivity = 1.0;
                                 if (activePulses.length < MAX_PULSES) {
                                     nData.outgoing.forEach(syn => {
                                         if (Math.random() < VISUAL_SAMPLING && activePulses.length < MAX_PULSES) {
@@ -413,14 +401,28 @@ let ws;
                                         }
                                     });
                                 }
+                            } else if (state > 0.5 && nData.isAlive) {
+                                activeCount++;
                             }
                         }
                     });
+
+                    if (retinaCtx) {
+                        retinaCtx.fillStyle = 'black';
+                        retinaCtx.fillRect(0, 0, 32, 32);
+                        retinaCtx.fillStyle = 'white';
+                        retinaCtx.fillRect(16, 0, 1, 32);
+                    }
+
+                    const density = (activeCount / Math.max(1, nodeMap.size)) * 100;
+                    const elSdr = document.getElementById('sdr-density');
+                    if (elSdr) elSdr.innerText = density.toFixed(2) + '%';
+
                     document.getElementById('spike-rate').innerText = spikesToday;
                     document.getElementById('dead-count').innerText = parseInt(document.getElementById('dead-count').innerText) + deadToday;
                     document.getElementById('tick').innerText = `Tick: ${data.tick}`;
                     document.getElementById('neurons').innerText = nodeMap.size;
-                    document.getElementById('synapses').innerText = data.synapse_count;
+                    
                     updateLegendCounts();
                 }
             };
@@ -433,14 +435,38 @@ let ws;
                     const mData = neuronMeshes.find(mesh => mesh.type === n.type);
                     if (mData && mData.mesh === m.mesh) {
                         n.visualActivity *= 0.94;
+
+                        let baseColor;
+                        if (colorMode === 'layer') {
+                            switch(n.layerId) {
+                                case 6: baseColor = new THREE.Color(0x000080); break;
+                                case 5: baseColor = new THREE.Color(0xff0000); break;
+                                case 4: baseColor = new THREE.Color(0xffff00); break;
+                                case 2: baseColor = new THREE.Color(0x00ffff); break;
+                                case 1: baseColor = new THREE.Color(0xffffff); break;
+                                default: baseColor = new THREE.Color(0x444444);
+                            }
+                        } else {
+                            baseColor = TYPE_COLORS[n.type] || new THREE.Color(0x444444);
+                        }
+
                         if (!n.isAlive) {
                             if (n.deathReason === 'calcium') _tempColor.copy(TYPE_COLORS.dead_calcium);
                             else if (n.deathReason === 'atp') _tempColor.copy(TYPE_COLORS.dead_atp);
                             else if (n.deathReason === 'regen') _tempColor.copy(TYPE_COLORS.dead_regen);
                             else _tempColor.copy(TYPE_COLORS.dead);
+                        } else {
+                            if (n.statusFlags & FLAG_IS_INHIBITED) {
+                                _tempColor.copy(baseColor).multiplyScalar(0.2);
+                            } else {
+                                _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
+                            }
                         }
-                        else _tempColor.copy(TYPE_COLORS[n.type]).lerp(new THREE.Color(1,1,1), n.visualActivity);
+                        
                         m.mesh.setColorAt(n.meshIdx, _tempColor);
+                        if (selectedNeuronId === n.id) {
+                            updatePassportStatus(n);
+                        }
                     }
                 });
                 m.mesh.instanceColor.needsUpdate = true;
@@ -499,18 +525,18 @@ let ws;
     </div>
     
     <!-- Neuron Passport Panel -->
-    <div id="neuron-passport" style="display: none; position: absolute; top: 80px; right: 20px; width: 250px; background: rgba(0,10,20,0.85); border: 1px solid #00ffcc; border-radius: 4px; padding: 15px; color: #00ffcc; font-family: 'JetBrains Mono', monospace; font-size: 12px; box-shadow: 0 0 15px rgba(0,255,204,0.1); backdrop-filter: blur(5px);">
+    <div id="neuron-passport" style="display: none; position: absolute; top: 80px; right: 20px; width: 250px; background: rgba(0,10,20,0.85); border: 1px solid #00ffcc; border-radius: 4px; padding: 15px; color: #00ffcc; font-family: 'Courier New', monospace; font-size: 12px; box-shadow: 0 0 15px rgba(0,255,204,0.1); backdrop-filter: blur(5px); z-index: 100;">
         <div style="font-weight: bold; border-bottom: 1px solid rgba(0,255,204,0.3); padding-bottom: 5px; margin-bottom: 10px;">NEURON PASSPORT</div>
         <div>ID: <span id="np-id" style="color: white;">-</span></div>
         <div>Type: <span id="np-type" style="color: white;">-</span></div>
         <div>Column: [<span id="np-column" style="color: white;">-</span>]</div>
         <div>Layer: [<span id="np-layer" style="color: white;">-</span>]</div>
         <div>Minicolumn: [<span id="np-minicolumn" style="color: white;">-</span>]</div>
-        <div>Status: <span id="np-status" style="color: white;">-</span></div>
+        <div style="margin-top: 5px; color: #aaa;">Status: <span id="np-status" style="color: white;">-</span></div>
     </div>
 
     <!-- Color Mode Toggle -->
-    <div style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); border: 1px solid #00ffcc; border-radius: 4px; padding: 5px 10px; color: #00ffcc; font-family: monospace; font-size: 11px; cursor: pointer; user-select: none;" id="color-mode-toggle" onclick="toggleColorMode()">
+    <div style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); border: 1px solid #00ffcc; border-radius: 4px; padding: 5px 10px; color: #00ffcc; font-family: monospace; font-size: 11px; cursor: pointer; user-select: none; z-index: 100;" id="color-mode-toggle" onclick="toggleColorMode()">
         COLOR MODE: <span id="current-color-mode" style="color: white;">TYPE</span>
     </div>
 
