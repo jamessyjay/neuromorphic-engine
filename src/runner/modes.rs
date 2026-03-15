@@ -676,27 +676,29 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 5000;
     println!("--- EXECUTING SLEEP CYCLE TEST (Phase 35 Validation) ---");
     let mut graph = if let Some(loaded_snapshot) = BrainSnapshot::load_from_disk("brain_save.bin") {
         
         loaded_snapshot.graph
     } else {
-        setup_benchmark(1000, 10000)
+        println!("No pre-trained sleep graph found. Running normal test sequence...");
+        let mut g = NetworkGraph::new();
+        g.add_neuron(NeuronType::Pyramidal);
+        g
     };
 
-    let mut current_env = Environment {
-        global_oxygen_level: DEFAULT_OXYGEN,
+    let mut current_env = Environment { 
+        global_oxygen_level: DEFAULT_OXYGEN, 
         global_glucose_level: DEFAULT_GLUCOSE,
-        dopamine_multiplier: DEFAULT_DOPAMINE,
-        toxin_levels: DEFAULT_TOXINS,
+        dopamine_multiplier: DEFAULT_DOPAMINE, 
+        toxin_levels: DEFAULT_TOXINS, 
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
-            wakefulness_multiplier: 1.0,
+            wakefulness_multiplier: 1.0, 
     };
 
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
 
-    for tick in 1..=50000 {
+    for tick in 1..=crate::engine::constants::TOTAL_LONG_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         graph.tick(tick, current_env);
         
@@ -711,11 +713,11 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
             graph.initiate_sleep_cycle();
             let post_sleep_snapshot = graph.snapshot_synapses();
             NetworkGraph::diff_synapses(&pre_sleep_snapshot, &post_sleep_snapshot);
-            BrainSnapshot { current_tick: _total_ticks, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+            BrainSnapshot { current_tick: tick, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
             return Ok(());
         }
     }
-    BrainSnapshot { current_tick: _total_ticks, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
+    BrainSnapshot { current_tick: crate::engine::constants::TOTAL_LONG_TEST_TICKS, environment: Environment { global_oxygen_level: 1.0, global_glucose_level: 1.0, dopamine_multiplier: 1.0, toxin_levels: 0.0, light_level: 0.0, stdp_learning_rate: 0.1, wakefulness_multiplier: 1.0 }, graph: graph.clone() }.save_to_disk("brain_save.bin");
     Ok(())
 }
 
@@ -725,8 +727,8 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut graph = NetworkGraph::new();
     let p = graph.add_neuron(NeuronType::Pyramidal);
     let i = graph.add_neuron(NeuronType::Interneuron);
-    graph.connect(p, i, 10.0, 0, false, true);
-    graph.connect(i, p, 15.0, 0, true, true);
+    graph.connect(p, i, crate::engine::constants::WEIGHT_STRONG_BIAS, 0, false, true);
+    graph.connect(i, p, crate::engine::constants::WEIGHT_STRONG_BIAS, 0, true, false);
 
     let mut env = Environment { 
         global_oxygen_level: DEFAULT_OXYGEN, 
@@ -740,9 +742,9 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
-    for tick in 1..=1000 {
+    for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut env, tick);
-        graph.neurons[0].current_voltage += VOLTAGE_STEP;
+        graph.neurons[0].current_voltage += crate::engine::constants::VOLTAGE_INJECTION_STEP;
         graph.tick(tick, env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
@@ -770,8 +772,8 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
     let eye = graph.add_neuron(NeuronType::Photoreceptor);
     let brain = graph.add_neuron(NeuronType::Interneuron);
     let muscle = graph.add_neuron(NeuronType::Pyramidal);
-    graph.connect(eye, brain, 15.0, 0, false, true);
-    graph.connect(brain, muscle, 12.0, 0, false, false);
+    graph.connect(eye, brain, crate::engine::constants::WEIGHT_EYE_TO_BRAIN, 0, false, true);
+    graph.connect(brain, muscle, crate::engine::constants::WEIGHT_BRAIN_TO_MUSCLE, 0, false, false);
 
     let mut env = Environment { 
         global_oxygen_level: 1.0, 
@@ -785,7 +787,7 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
-    for tick in 1..=1200 {
+    for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         env.light_level = if (tick / 50) % 2 == 0 { LIGHT_HIGH } else { LIGHT_LOW };
         if (300..=800).contains(&tick) {
             env.dopamine_multiplier = BOOSTED_DOPAMINE;
@@ -835,14 +837,14 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let n1 = graph.add_neuron(NeuronType::Pyramidal);
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
     let n3 = graph.add_neuron(NeuronType::Pyramidal);
-    graph.connect(n1, n2, 15.0, 0, false, false);
-    graph.connect(n2, n3, 15.0, 0, false, false);
-    graph.connect(n3, n1, 15.0, 0, false, false);
-    graph.neurons[n1 as usize].current_voltage = 20.0;
+    graph.connect(n1, n2, crate::engine::constants::WEIGHT_EYE_TO_BRAIN, 0, false, false);
+    graph.connect(n2, n3, crate::engine::constants::WEIGHT_EYE_TO_BRAIN, 0, false, false);
+    graph.connect(n3, n1, crate::engine::constants::WEIGHT_EYE_TO_BRAIN, 0, false, false);
+    graph.neurons[n1 as usize].current_voltage = crate::engine::constants::VOLTAGE_FORCED_SPIKE;
 
     let mut results = vec![];
-    for tick in 0..3000 {
-        if tick == 300 { env.global_oxygen_level = HYPOXIC_OXYGEN; }
+    for tick in 0..crate::engine::constants::TOTAL_TEST_TICKS {
+        if tick == crate::engine::constants::HYPOXIA_TICK_TRIGGER { env.global_oxygen_level = HYPOXIC_OXYGEN; }
         stimulus_service.process_tick(&mut graph, &mut env, tick as u32);
         graph.tick(tick as u32, env);
         
@@ -852,7 +854,7 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 
         for n in &graph.neurons {
             total_atp += n.energy_atp;
-            avg_wear += n.metabolic_wear as f32 / 65535.0;
+            avg_wear += n.metabolic_wear as f32 / (crate::engine::constants::COORD_MAX as f32);
             if !n.is_alive == 1 { dead_count += 1; }
         }
 
@@ -881,7 +883,7 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let n1 = graph.add_neuron(NeuronType::Pacemaker);
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
-    graph.connect(n1, n2, 1.0, 0, false, true);
+    graph.connect(n1, n2, crate::engine::constants::WEIGHT_TEST_DEFAULT, 0, false, true);
 
     let mut weight_history = vec![];
     
@@ -918,8 +920,8 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let eye = graph.add_neuron(NeuronType::Photoreceptor);
     let f1_det = graph.add_neuron(NeuronType::Pyramidal);
     let f2_det = graph.add_neuron(NeuronType::Pyramidal);
-    graph.connect(eye, f1_det, 5.0, 0, false, true);
-    graph.connect(eye, f2_det, 5.0, 0, false, true);
+    graph.connect(eye, f1_det, crate::engine::constants::WEIGHT_TEST_DEFAULT, 0, false, true);
+    graph.connect(eye, f2_det, crate::engine::constants::WEIGHT_TEST_DEFAULT, 0, false, true);
     
     let mut current_env = Environment {
         global_oxygen_level: 1.0,  
@@ -933,7 +935,7 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
-    for tick in 1..=2000 {
+    for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         graph.tick(tick, current_env);
         
@@ -954,7 +956,6 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 3000;
     println!("--- EXECUTING EMERGENCE FROM CHAOS (Phase 29) ---");
     let mut graph = NetworkGraph::new();
     for _ in 0..500 { graph.add_neuron(NeuronType::Pyramidal); }
@@ -971,9 +972,11 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
-    for tick in 1..=3000 {
+    for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
+        if tick % 200 == 0 {
+            for i in 0..200 { graph.neurons[i].current_voltage += crate::engine::constants::VOLTAGE_INJECTION_STEP; }
+        }
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
-        for i in 0..200 { graph.neurons[i].current_voltage += 15.0; }
         graph.tick(tick, current_env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
@@ -986,21 +989,20 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_emergence_chart(&history, "graphs/emergence_growth.png")?;
-    finalize_and_save_snapshot(&graph, 3000, "reports/emergence_report.json", "brain_save.bin");
+    finalize_and_save_snapshot(&graph, crate::engine::constants::TOTAL_TEST_TICKS, "reports/emergence_report.json", "brain_save.bin");
     Ok(())
 }
 
 pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
-    let _total_ticks = 3000;
     println!("--- EXECUTING SYNAPTIC MORPHOLOGY AUDIT (Phase 30) ---");
     let mut graph = NetworkGraph::new();
     let source = graph.add_neuron(NeuronType::Pyramidal);
     let target = graph.add_neuron(NeuronType::Pyramidal);
-    graph.connect(source, target, 5.0, 0, false, false);
+    graph.connect(source, target, crate::engine::constants::WEIGHT_TEST_DEFAULT, 0, false, false);
     
     let mut current_env = Environment { 
         global_oxygen_level: DEFAULT_OXYGEN, 
-        global_glucose_level: DEFAULT_GLUCOSE, 
+        global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: MORPHOLOGY_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
@@ -1010,9 +1012,9 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     let mut history = vec![];
 
-    for tick in 1..=3000 {
+    for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
-        if tick % 25 == 0 { graph.neurons[source as usize].current_voltage += DEFAULT_WEIGHT * 17.5; }
+        if tick % 25 == 0 { graph.neurons[source as usize].current_voltage += crate::engine::constants::VOLTAGE_EMERGENCE_INJECTION; }
         graph.tick(tick, current_env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
@@ -1027,7 +1029,7 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     visualization::render_morphology_chart(&history, "graphs/morphology_audit.png")?;
-    finalize_and_save_snapshot(&graph, 3000, "reports/morphology_report.json", "brain_save.bin");
+    finalize_and_save_snapshot(&graph, crate::engine::constants::TOTAL_TEST_TICKS, "reports/morphology_report.json", "brain_save.bin");
 
     Ok(())
 }

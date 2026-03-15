@@ -290,3 +290,25 @@ pub const PRE_SEED_VOLTAGE: f32 = -30.0;
 pub const SCALING_BENCHMARK_TICKS: u32 = 500;
 /// Density multiplier: how many synapses per neuron we request in the benchmark
 pub const SCALING_SYNAPSE_DENSITY: usize = 10;
+
+// --- Connection Default Weights ---
+/// Synapse weight connecting an external eye/sensor to the first brain layer
+pub const WEIGHT_EYE_TO_BRAIN: f32 = 15.0;
+/// Synapse weight connecting the brain output to a motor/muscle node
+pub const WEIGHT_BRAIN_TO_MUSCLE: f32 = 12.0;
+/// Heavy synapse weight used to strongly bias network tests
+pub const WEIGHT_STRONG_BIAS: f32 = 10.0;
+/// Base testing connection weight
+pub const WEIGHT_TEST_DEFAULT: f32 = 5.0;
+/// Injected voltage step size during manual test ticks
+pub const VOLTAGE_INJECTION_STEP: f32 = 15.0;
+/// Supercharged voltage injection for emergence testing
+pub const VOLTAGE_EMERGENCE_INJECTION: f32 = 17.5;
+/// High voltage used to force a neuron to spike
+pub const VOLTAGE_FORCED_SPIKE: f32 = 20.0;
+/// Number of simulated test ticks
+pub const TOTAL_TEST_TICKS: u32 = 3000;
+/// Number of simulated long test ticks
+pub const TOTAL_LONG_TEST_TICKS: u32 = 50000;
+/// Hypoxic trigger for oxygen deprivation tests
+pub const HYPOXIA_TICK_TRIGGER: u32 = 300;
