@@ -79,6 +79,7 @@ fn test_z_boundaries() {
             5 => assert!(n.z >= LAYER_5_Z_MIN && n.z <= LAYER_5_Z_MAX, "L5 neuron {} has z {} out of bounds", n.id, n.z),
             4 => assert!(n.z >= LAYER_4_Z_MIN && n.z <= LAYER_4_Z_MAX, "L4 neuron {} has z {} out of bounds", n.id, n.z),
             2 => assert!(n.z >= LAYER_2_3_Z_MIN && n.z <= LAYER_2_3_Z_MAX, "L2/3 neuron {} has z {} out of bounds", n.id, n.z),
+            1 => assert!(n.z >= 60001 && n.z <= 65535, "L1 neuron {} has z {} out of bounds", n.id, n.z),
             _ => panic!("Unknown layer ID {}", n.layer_id),
         }
     }
@@ -89,10 +90,8 @@ fn test_radial_clustering() {
     let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 100);
     use neuromorphic_engine::engine::constants::*;
     
-    let spacing_x = COORD_SCALE / 5.0;
-    let spacing_y = COORD_SCALE / 2.0;
-    let column_centers_x: Vec<f32> = (0..5).map(|i| (spacing_x / 2.0) + (i as f32 * spacing_x)).collect();
-    let column_centers_y: Vec<f32> = (0..2).map(|i| (spacing_y / 2.0) + (i as f32 * spacing_y)).collect();
+    let column_centers_x: Vec<f32> = (0..5).map(|i| (i as f32) * 12000.0 + 10000.0).collect();
+    let column_centers_y: Vec<f32> = (0..2).map(|i| (i as f32) * 20000.0 + 10000.0).collect();
 
     for n in &graph.neurons {
         let center_x = column_centers_x[(n.column_id % 5) as usize];
