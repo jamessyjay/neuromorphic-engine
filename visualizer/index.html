@@ -61,7 +61,7 @@
 <body>
     <div id="ui-layer">
         <div class="panel">
-            <div><span class="label">ENGINE:</span> NEUROMORPHIC v0.3.7</div>
+            <div><span class="label">ENGINE:</span> THOUSAND BRAINS ENGINE v0.5.0</div>
             <div id="status">Status: CONNECTING...</div>
             <div id="tick">Tick: 0</div>
             <hr style="border: 0; border-top: 1px solid rgba(74, 222, 128, 0.2); margin: 5px 0;">
@@ -112,7 +112,111 @@
     <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        let ws;
+        
+        let colorMode = 'type'; // 'type' or 'layer'
+        let selectedNeuronId = null;
+        let retinaCtx = null;
+        const FLAG_IS_INHIBITED = 1;
+        const FLAG_IS_PREDICTIVE = 2;
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function getLayerName(layerId) {
+            switch(layerId) {
+                case 6: return "L6 - Location";
+                case 5: return "L5 - Output";
+                case 4: return "L4 - Input";
+                case 2: return "L2/3 - Identity";
+                case 1: return "L1 - Feedback";
+                default: return "Unknown";
+            }
+        }
+
+        function getTypeName(typeId) {
+            switch(typeId) {
+                case 0: return "Pyramidal";
+                case 2: return "Interneuron";
+                case 3: return "Pacemaker";
+                case 4: return "Purkinje";
+                case 5: return "Photoreceptor";
+                case 6: return "Nociceptor";
+                default: return "Unknown";
+            }
+        }
+
+        function toggleColorMode() {
+            colorMode = colorMode === 'type' ? 'layer' : 'type';
+            document.getElementById('current-color-mode').innerText = colorMode.toUpperCase();
+            document.getElementById('legend-type').style.display = colorMode === 'type' ? 'block' : 'none';
+            document.getElementById('legend-layer').style.display = colorMode === 'layer' ? 'block' : 'none';
+            
+            // Re-color all instances
+            if (window.lastTickData) {
+                updateVisuals(window.lastTickData);
+            }
+        }
+
+        window.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            // We need to raycast against all neuronMeshes
+            let closest = null;
+            let closestDist = Infinity;
+
+            for (const mData of neuronMeshes) {
+                const intersects = raycaster.intersectObject(mData.mesh);
+                if (intersects.length > 0) {
+                    if (intersects[0].distance < closestDist) {
+                        closestDist = intersects[0].distance;
+                        closest = { mesh: mData.mesh, instanceId: intersects[0].instanceId };
+                    }
+                }
+            }
+
+            if (closest) {
+                // Find nodeMap entry by matching mesh and instanceId (we need to store instanceId in nodeMap)
+                for (const [id, node] of nodeMap.entries()) {
+                    if (node.mesh === closest.mesh && node.instanceId === closest.instanceId) {
+                        selectedNeuronId = id;
+                        showPassport(node);
+                        break;
+                    }
+                }
+            } else {
+                selectedNeuronId = null;
+                document.getElementById('neuron-passport').style.display = 'none';
+            }
+        });
+
+        function showPassport(node) {
+            document.getElementById('neuron-passport').style.display = 'block';
+            document.getElementById('np-id').innerText = node.id;
+            document.getElementById('np-type').innerText = getTypeName(node.type);
+            document.getElementById('np-column').innerText = node.columnId;
+            document.getElementById('np-layer').innerText = getLayerName(node.layerId);
+            document.getElementById('np-minicolumn').innerText = node.minicolumnId;
+            updatePassportStatus(node);
+        }
+
+        function updatePassportStatus(node) {
+            let status = [];
+            if (node.statusFlags & FLAG_IS_PREDICTIVE) status.push("Predictive");
+            if (node.statusFlags & FLAG_IS_INHIBITED) status.push("Inhibited (WTA)");
+            if (node.vState > 0.8) status.push("Active (Spike)");
+            
+            if (status.length === 0) status.push("Idle");
+            document.getElementById('np-status').innerText = status.join(" | ");
+        }
+
+        window.addEventListener('load', () => {
+            const canvas = document.getElementById('retina-canvas');
+            if (canvas) retinaCtx = canvas.getContext('2d');
+        });
+
+let ws;
         let currentEnv = { dopamine: 1.0, lr: 0.1 };
         const nodeMap = new Map();
         let neuronMeshes = [];
@@ -190,16 +294,28 @@
                 neuronMeshes.push({ type: parseInt(t), mesh, currentIndex: 0 });
             });
 
+            
             data.neurons.forEach(n => {
                 const id = n[0], type = n[4];
-                let x = (n[1]/65535)*100-50, y = (n[2]/65535)*100-50, z = (n[3]/65535)*100-50;
-                if(type===5) x=-75; else if(type===4) x=75;
+                const columnId = n[5], layerId = n[6], minicolumnId = n[7];
+                // Map coordinates: Z scale x2 to make it look like a cylinder cake
+                let x = (n[1]/65535)*200-100;
+                let y = (n[2]/65535)*200-100;
+                let z = (n[3]/65535)*400-200;
+                
                 const mData = neuronMeshes.find(m => m.type === type);
                 if(mData) {
                     _dummy.position.set(x,y,z); _dummy.updateMatrix();
                     mData.mesh.setMatrixAt(mData.currentIndex, _dummy.matrix);
-                    mData.mesh.setColorAt(mData.currentIndex, TYPE_COLORS[type]);
-                    nodeMap.set(id, { x, y, z, type, meshIdx: mData.currentIndex, outgoing: [], visualActivity: 0, isAlive: true });
+                    
+                    nodeMap.set(id, { 
+                        id, x, y, z, type, 
+                        columnId, layerId, minicolumnId,
+                        mesh: mData.mesh, 
+                        instanceId: mData.currentIndex,
+                        statusFlags: 0,
+                        vState: 0
+                    });
                     mData.currentIndex++;
                 }
             });
@@ -375,5 +491,28 @@
         connect(); animate();
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
+
+    <!-- Virtual Retina Monitor -->
+    <div id="retina-container" style="position: absolute; bottom: 20px; left: 20px; width: 128px; height: 128px; background: rgba(0,0,0,0.8); border: 1px solid #00ffcc; border-radius: 4px; box-shadow: 0 0 10px rgba(0,255,204,0.2);">
+        <canvas id="retina-canvas" width="32" height="32" style="width: 100%; height: 100%; image-rendering: pixelated;"></canvas>
+        <div style="position: absolute; top: -20px; left: 0; color: #00ffcc; font-size: 10px; font-family: monospace; letter-spacing: 1px; text-shadow: 0 0 5px #00ffcc;">VIRTUAL RETINA</div>
+    </div>
+    
+    <!-- Neuron Passport Panel -->
+    <div id="neuron-passport" style="display: none; position: absolute; top: 80px; right: 20px; width: 250px; background: rgba(0,10,20,0.85); border: 1px solid #00ffcc; border-radius: 4px; padding: 15px; color: #00ffcc; font-family: 'JetBrains Mono', monospace; font-size: 12px; box-shadow: 0 0 15px rgba(0,255,204,0.1); backdrop-filter: blur(5px);">
+        <div style="font-weight: bold; border-bottom: 1px solid rgba(0,255,204,0.3); padding-bottom: 5px; margin-bottom: 10px;">NEURON PASSPORT</div>
+        <div>ID: <span id="np-id" style="color: white;">-</span></div>
+        <div>Type: <span id="np-type" style="color: white;">-</span></div>
+        <div>Column: [<span id="np-column" style="color: white;">-</span>]</div>
+        <div>Layer: [<span id="np-layer" style="color: white;">-</span>]</div>
+        <div>Minicolumn: [<span id="np-minicolumn" style="color: white;">-</span>]</div>
+        <div>Status: <span id="np-status" style="color: white;">-</span></div>
+    </div>
+
+    <!-- Color Mode Toggle -->
+    <div style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); border: 1px solid #00ffcc; border-radius: 4px; padding: 5px 10px; color: #00ffcc; font-family: monospace; font-size: 11px; cursor: pointer; user-select: none;" id="color-mode-toggle" onclick="toggleColorMode()">
+        COLOR MODE: <span id="current-color-mode" style="color: white;">TYPE</span>
+    </div>
+
 </body>
 </html>

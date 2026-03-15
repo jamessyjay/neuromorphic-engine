@@ -68,7 +68,7 @@ pub fn generate_initial_state(graph: &NetworkGraph) -> streamer::InitialStatePay
         synapses: Vec::with_capacity(graph.synapses.len()),
     };
     for n in &graph.neurons {
-        initial_state.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_));
+        initial_state.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_, n.column_id, n.layer_id, n.minicolumn_id));
     }
     for s in &graph.synapses {
         initial_state.synapses.push((s.source_id, s.target_id, s.weight));
@@ -116,7 +116,7 @@ pub fn broadcast_tick_update(
     for n in &graph.neurons {
         let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
         let visual_state = get_visual_state(n, tick, atp_pct);
-        update.neurons.push((n.id, visual_state, atp_pct));
+        update.neurons.push((n.id, visual_state, atp_pct, n.status_flags));
     }
     
     let msg = streamer::StreamMessage::TickUpdate(update);
@@ -1198,7 +1198,7 @@ pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
                     synapses: Vec::with_capacity(graph.synapses.len()),
                 };
                 for n in &graph.neurons {
-                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_));
+                    snapshot.neurons.push((n.id, n.x as f32, n.y as f32, n.z as f32, n.type_, n.column_id, n.layer_id, n.minicolumn_id));
                 }
                 for s in &graph.synapses {
                     snapshot.synapses.push((s.source_id, s.target_id, s.weight));
@@ -1308,7 +1308,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * crate::engine::constants::METRIC_MAX_F32;
                     let visual_state = get_visual_state(n, tick, atp_pct);
-                    update.neurons.push((n.id, visual_state, atp_pct));
+                    update.neurons.push((n.id, visual_state, atp_pct, n.status_flags));
                 }
                 
                 let msg = crate::monitor::streamer::StreamMessage::TickUpdate(update);
