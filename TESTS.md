@@ -119,25 +119,46 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 - **64. Test "HTM Predictive State Coincidence":** Validates Jeff Hawkins' active dendrites theory. Proves that contextual signals on Basal dendrites set the neuron into a "Predictive State" for 20 ticks. Verifies that a weak Proximal signal correctly triggers an action potential only while the predictive window is open (Coincidence Detection).
 
 ### 65. `test_atomic_hammer`
+
 **Location:** `tests/edge_cases_tests.rs`
 **Purpose:** Ensure `atomic_add_packed_voltage` reliably handles 512 concurrent sources spiking onto a single dendrite without data loss.
 
 ### 66. `test_sequence_recall`
+
 **Location:** `tests/edge_cases_tests.rs`
 **Purpose:** Verify HTM active dendrites. A -> B -> C forms a predictive chain. Spiking A causes B to enter predictive state, which then correctly propagates sequence memory without misfiring.
 
 ### 67. `test_seizure`
+
 **Location:** `tests/edge_cases_tests.rs`
 **Purpose:** Validate Homeostatic E/I balance. Provoking a massive spike wave on 50% of a 1000-neuron network should automatically regulate and calm down back to background noise levels within 500 ticks.
 
 ### 68. `test_signal_race_condition`
+
 **Location:** `tests/edge_cases_tests.rs`
 **Purpose:** Verify accurate synapse delivery delays. An unmyelinated spike (4 ticks) and myelinated spike (1 tick) triggered with precise offset must arrive and sum perfectly on the identical tick.
 
 ### 69. `test_metabolic_darwinism`
+
 **Location:** `tests/edge_cases_tests.rs`
 **Purpose:** Check long-term structural stability. Over 10,000 ticks of neurogenesis and microglial pruning, the total synapse count must remain stable and not cascade to 0 or infinity.
 
 ### 70. `test_inhibitory_stdp`
+
 **Location:** `tests/edge_cases_tests.rs`
 **Purpose:** Validate inhibitory plasticity. If a target is hyperactive, the inhibitory synapses connected to it must strengthen to suppress the activity.
+
+### 71. `test_no_orphan_neurons`
+
+**Location:** `tests/columnar_tests.rs`
+**Purpose:** Ensure that network generation eliminates orphan neurons. All neurons must have at least 3 outgoing synapses, and neurons in Layer 4 must project forward to Layer 2/3.
+
+### 72. `test_wta_suppression`
+
+**Location:** `tests/columnar_tests.rs`
+**Purpose:** Validate Winner-Takes-All (WTA) lateral inhibition in minicolumns. Ensures that when one neuron in a minicolumn spikes, other neurons in the same minicolumn are suppressed (hyperpolarized and flagged as inhibited).
+
+### 73. `test_sdr_activity_limit`
+
+**Location:** `tests/sparsity_tests.rs`
+**Purpose:** Verify Sparse Distributed Representation (SDR) tuning mechanism. Proves that if Layer 4 activity exceeds the target sparsity of 5%, homeostatic scaling dynamically raises the activation threshold to enforce sparsity.
