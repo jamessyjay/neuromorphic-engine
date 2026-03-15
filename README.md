@@ -14,6 +14,7 @@ For a deep dive into the architecture and logic of the project, visit the [docs/
 - 🧬 [Solution Architecture](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/02_solution_architecture.md) — Biological algorithms, chaos, and metabolism.
 - ⚗️ [API & FFI Reference](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/03_api_reference.md) — Bridges between Rust and C++.
 - 📊 [Visualization & Metrics](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/04_metrics_and_viz.md) — Guide to tests and result analysis.
+- [Project Structure](./docs/PROJECT_STRUCTURE.md)
 
 ---
 

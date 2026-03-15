@@ -48,6 +48,7 @@ The project follows a strict domain-driven modular architecture designed to clea
 ## **5. Dependencies & Requirements**
 
 ### **Rust Backends (Host)**
+
 * **tokio / warp**: Asynchronous runtime and WebSockets for the UI HUD.
 * **rayon**: Work-stealing parallelism for CPU-bound background services (Astrocytes, Telemetry).
 * **plotters**: Data visualization and metric chart rendering.
@@ -55,9 +56,11 @@ The project follows a strict domain-driven modular architecture designed to clea
 * **rand**: High-entropy stochastic seed generation.
 
 ### **C++ / CUDA Backend (Device)**
+
 * **CUDA Toolkit (v11+)**: Required for `nvcc` compilation and GPU acceleration.
 * **curand**: Hardware-accelerated device-side random number generation.
 * **C++ Compiler**: Clang/GCC for FFI integration during the `build.rs` phase.
 
 ### **Frontend**
+
 * **Vanilla HTML5 / JS**: Minimalist visualization (`visualizer/index.html`) using standard WebSocket API.

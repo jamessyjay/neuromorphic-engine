@@ -17,6 +17,7 @@ The primary computational element of the system is a heavily augmented Leaky Int
 ### **Active Dendrites and HTM (Predictive State)**
 
 The engine implements advanced dendritic logic inspired by the Thousand Brains Theory (HTM):
+
 - **Proximal Dendrites (Branch 0):** Act as direct feedforward inputs. Sufficient excitation here causes immediate somatic depolarization.
 - **Basal/Apical Dendrites (Branches 1-7):** Act as contextual predictors. Activation here does not trigger a spike but places the neuron into a **Predictive State**.
 - **Coincidence Detection:** If a feedforward signal arrives while the neuron is in a predictive state, the required voltage threshold for an action potential is significantly reduced.
@@ -24,6 +25,7 @@ The engine implements advanced dendritic logic inspired by the Thousand Brains T
 ### **Synaptic Plasticity (STDP and Dopamine Modulation)**
 
 Learning is implemented via Spike-Timing-Dependent Plasticity (STDP), modifying synaptic weights based on the causal relationship between pre-synaptic and post-synaptic spikes. The engine further incorporates a global Dopamine Modulator:
+
 - Reward signals (e.g., Pavlovian conditioning) trigger dopamine rushes.
 - High dopamine amplifies Long-Term Potentiation (LTP), solidifying active synaptic connections.
 - Neurotransmitter buffers simulate synaptic fatigue, preventing infinite high-frequency signal transmission.
@@ -49,6 +51,7 @@ A unique feature of the engine is the `EnvironmentRegulator`. It monitors the ho
 ### **Neurogenesis and Microglia (Structural Plasticity)**
 
 The network is not static:
+
 - **Neurogenesis:** Spatially aware stochastic sampling allows highly active neurons in close proximity to sprout new dendritic connections.
 - **Microglia:** A background service probabilistically prunes weak synapses that haven't transmitted signals recently, maintaining a clean network topology while respecting competitive minimum-synapse thresholds.
 
@@ -90,7 +93,7 @@ While the JSON streamer is asynchronous, packing massive arrays (100k+ neurons) 
 
 ### **VRAM Limitations for Dense Topology**
 
-Because the engine simulates individual synapses with explicit states (neurotransmitter buffers, refractory ticks, specific branch targets), heavily interconnected networks (high density) rapidly consume VRAM. 
+Because the engine simulates individual synapses with explicit states (neurotransmitter buffers, refractory ticks, specific branch targets), heavily interconnected networks (high density) rapidly consume VRAM.
 
 ### **Nursery Calibration**
 
@@ -101,6 +104,7 @@ The chaotic nature of the Gaussian-distributed weights means that without proper
 Audit results characterize the Neuromorphic Engine as a highly mature platform for computational neuroscience and biological AI modeling. The Rust and CUDA implementation ensures excellent scalability, while the deep biological mechanics open the path to creating systems that learn and adapt naturally.
 
 **Development Recommendations:**
+
 1. **Binary WebSockets Protocol**: Replace JSON strings in the streamer with a binary format to allow denser UI visualizer updates.
 2. **Multi-GPU Orchestration**: Expand the CUDA backend to partition the `NetworkGraph` across multiple GPUs to push beyond the 1-2 million synapse barrier.
 3. **Short-Term Plasticity (STP)**: Integrate short-term facilitation and depression models to better process fast time-series inputs.
