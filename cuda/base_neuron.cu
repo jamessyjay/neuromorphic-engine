@@ -658,4 +658,18 @@ void synchronize_device() {
     cudaDeviceSynchronize();
 #endif
 }
+
+void cleanup_gpu_resources(void* ptr) {
+    if (ptr == nullptr) return;
+#ifdef USE_CUDA
+    cudaDeviceSynchronize();
+    cudaFree(ptr);
+#else
+    // On CPU, we let Rust's Vec manage its own heap memory via its allocator, 
+    // but if we explicitly malloc'd something from C/C++, we'd free it here.
+    // Since Rust owns the Vec buffer, we don't call free(ptr) here to avoid double-free/segfaults, 
+    // UNLESS we allocated it via cudaMallocManaged equivalent on CPU mock.
+    // For pure CPU Rust ownership, this is a no-op.
+#endif
+}
 } // extern "C"

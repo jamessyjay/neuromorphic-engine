@@ -312,3 +312,18 @@ fn test_performance_scaling_tps() {
     }
     println!("{:-<15}-+-{:-<15}-+-{:-<15}-+-{:-<15}", "", "", "", "");
 }
+
+#[test]
+fn test_resource_cleanup_no_double_free() {
+    println!("--- EXECUTING RESOURCE CLEANUP TEST ---");
+    // Create and drop the graph 100 times to ensure RAII logic works 
+    // and doesn't crash with double free or segfaults.
+    for _ in 0..100 {
+        let mut graph = neuromorphic_engine::network::graph::NetworkGraph::new();
+        graph.add_neuron(neuromorphic_engine::engine::ffi::NeuronType::Pyramidal);
+        graph.add_neuron(neuromorphic_engine::engine::ffi::NeuronType::Photoreceptor);
+        graph.connect(0, 1, 1.0, 0, false, false);
+        // implicit drop happens here at the end of the loop
+    }
+    println!("✅ RESOURCE CLEANUP PASS: 100 graph drops handled safely.");
+}

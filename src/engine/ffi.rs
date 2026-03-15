@@ -107,4 +107,5 @@ extern "C" {
 
     pub fn init_neuron(neuron: *mut BaseNeuron, id: u32, type_: NeuronType, seed: u32);
     pub fn synchronize_device();
+    pub fn cleanup_gpu_resources(ptr: *mut std::ffi::c_void);
 }

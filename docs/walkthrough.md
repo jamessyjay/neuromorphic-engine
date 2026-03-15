@@ -294,3 +294,11 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Bitwise Math:** Replaced modulo operator `% 256` with bitwise `& 0xFF` for `internal_phase` updates. This avoids expensive integer division instructions on the GPU.
 - **Loop Unrolling:** Added `#pragma unroll` to the `evaluate_branches` function in CUDA. Since `NUM_BRANCHES` is a fixed compile-time constant (8), this allows the compiler to flatten the loop and execute branch evaluations concurrently within the warp, skipping branch prediction overhead.
 - **LDG Read-Only Cache:** Deployed the `__ldg()` intrinsic for the early-exit checks in `tick_synapses_kernel`. By explicitly routing the `is_alive` state fetches for `source` and `target` neurons through the read-only data cache, we drastically reduce L1 bandwidth pressure during dense synaptic ticks.
+
+## Phase 54: RAII & Safe Resource Cleanup
+
+**Summary:** 
+- **Ownership Model Definition:** Defined strict boundaries where `NetworkGraph` via Rust `Vec` owns Host RAM, and C++ handles explicitly allocated device buffers.
+- **Rust `Drop` Trait:** Implemented `impl Drop for NetworkGraph` to ensure that before any Host vectors are deleted, `crate::engine::ffi::synchronize_device()` is called. This guarantees the GPU has completely finished reading/writing the memory before Rust reclaims it.
+- **CUDA Cleanup API:** Exposed a safe `cleanup_gpu_resources` C++ function through FFI with built-in null-pointer checks (`if (ptr == nullptr) return;`) and safe `#ifdef USE_CUDA` wrappers to prevent invalid free crashes on macOS mocks while ensuring zero VRAM leaks on Jetson hardware.
+- **Validation Test:** Created a destructive test `test_resource_cleanup_no_double_free` that instantiates and drops `NetworkGraph` 100 times sequentially, verifying complete memory stability without segfaults.

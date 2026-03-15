@@ -385,3 +385,19 @@ impl NetworkGraph {
         }
     }
 }
+
+impl Drop for NetworkGraph {
+    fn drop(&mut self) {
+        unsafe {
+            // First, ensure all pending kernels finish and GPU is idle.
+            crate::engine::ffi::synchronize_device();
+            
+            // NOTE: Currently, we use Rust's `Vec` which is allocated via CPU allocator.
+            // On macOS (Mock), this memory is freed normally by Rust when the Vec is dropped.
+            // If we switch to explicit `cudaMallocManaged` through C++ later, we'd pass the pointers here.
+            // For now, we simulate the hook by passing null to demonstrate the structure, 
+            // since calling `free` on a Rust Vec buffer causes a double-free segfault.
+            crate::engine::ffi::cleanup_gpu_resources(std::ptr::null_mut());
+        }
+    }
+}

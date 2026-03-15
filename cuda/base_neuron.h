@@ -247,3 +247,14 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed);
 
 } // extern "C"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void cleanup_gpu_resources(void* ptr);
+void synchronize_device();
+
+#ifdef __cplusplus
+}
+#endif
