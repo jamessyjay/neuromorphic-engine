@@ -577,6 +577,9 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 extern "C" {
 
     void tick_neuron_cpu(BaseNeuron* neuron, BaseNeuron* all_neurons, int count, Environment env, uint32_t current_tick) {
+        (void)all_neurons;
+        (void)count;
+        
         // Phase 3 (WTA reset) and SDR threshold happen in Rust tick() loop before this
         
         if (!neuron->is_alive) {
