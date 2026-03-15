@@ -106,6 +106,9 @@ static inline __device__ void die_gracefully(BaseNeuron* n, uint8_t reason, uint
 
 // Atomic function: metabolism
 static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, uint32_t current_tick) {
+    if (current_tick == 5005 && n->id == 0) {
+        printf("Neuron 0 ATP: %f, Leak: %f\n", n->energy_ATP, BASELINE_LEAK_RATE);
+    }
 
     if (!n->is_alive) {
         n->dead_ticks += 1;
@@ -270,9 +273,9 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     }
 
     // Phase 18 Fix: "Metabolic Coma" (Safety Valve)
-    if (n->energy_ATP < n->max_atp * 0.10f) {
-        n->current_voltage = n->resting_voltage;
-        return;
+    if (n->energy_ATP < 20.0f) {
+        n->current_voltage = n->resting_voltage; // Go to sleep
+        return; // CANNOT fire if energy is below 20
     }
 
     // Specialized cell behaviors in idle state

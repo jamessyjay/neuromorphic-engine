@@ -37,7 +37,7 @@ extern "C" {
 #define ACTION_POTENTIAL_PEAK 40.0f
 
 // Metabolic parameters (Phase 40)
-#define ATP_RECOVERY_RATE 0.15f
+#define ATP_RECOVERY_RATE 1.5f
 #define ATP_SPIKE_COST 25.0f
 #define GLUCOSE_CONVERSION_RATE 0.2f
 #define MIN_GLUCOSE_LEVEL 0.1f

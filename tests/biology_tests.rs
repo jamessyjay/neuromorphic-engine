@@ -69,6 +69,7 @@ fn test_mitochondrial_failure() {
     let mut env = default_env();
     env.global_glucose_level = 0.05; // Critical glucose
     env.global_oxygen_level = 0.4; // Hypoxia required for death
+    env.wakefulness_multiplier = 0.0; // Disable recovery so passive drain can kill them
 
     for tick in 5001..=5500 {
         // Minimal activity to burn ATP slowly
@@ -112,6 +113,7 @@ fn test_oxygen_deprivation() {
     
     let mut env = default_env();
     env.global_oxygen_level = 0.0; // Total hypoxia
+    env.wakefulness_multiplier = 0.0; // Disable recovery so passive drain can kill them
 
     for n in &mut graph.neurons {
         n.energy_atp = 0.1; // Set very low ATP so they die almost instantly

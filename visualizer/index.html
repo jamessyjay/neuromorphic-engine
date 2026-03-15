@@ -250,8 +250,14 @@
                     data.neurons.forEach(n => {
                         const nData = nodeMap.get(n[0]);
                         if (nData) {
-                            if (n[2] <= 0 && nData.isAlive) { nData.isAlive = false; deadToday++; }
-                            if (n[1] === 2.0 && nData.isAlive) {
+                            if (n[1] >= 3.0 && nData.isAlive) {
+                                nData.isAlive = false;
+                                deadToday++;
+                                if (n[1] === 3.0) nData.deathReason = 'calcium';
+                                else if (n[1] === 4.0) nData.deathReason = 'atp';
+                                else nData.deathReason = 'regen';
+                            }
+                            if (n[1] === 1.0 && nData.isAlive) {
                                 spikesToday++; nData.visualActivity = 1.0;
                                 if (activePulses.length < MAX_PULSES) {
                                     nData.outgoing.forEach(syn => {
