@@ -289,14 +289,35 @@
 
             data.neurons.forEach(n => {
                 const id = n[0], type = n[4];
-                let x = (n[1]/65535)*100-50, y = (n[2]/65535)*100-50, z = (n[3]/65535)*100-50;
-                if(type===5) x=-75; else if(type===4) x=75;
+                const columnId = n[5] || 0;
+                const layerId = n[6] || 0;
+                const minicolumnId = n[7] || 0;
+
+                let x = (n[1] / 65535) * 200 - 100;
+                let y = (n[2] / 65535) * 200 - 100;
+                let z = (n[3] / 65535) * 400 - 200;
+
                 const mData = neuronMeshes.find(m => m.type === type);
-                if(mData) {
-                    _dummy.position.set(x,y,z); _dummy.updateMatrix();
+                if (mData) {
+                    _dummy.position.set(x, y, z);
+                    _dummy.updateMatrix();
                     mData.mesh.setMatrixAt(mData.currentIndex, _dummy.matrix);
-                    mData.mesh.setColorAt(mData.currentIndex, TYPE_COLORS[type]);
-                    nodeMap.set(id, { x, y, z, type, meshIdx: mData.currentIndex, outgoing: [], visualActivity: 0, isAlive: true });
+                    
+                    let initialColor = TYPE_COLORS[type] || new THREE.Color(0xffffff);
+                    mData.mesh.setColorAt(mData.currentIndex, initialColor);
+
+                    nodeMap.set(id, { 
+                        id, x, y, z, type, 
+                        columnId, layerId, minicolumnId,
+                        meshIdx: mData.currentIndex,
+                        instanceId: mData.currentIndex,
+                        mesh: mData.mesh,
+                        outgoing: [], 
+                        visualActivity: 0, 
+                        isAlive: true,
+                        statusFlags: 0,
+                        vState: 0
+                    });
                     mData.currentIndex++;
                 }
             });
