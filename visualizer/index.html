@@ -289,12 +289,12 @@
 
             data.neurons.forEach(n => {
                 const id = n[0], type = n[4];
-                const columnId = n[5] || 0;
-                const layerId = n[6] || 0;
-                const minicolumnId = n[7] || 0;
+                const columnId = n[5] !== undefined ? n[5] : 0;
+                const layerId = n[6] !== undefined ? n[6] : 0;
+                const minicolumnId = n[7] !== undefined ? n[7] : 0;
 
-                let x = (n[1] / 65535) * 200 - 100;
-                let y = (n[2] / 65535) * 200 - 100;
+                let x = (n[1] / 65535) * 600 - 300;
+                let y = (n[2] / 65535) * 600 - 300;
                 let z = (n[3] / 65535) * 400 - 200;
 
                 const mData = neuronMeshes.find(m => m.type === type);

@@ -89,9 +89,10 @@ fn test_radial_clustering() {
     let graph = neuromorphic_engine::runner::modes::setup_benchmark(10000, 100);
     use neuromorphic_engine::engine::constants::*;
     
-    let spacing = COORD_SCALE / 5.0; 
-    let column_centers_x: Vec<f32> = (0..5).map(|i| 10000.0 + (i as f32 * spacing * 100.0)).collect();
-    let column_centers_y: Vec<f32> = (0..2).map(|i| 10000.0 + (i as f32 * spacing * 100.0)).collect();
+    let spacing_x = COORD_SCALE / 5.0;
+    let spacing_y = COORD_SCALE / 2.0;
+    let column_centers_x: Vec<f32> = (0..5).map(|i| (spacing_x / 2.0) + (i as f32 * spacing_x)).collect();
+    let column_centers_y: Vec<f32> = (0..2).map(|i| (spacing_y / 2.0) + (i as f32 * spacing_y)).collect();
 
     for n in &graph.neurons {
         let center_x = column_centers_x[(n.column_id % 5) as usize];
