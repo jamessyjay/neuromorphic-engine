@@ -53,7 +53,7 @@ The project uses a strict domain-driven module structure. Do not place everythin
 ### 1. TECHNOLOGY STACK
 
 - **RUST (Host/CPU):** Orchestrator. Manages ticks, memory, and `Environment`. It is prohibited to use `.unwrap()` unnecessarily.
-- **C++ / CUDA C (Device/GPU):** Massively parallel mathematics. Only **Unified Memory** (`cudaMallocManaged`). 
+- **C++ / CUDA C (Device/GPU):** Massively parallel mathematics. Only **Unified Memory** (`cudaMallocManaged`).
 
 ### 2. HETEROGENEITY AND CHAOS
 
@@ -105,8 +105,9 @@ Any new feature must pass the rigorous validation suites in `tests/`:
 1. **Task Analysis:** Do I understand the task? Which formula from `./specs/` is needed? If not — ASK!
 2. **Search for existing code:** Check `src/` (in proper subdirectories) and `cuda/` folders for ready-made tools.
 3. **Planning (FFI):** Ensure that types `f32` (Rust) and `float` (C++) match exactly. Be hyper-aware of `#[repr(C)]` alignment!
-4. **Implementation:** Write atomic functions. Follow SOLID.
-5. **Verification:** Run `cargo test`. Ensure 100% tests pass.
+4. **Create tasks checklist** Create checklist with a list of tasks whicb are about to be executed. After every completed task mark the task in the checklist as completed. Review the checklist before proceeding with the next task (maybe it is already done)
+5. **Implementation:** Write atomic functions. Follow SOLID.
+6. **Verification:** Run `cargo test`. Ensure 100% tests pass.
 
 ---
 
