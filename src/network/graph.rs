@@ -218,7 +218,7 @@ impl NetworkGraph {
     }
 
     pub fn tick(&mut self, current_tick: u32, env: crate::engine::ffi::Environment) {
-        // Phase 3: Сброс (happens at the beginning of tick)
+        // Phase 3: Reset (happens at the beginning of tick)
         for n in &mut self.neurons {
             n.status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
         }

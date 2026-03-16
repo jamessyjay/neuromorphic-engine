@@ -135,15 +135,19 @@ fn test_sequence_recall() {
         // C should be predictive at B_spike + delay (20 ticks)? 
         // Wait, if B is just predictive, it won't actually spike unless stimulated.
         // If B doesn't spike, C won't get a signal! 
-        // The prompt says: "На тике 100 дать спайк только нейрону A. Assert: На тике 110 нейрон B должен перейти в predictive_ticks > 0. На тике 120 нейрон C должен перейти в predictive_ticks > 0."
-        // For C to become predictive without B spiking, the STDP must have formed a strong connection A -> C or B must spike from the predictive state? 
-        // But basal dendrite doesn't trigger spike. 
-        // Let's force B to spike if it's predictive, or maybe the test implies A -> C connection somehow? No, A -> B -> C.
+        // The prompt says: "At tick 100 spike only neuron A. Assert: At tick 110 neuron B should have predictive_ticks > 0. At tick 120 neuron C should have predictive_ticks > 0."
+        
+        // Let's actually execute the test as described:
+        
+        // Wait, "Chain of neurons: A -> B -> C... At tick 100 spike only A... At tick 120 neuron C should have predictive_ticks > 0". 
+        // We need synapses to form first! We haven't created any synapses.
+        
+        // But prompt says "Connections via basal dendrites (Branch 1-7)."it's predictive, or maybe the test implies A -> C connection somehow? No, A -> B -> C.
         // If B only gets predictive, it doesn't fire. Thus C receives no signal.
-        // Wait, "Цепочка нейронов: A -> B -> C... На тике 100 дать спайк только A... На тике 120 нейрон C должен перейти в predictive_ticks > 0". 
+        // Wait, "Chain of neurons: A -> B -> C... At tick 100 spike only A... At tick 120 neuron C should have predictive_ticks > 0". 
         // This means B MUST FIRE. But B is only connected via Basal dendrite. Basal dendrite causes Predictive state, not spike!
         // To make B fire, A would need to connect to B's PROXIMAL dendrite (Branch 0). 
-        // But prompt says "Связи через базальные дендриты (Branch 1-7)."
+        // But prompt says "Connections via basal dendrites (Branch 1-7)."
         // Is there another mechanism? Spontaneous thermal noise might trigger B if it's predictive (+15mV offset).
         // Let's just follow the prompt exactly and see. 
         if t == 21 {

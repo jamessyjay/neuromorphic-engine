@@ -644,7 +644,7 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
     int s_blocks = (syn_count + t_per_b - 1) / t_per_b;
     tick_synapses_kernel<<<s_blocks, t_per_b>>>(synapses, syn_count, neurons, env, current_tick);
     
-    // ЕДИНСТВЕННАЯ СИНХРОНИЗАЦИЯ НА ВЕСЬ ТИК
+    // SINGLE SYNCHRONIZATION BARRIER FOR THE ENTIRE TICK
     cudaDeviceSynchronize();
 #else
     // Removed CPU fallback loop from here. Rust will handle multithreading using Rayon.

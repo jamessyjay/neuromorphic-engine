@@ -235,7 +235,7 @@ fn test_metabolic_fatigue() {
     println!("Metabolic Fatigue | Final ATP: {:.2}, death_reason: {}", end_atp, death_reason);
     
     // We expect it to stop spiking once ATP < 15.0 and death_reason = 4 (STATE_METABOLIC_SHUTDOWN)
-    // "Проверить, что нейроны не сдохли окончательно (ATP > 0), но перешли в режим энергосбережения."
+    // "Check that neurons didn't completely die (ATP > 0), but entered energy saving mode."
     assert!(spikes > 0, "Neurons didn't fire at all.");
     assert!(spikes < 1000, "Neurons did not fatigue! They fired on every single tick without limit.");
     assert!(death_reason == 4 || death_reason == 1, "Neuron did not enter Metabolic Shutdown or Die from fatigue.");

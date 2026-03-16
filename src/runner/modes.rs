@@ -310,7 +310,7 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     // Force memory coalescing after generation
     graph.optimize_memory_layout();
 
-    // 1. Elimination of Orphans (TЗ №4)
+    // 1. Elimination of Orphans
     let mut outgoing_synapses: Vec<Vec<u32>> = vec![Vec::new(); graph.neurons.len()];
     for s in &graph.synapses {
         outgoing_synapses[s.source_id as usize].push(s.target_id);
