@@ -354,9 +354,11 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Persistence Layer Synchronization:** Discarded all raw occurrences of manually built `BrainSnapshot` at the end of runtime methods (`run_benchmark_mode` and `run_simulation`), defaulting to the static `BrainSnapshot::save_test_snapshot` helper or `finalize_and_save_snapshot` to stop accidental overriding of actual progression ticks down to tick 3. Tests consistently recover gracefully without data loss.
 
 ### Documentation Sync
+
 - **Project Structure Rewrite:** Complete overhaul of `docs/PROJECT_STRUCTURE.md` to accurately reflect the Domain-Driven Rust/CUDA Neuromorphic Engine architecture, rather than the old template contents.
 
 ### Cortical Column Architecture (v0.5.0) - FFI Layer Rewrite
+
 - **Expanded BaseNeuron (256 bytes):** Restructured the core `BaseNeuron` struct strictly aligned to 64-byte boundaries (cache lines) pushing total size to exactly 256 bytes.
 - **Reference Frames & WTA:** Added `column_id`, `minicolumn_id`, `layer_id`, `status_flags` (with `FLAG_IS_INHIBITED`), and reference coordinates `ref_coord_x/y` paving the way for full Cortical Column implementation.
 - **Dendritic Array Growth:** Expanded `branches` from 8 to 16, adding definitions for `BRANCH_MASK_PROXIMAL`, `BRANCH_MASK_DISTAL`, and `BRANCH_MASK_APICAL`.
@@ -365,6 +367,7 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **Full Alignment Testing:** Created `test_memory_alignment` and patched test files ensuring that `BaseNeuron` exactly matches `256` bytes and `Compartment` remains perfectly tight at `8` bytes without implicit rustc padding interference.
 
 ### Testing Layer Update (v0.5.0) - Cortical Column Validation
+
 - **Hardware JSON Saturation (2x Payload):** Expanded the size limit in `test_json_saturation` to 10MB to accommodate the new 256-byte `BaseNeuron` size.
 - **Reference Frame Persistence:** Added `test_l6_coord_persistence` into `biology_tests.rs` verifying that `ref_coord_x` and `ref_coord_y` are perfectly recovered during binary Bincode serialization.
 - **Dendritic Roles:** Implemented `test_dendritic_role_separation` verifying that Branches 0-3 (Proximal) cause immediate somatic spikes, while Branches 4-15 (Distal/Apical) trigger the HTM Predictive state without massive immediate depolarization.
@@ -372,12 +375,14 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - **SDR Sparsity Targets:** Added `sparsity_tests.rs` simulating global noise across 1000 nodes, confirming that WTA mechanisms reliably clamp concurrent spikes down to the biological 2-15% SDR sparsity bounds.
 
 ### Dictatorship of Inhibition & Connectivity (v0.6.0)
+
 - **Elimination of Orphans:** Integrated network setup logic that rigidly ensures every generated neuron possesses at least 3 outgoing synapses, strictly forbidding "orphan" neurons from existing isolated from the graph. Further rules compel Layer 4 neurons to consistently map outputs to Layer 2/3.
 - **WTA Inhibition Enforcement:** Introduced full Winner-Take-All lateral inhibition scaling using `FLAG_IS_INHIBITED`. Within any given minicolumn, the first pyramidal/interneuron to surpass activation threshold spikes and suppresses the rest of the minicolumn, hyperpolarizing losers and halting their output. Executed simultaneously across Rust (CPU fallback) and CUDA.
 - **SDR Homeostatic Tuning:** Activated dynamic Sparse Distributed Representation (SDR) tuning specific to Layer 4. The engine actively calculates total firing activity and gracefully scales the activation threshold of Layer 4 neurons per tick, forcing activity down towards a targeted 5% sparsity baseline.
 - **UI Inhibited State Visualization:** Augmented the WebGL visualizer (`index.html`) to dim the opacity/brightness of any neuron dynamically flagged as inhibited (`FLAG_IS_INHIBITED`) by 90% during its active suppression window.
 
 ### HTM Temporal Memory & Inter-Column Voting (v0.7.0)
+
 - **Distal Predictive State Activation:** Fully instantiated distal dendrites (branches 4-11). Reaching a threshold potential on a distal dendrite now sets the neuron into a Predictive State (`FLAG_IS_PREDICTIVE`) for 20 ticks rather than triggering a spike. A predicted neuron is partially depolarized, dramatically reducing the requisite proximal voltage necessary to force an action potential.
 - **Minicolumn Bursting:** Injected true HTM Bursting mechanics to the WTA phase. If a feedforward signal hits a minicolumn and exactly ONE neuron is correctly in a Predictive State, that neuron wins instantly and the rest are silenced (sparse representation). If *no* neuron in the minicolumn is predictive (an unrecognized, novel stimulus), the entire minicolumn undergoes "Bursting" - all 20 neurons fire simultaneously to force new associative learning.
 - **Horizontal Voting (L2/3 to Distal):** Mapped long-range L2/3 to L2/3 synapses exclusively to distal branches. Columns actively participating in a recognized pattern now transmit predictive voting signals to distal branches of neighboring columns, forcing systemic consensus across the global layer.
@@ -387,7 +392,8 @@ To secure the biological integrity and hardware stability of the engine, a compl
 
 **Objective**: Expand physics validation to cover structural Logic Integrity (prediction decay, sequence learning with surprise, cross-column voting, metabolic fatigue) and fix underlying bugs found during test creation.
 
-### What was done:
+### What was done
+
 1. **Added `tests/logic_integrity.rs`:**
    - `test_prediction_decay`: Asserts `predictive_ticks` count properly decreases to zero.
    - `test_sequence_learning_and_surprise`: Validates standard sequence learning followed by an unexpected (Surprise) pattern triggering a Minicolumn Burst.
@@ -406,11 +412,13 @@ To secure the biological integrity and hardware stability of the engine, a compl
    - Relaxed overly tight thermal noise boundaries in `test_stdp_associative_persistence_under_noise` to allow natural noise spikes without triggering false positive "Epilepsy" failures.
    - Adjusted `test_nmda_multiplexing_logical_and`'s sub-stimulus injection to accurately reflect the corrected dendritic summation scaling gain.
 
-### Verification:
+### Verification
+
 - Run `cargo test`: **ALL 79 tests PASS successfully.**
 - Architecture validation: Stable state and no regressions in existing physics parameters.
 
-### Logic Constraints Fixes (Iteration 2):
+### Logic Constraints Fixes (Iteration 2)
+
 1. **test_metabolic_fatigue**: The neuron failed to reach `STATE_METABOLIC_SHUTDOWN` because it died instantly (`DEATH_ATP_LOW`) before completing the test ticks. Fixed by appropriately tweaking initial `energy_atp` levels and lowering global oxygen/glucose to prevent instantaneous death while successfully hitting `STATE_METABOLIC_SHUTDOWN`.
 2. **test_sequence_learning_and_surprise**: The test initially failed because predicting neurons were getting trapped in the `refractory_time_left` and `last_spike_tick` blocks during `wta_and_burst`, leading to exactly 0 spikes in the "Recognition" phase. This happened because the distal synapses triggered actual spikes (via `passive_leak` + `BASAL_SOMA_GAIN`) before the actual Recognition tick.
     - **Fix:** Clamped the synaptic weight for testing `A -> B` from `5.0` to `1.0` so it correctly only activates the `FLAG_IS_PREDICTIVE` state without prematurely forcing a somatic spike.
