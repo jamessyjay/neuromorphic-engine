@@ -489,8 +489,8 @@ __device__ inline void unpack_wta(unsigned long long int packed, float* v, uint3
 
 __device__ unsigned long long int minicolumn_winners[50000]; // Assume max 1000 columns * 50 minicolumns
 
-// Optimized Kernel 1: Only Neuron Biology (Metabolism, Calcium, Spiking)
-__global__ void tick_neurons_prepare_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
+// Phase 1: Neuron Biology (Metabolism, Calcium) and WTA Vote
+__global__ void tick_neurons_prep_and_vote_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
 
@@ -518,15 +518,8 @@ __global__ void tick_neurons_prepare_kernel(BaseNeuron* neurons, int count, Envi
     
     // Thermal Noise
     n->current_voltage += get_thermal_noise(n->id, current_tick);
-}
-
-__global__ void wta_and_burst_vote_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= count) return;
-
-    BaseNeuron* n = &neurons[idx];
-    if (!n->is_alive) return;
-
+    
+    // WTA Voting Phase
     if (n->type != TYPE_PYRAMIDAL && n->type != TYPE_INTERNEURON) return;
 
     if (n->current_voltage > n->activation_threshold) {
@@ -640,19 +633,18 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 #ifdef USE_CUDA
     int t_per_b = THREADS_PER_BLOCK;
     int n_blocks = (count + t_per_b - 1) / t_per_b;
-    tick_neurons_prepare_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
-    cudaDeviceSynchronize(); 
-
-    // Phase 2: WTA Vote
-    wta_and_burst_vote_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
-    cudaDeviceSynchronize();
     
-    // Phase 3: WTA Apply and Spike
+    // Phase 1: Prepare and Vote
+    tick_neurons_prep_and_vote_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
+    
+    // Phase 2: WTA Apply and Spike
     wta_apply_and_spike_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
-    cudaDeviceSynchronize();
     
+    // Phase 3: Synapses
     int s_blocks = (syn_count + t_per_b - 1) / t_per_b;
     tick_synapses_kernel<<<s_blocks, t_per_b>>>(synapses, syn_count, neurons, env, current_tick);
+    
+    // ЕДИНСТВЕННАЯ СИНХРОНИЗАЦИЯ НА ВЕСЬ ТИК
     cudaDeviceSynchronize();
 #else
     // Removed CPU fallback loop from here. Rust will handle multithreading using Rayon.
