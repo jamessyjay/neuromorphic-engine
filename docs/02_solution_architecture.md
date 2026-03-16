@@ -91,3 +91,12 @@ If a neuron spikes too frequently, its `activation_threshold` dynamically increa
 
 - The higher the wear, the slower ATP regenerates.
 - This limits the maximum discharge frequency of the neuron over long periods and simulates biological fatigue. Sleep cycles periodically flush out this wear.
+
+## 6. Logic Integrity & HTM Integration
+
+To ensure stable learning and continuous operation without mathematically crashing or saturating, the engine enforces strict logic constraints:
+
+- **Sequence Learning & Surprise:** Predictable sequences cause specific neurons to anticipate signals via their distal dendrites. If a completely unpredicted signal (Surprise) hits a Minicolumn where zero neurons were in a predictive state, a **Minicolumn Burst** occurs (all neurons in the column fire) to represent the novelty of the stimulus.
+- **Cross-Column Voting:** Sparse Distributed Representations (SDR) across the network build consensus. If multiple neurons across different minicolumns send contextual signals to a specific target column, those votes accumulate, reinforcing the correct prediction and suppressing noise.
+- **Metabolic Fatigue:** Continuous bursting or high-frequency firing drains ATP faster than it can be restored. This creates a natural rate-limit, elevating the neuron's dynamic activation threshold and preventing runaway feedback loops (Epilepsy).
+

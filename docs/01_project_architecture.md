@@ -95,3 +95,9 @@ For each single tick (1 tick = 1 ms biological time):
     - *Microglia* (Every 500 ticks)
     - *Neurogenesis* (Every 1000 ticks)
 5. **Rust (Monitor):** Pushes decoupled UDP/WebSocket telemetry packages to visualizer clients.
+
+### Logic Constraints Layer
+Rust implements a series of safety and architectural constraints above the raw mathematics to maintain structural logic:
+- **Metabolic Limits:** Ensures no neuron or cluster can continuously fire unconstrained.
+- **Dendritic Context:** Validates HTM sequences and manages minicolumn bursting during anomaly detection.
+- **Voting Consensus:** Allows Sparse Distributed Representations to converge on correct predictive patterns.
