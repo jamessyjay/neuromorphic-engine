@@ -90,6 +90,51 @@ fn test_sequence_learning() {
 }
 
 #[test]
+fn test_wta_bulletin_board_o1() {
+    let mut graph = NetworkGraph::new();
+    
+    // Create 5 pyramidal neurons in the same minicolumn
+    for _ in 0..5 {
+        let n = graph.add_neuron(NeuronType::Pyramidal);
+        graph.neurons[n as usize].column_id = 42;
+        graph.neurons[n as usize].minicolumn_id = 7;
+        graph.neurons[n as usize].current_voltage = -60.0; // below threshold
+    }
+    
+    // Artificially raise voltage of neuron 3 to win
+    graph.neurons[3].current_voltage = 50.0; // Clearly above threshold
+    graph.neurons[3].status_flags |= constants::FLAG_IS_PREDICTIVE; // Must be predictive to inhibit others!
+    graph.neurons[1].current_voltage = 10.0; // Also above threshold, but lower than 3
+    
+    let env = default_env();
+    graph.tick(1, env);
+    
+    #[cfg(feature = "cuda")]
+    {
+        // For CUDA, we can verify via FFI directly
+        let mut out_v = 0.0f32;
+        let mut out_id = 0u32;
+        unsafe {
+            neuromorphic_engine::engine::ffi::debug_get_minicolumn_winner(42, 7, &mut out_v, &mut out_id);
+        }
+        
+        assert_eq!(out_id, 4, "Neuron with index 3 should have won the WTA bulletin board (its ID is 4)");
+        assert!(out_v > 1049.0 && out_v < 1055.0, "Winner voltage should be around 1050 (50 + 1000 for predictive)");
+        
+        // Verify others are inhibited
+        assert_eq!((graph.neurons[1].status_flags & constants::FLAG_IS_INHIBITED) != 0, true, "Neuron 1 should be inhibited");
+        assert_eq!((graph.neurons[3].status_flags & constants::FLAG_IS_INHIBITED) == 0, true, "Neuron 3 (winner) should NOT be inhibited");
+    }
+    
+    #[cfg(not(feature = "cuda"))]
+    {
+        // In CPU mode, the WTA broadcast isn't fully using the bulletin board in the same way, but the result should be the same.
+        assert_eq!((graph.neurons[1].status_flags & constants::FLAG_IS_INHIBITED) != 0, true, "Neuron 1 should be inhibited");
+        assert_eq!((graph.neurons[3].status_flags & constants::FLAG_IS_INHIBITED) == 0, true, "Neuron 3 (winner) should NOT be inhibited");
+    }
+}
+
+#[test]
 fn test_column_bursting() {
     let mut graph = NetworkGraph::new();
     

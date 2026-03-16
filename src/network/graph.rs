@@ -231,31 +231,23 @@ impl NetworkGraph {
             });
 
             // Phase 2: WTA and Bursting
-            use std::collections::{HashMap, HashSet};
-            let mut minicolumn_winners: HashMap<(u16, u8), u32> = HashMap::new();
-            let mut predictive_crossed: HashSet<(u16, u8)> = HashSet::new();
+            use std::collections::HashMap;
+            // Map from (column_id, minicolumn_id) -> (winner_id, winner_v, is_predictive)
+            let mut minicolumn_winners: HashMap<(u16, u8), (u32, f32, bool)> = HashMap::new();
             
             for n in &self.neurons {
                 if n.is_alive == 1 && n.current_voltage > n.activation_threshold && (n.type_ == 0 || n.type_ == 2) {
                     let key = (n.column_id, n.minicolumn_id);
                     let is_pred = (n.status_flags & crate::engine::constants::FLAG_IS_PREDICTIVE) != 0;
+                    let effective_v = if is_pred { n.current_voltage + 1000.0 } else { n.current_voltage };
                     
-                    if is_pred {
-                        let was_not_predictive = !predictive_crossed.contains(&key);
-                        predictive_crossed.insert(key);
-                        if was_not_predictive {
-                            minicolumn_winners.insert(key, n.id);
-                        } else {
-                            let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
-                            if n.id < *current_winner {
-                                *current_winner = n.id;
-                            }
+                    if let Some(current_winner) = minicolumn_winners.get_mut(&key) {
+                        let (_, winner_eff_v, _) = *current_winner;
+                        if effective_v > winner_eff_v || (effective_v == winner_eff_v && n.id < current_winner.0) {
+                            *current_winner = (n.id, effective_v, is_pred);
                         }
-                    } else if !predictive_crossed.contains(&key) {
-                        let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
-                        if n.id < *current_winner {
-                            *current_winner = n.id;
-                        }
+                    } else {
+                        minicolumn_winners.insert(key, (n.id, effective_v, is_pred));
                     }
                 }
             }
@@ -263,18 +255,16 @@ impl NetworkGraph {
             for n in &mut self.neurons {
                 if n.is_alive == 1 && (n.type_ == 0 || n.type_ == 2) {
                     let key = (n.column_id, n.minicolumn_id);
-                    if let Some(&winner_id) = minicolumn_winners.get(&key) {
-                        if predictive_crossed.contains(&key) {
-                            if n.id != winner_id {
-                                n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
-                                n.current_voltage = n.resting_voltage - 10.0;
-                                n.refractory_time_left = 5.0;
-                            }
-                        } else {
-                            // Bursting
+                    if let Some(&(winner_id, _, winner_was_predictive)) = minicolumn_winners.get(&key) {
+                        if !winner_was_predictive {
+                            // Surprise! Bursting (No predictive neurons crossed threshold)
                             if n.current_voltage <= n.activation_threshold {
                                 n.current_voltage = n.activation_threshold + 5.0;
                             }
+                        } else if n.id != winner_id {
+                            n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
+                            n.current_voltage = n.resting_voltage - 10.0;
+                            n.refractory_time_left = 5.0;
                         }
                     }
                 }

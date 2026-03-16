@@ -120,6 +120,7 @@ extern "C" {
     pub fn init_neuron(neuron: *mut BaseNeuron, id: u32, type_: NeuronType, seed: u32);
     pub fn synchronize_device();
     pub fn cleanup_gpu_resources(ptr: *mut std::ffi::c_void);
+    pub fn debug_get_minicolumn_winner(column_id: u16, minicolumn_id: u8, out_v: *mut f32, out_id: *mut u32);
 }
 
 #[cfg(test)]

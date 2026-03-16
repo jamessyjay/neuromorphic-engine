@@ -466,6 +466,29 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
 }
 
 #ifdef USE_CUDA
+// --- WTA BIT-PACKING ---
+// Bits 0-31: float max_v (Voltage)
+// Bits 32-53: uint32_t winner_id (22 bits, max ~4 million neurons)
+// Bits 54-63: uint16_t tick_mask (10 bits, current_tick % 1024)
+
+__device__ inline unsigned long long int pack_wta(float v, uint32_t id, uint16_t tick_mask) {
+    uint32_t v_bits = __float_as_uint(v);
+    unsigned long long int packed = 0;
+    packed |= (unsigned long long int)v_bits;
+    packed |= ((unsigned long long int)(id & 0x3FFFFF) << 32);
+    packed |= ((unsigned long long int)(tick_mask & 0x3FF) << 54);
+    return packed;
+}
+
+__device__ inline void unpack_wta(unsigned long long int packed, float* v, uint32_t* id, uint16_t* tick_mask) {
+    uint32_t v_bits = (uint32_t)(packed & 0xFFFFFFFF);
+    *v = __uint_as_float(v_bits);
+    *id = (uint32_t)((packed >> 32) & 0x3FFFFF);
+    *tick_mask = (uint16_t)((packed >> 54) & 0x3FF);
+}
+
+__device__ unsigned long long int minicolumn_winners[50000]; // Assume max 1000 columns * 50 minicolumns
+
 // Optimized Kernel 1: Only Neuron Biology (Metabolism, Calcium, Spiking)
 __global__ void tick_neurons_prepare_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -497,7 +520,7 @@ __global__ void tick_neurons_prepare_kernel(BaseNeuron* neurons, int count, Envi
     n->current_voltage += get_thermal_noise(n->id, current_tick);
 }
 
-__global__ void wta_and_burst_kernel(BaseNeuron* neurons, int count, uint32_t current_tick) {
+__global__ void wta_and_burst_vote_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
 
@@ -506,86 +529,78 @@ __global__ void wta_and_burst_kernel(BaseNeuron* neurons, int count, uint32_t cu
 
     if (n->type != TYPE_PYRAMIDAL && n->type != TYPE_INTERNEURON) return;
 
-    bool any_crossed = false;
-    bool any_predictive_crossed = false;
-    uint32_t best_pred_id = 0xFFFFFFFF;
-    float best_pred_v = -1000.0f;
-
-    for (int i = 0; i < count; i++) {
-        BaseNeuron* other = &neurons[i];
-        if (other->column_id == n->column_id && other->minicolumn_id == n->minicolumn_id && other->is_alive) {
-            if (other->current_voltage > other->activation_threshold) {
-                any_crossed = true;
-                bool is_pred = (other->status_flags & FLAG_IS_PREDICTIVE) != 0;
-                if (is_pred) {
-                    any_predictive_crossed = true;
-                    if (other->current_voltage > best_pred_v || (other->current_voltage == best_pred_v && other->id < best_pred_id)) {
-                        best_pred_v = other->current_voltage;
-                        best_pred_id = other->id;
-                    }
+    if (n->current_voltage > n->activation_threshold) {
+        int winner_idx = n->column_id * 50 + n->minicolumn_id;
+        
+        unsigned long long int* addr_as_ull = &minicolumn_winners[winner_idx];
+        unsigned long long int assumed, old = *addr_as_ull;
+        uint16_t current_tick_mask = current_tick % 1024;
+        
+        do {
+            assumed = old;
+            
+            float old_v;
+            uint32_t old_id;
+            uint16_t old_tick;
+            unpack_wta(assumed, &old_v, &old_id, &old_tick);
+            
+            bool is_pred = (n->status_flags & FLAG_IS_PREDICTIVE) != 0;
+            float effective_v = is_pred ? n->current_voltage + 1000.0f : n->current_voltage;
+            
+            unsigned long long int new_val;
+            
+            if (old_tick != current_tick_mask) {
+                new_val = pack_wta(effective_v, n->id, current_tick_mask);
+            } else {
+                if (effective_v > old_v || (effective_v == old_v && n->id < old_id)) {
+                    new_val = pack_wta(effective_v, n->id, current_tick_mask);
+                } else {
+                    break;
                 }
             }
-        }
-    }
-
-    if (any_crossed) {
-        if (any_predictive_crossed) {
-            if (n->id != best_pred_id) {
-                n->status_flags |= FLAG_IS_INHIBITED;
-                n->current_voltage = n->resting_voltage - 10.0f;
-                n->refractory_time_left = 5.0f;
-            }
-        } else {
-            // Bursting!
-            if (n->current_voltage <= n->activation_threshold) {
-                n->current_voltage = n->activation_threshold + 5.0f;
-            }
-        }
+            
+            old = atomicCAS(addr_as_ull, assumed, new_val);
+        } while (assumed != old);
     }
 }
 
-__global__ void tick_neurons_spike_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
+__global__ void wta_apply_and_spike_kernel(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
     
     BaseNeuron* n = &neurons[idx];
     if (!n->is_alive) return;
 
-    process_spike(n, env, current_tick);
-}
-
-// Optimized Kernel 2(BaseNeuron* neurons, int count, uint32_t current_tick) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= count) return;
-
-    BaseNeuron* n = &neurons[idx];
-    if (!n->is_alive) return;
-
-    // Only pyramidal and interneurons participate in minicolumn WTA
-    if (n->type != TYPE_PYRAMIDAL && n->type != TYPE_INTERNEURON) return;
-
-    // Check if any *other* neuron in the same minicolumn spiked THIS tick
-    bool suppressed = false;
-    for (int i = 0; i < count; i++) {
-        if (i == idx) continue;
-        BaseNeuron* other = &neurons[i];
-        if (other->column_id == n->column_id && other->minicolumn_id == n->minicolumn_id) {
-            if (other->last_spike_tick == current_tick) {
-                // Determine winner if both spiked (e.g. lower ID wins or higher voltage won)
-                // If the other neuron spiked and has a lower ID, it wins the tie-breaker
-                if (n->last_spike_tick != current_tick || other->id < n->id) {
-                    suppressed = true;
-                    break;
+    if (n->type == TYPE_PYRAMIDAL || n->type == TYPE_INTERNEURON) {
+        int winner_idx = n->column_id * 50 + n->minicolumn_id;
+        unsigned long long int winner_entry = minicolumn_winners[winner_idx];
+        
+        float w_v;
+        uint32_t w_id;
+        uint16_t w_tick;
+        unpack_wta(winner_entry, &w_v, &w_id, &w_tick);
+        
+        uint16_t current_tick_mask = current_tick % 1024;
+        
+        if (w_tick == current_tick_mask) {
+            bool am_i_predictive = (n->status_flags & FLAG_IS_PREDICTIVE) != 0;
+            // The winner's v is > 500 if they were predictive
+            bool winner_was_predictive = w_v > 500.0f;
+            
+            if (am_i_predictive && !winner_was_predictive) {
+                // Surprise! Bursting (No predictive neurons)
+                if (n->current_voltage <= n->activation_threshold) {
+                    n->current_voltage = n->activation_threshold + 5.0f;
                 }
+            } else if (n->id != w_id) {
+                n->status_flags |= FLAG_IS_INHIBITED;
+                n->current_voltage = n->resting_voltage - 10.0f;
+                n->refractory_time_left = 5.0f;
             }
         }
     }
 
-    if (suppressed) {
-        n->status_flags |= FLAG_IS_INHIBITED;
-        n->current_voltage = n->resting_voltage;
-        n->refractory_time_left = 5.0f; // Set refractory to 5 ticks as per spec
-    }
+    process_spike(n, env, current_tick);
 }
 
 // Optimized Kernel 2: Parallel Synapse Processing (Axon delivery & binding)
@@ -625,11 +640,15 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 #ifdef USE_CUDA
     int t_per_b = THREADS_PER_BLOCK;
     int n_blocks = (count + t_per_b - 1) / t_per_b;
-    tick_neurons_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
+    tick_neurons_prepare_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
     cudaDeviceSynchronize(); 
 
-    // Phase 2: WTA Broadcast
-    wta_broadcast_kernel<<<n_blocks, t_per_b>>>(neurons, count, current_tick);
+    // Phase 2: WTA Vote
+    wta_and_burst_vote_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
+    cudaDeviceSynchronize();
+    
+    // Phase 3: WTA Apply and Spike
+    wta_apply_and_spike_kernel<<<n_blocks, t_per_b>>>(neurons, count, env, current_tick);
     cudaDeviceSynchronize();
     
     int s_blocks = (syn_count + t_per_b - 1) / t_per_b;
@@ -786,4 +805,30 @@ void cleanup_gpu_resources(void* ptr) {
     // For pure CPU Rust ownership, this is a no-op.
 #endif
 }
+
+void debug_get_minicolumn_winner(uint16_t column_id, uint8_t minicolumn_id, float* out_v, uint32_t* out_id) {
+#ifdef USE_CUDA
+    int winner_idx = column_id * 50 + minicolumn_id;
+    unsigned long long int packed;
+    cudaMemcpyFromSymbol(&packed, minicolumn_winners, sizeof(unsigned long long int), winner_idx * sizeof(unsigned long long int));
+    
+    float v;
+    uint32_t id;
+    uint16_t tick_mask;
+    
+    uint32_t v_bits = (uint32_t)(packed & 0xFFFFFFFF);
+    float tmp_v;
+    memcpy(&tmp_v, &v_bits, sizeof(float));
+    *out_v = tmp_v;
+    
+    *out_id = (uint32_t)((packed >> 32) & 0x3FFFFF);
+#else
+    // CPU fallback is not supported for this global symbol logic right now
+    (void)column_id;
+    (void)minicolumn_id;
+    *out_v = 0.0f;
+    *out_id = 0;
+#endif
+}
+
 } // extern "C"
