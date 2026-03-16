@@ -256,7 +256,12 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     if (n->refractory_time_left > 0.0f) {
         n->refractory_time_left -= 1.0f; 
         n->current_voltage = n->resting_voltage - HYPERPOLARIZATION_OFFSET; // Hyperpolarization
-        if (n->predictive_ticks > 0) n->predictive_ticks--;
+        if (n->predictive_ticks > 0) {
+            n->predictive_ticks--;
+            if (n->predictive_ticks == 0) {
+                n->status_flags &= ~FLAG_IS_PREDICTIVE;
+            }
+        }
         return; 
     }
 

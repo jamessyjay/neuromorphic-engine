@@ -241,10 +241,15 @@ impl NetworkGraph {
                     let is_pred = (n.status_flags & crate::engine::constants::FLAG_IS_PREDICTIVE) != 0;
                     
                     if is_pred {
+                        let was_not_predictive = !predictive_crossed.contains(&key);
                         predictive_crossed.insert(key);
-                        let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
-                        if n.id < *current_winner {
-                            *current_winner = n.id;
+                        if was_not_predictive {
+                            minicolumn_winners.insert(key, n.id);
+                        } else {
+                            let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
+                            if n.id < *current_winner {
+                                *current_winner = n.id;
+                            }
                         }
                     } else if !predictive_crossed.contains(&key) {
                         let current_winner = minicolumn_winners.entry(key).or_insert(n.id);
