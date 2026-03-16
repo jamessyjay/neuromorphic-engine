@@ -358,7 +358,7 @@ fn test_htm_predictive_state_coincidence() {
     unsafe { tick_neuron_prepare_cpu(&mut neuron, env.clone(), 1); tick_neuron_spike_cpu(&mut neuron, env.clone(), 1); }
     
     println!("predictive_ticks: {}, current_voltage: {}, resting: {}, threshold: {}", neuron.predictive_ticks, neuron.current_voltage, neuron.resting_voltage, neuron.activation_threshold);
-    assert_eq!(neuron.predictive_ticks, 19, "Neuron should enter Predictive State for 20 ticks");
+    assert_eq!(neuron.predictive_ticks, 20, "Neuron should enter Predictive State for 20 ticks");
     assert!(neuron.current_voltage < neuron.activation_threshold, "Context alone MUST NOT trigger a spike");
     
     // Phase 2: Weak signal arrives on Proximal branch 0 while in Predictive State

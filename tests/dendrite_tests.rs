@@ -283,7 +283,7 @@ fn test_dendritic_role_separation() {
     // Distal should set Predictive State, but NOT depolarize significantly
     println!("Predictive Ticks: {}, Target Resting: {:.2}, Current V: {:.2}, Thresh: {:.2}, Flags: {}", 
              graph.neurons[2].predictive_ticks, target_resting, graph.neurons[2].current_voltage, graph.neurons[2].activation_threshold, graph.neurons[2].status_flags);
-    assert_eq!(graph.neurons[2].predictive_ticks, 19, "Distal branch must trigger Predictive State");
+    assert_eq!(graph.neurons[2].predictive_ticks, 20, "Distal branch must trigger Predictive State");
     assert!(graph.neurons[2].current_voltage > target_resting + 5.0 && graph.neurons[2].current_voltage < target_resting + 30.0, "Distal should cause a 15.0mV predictive boost, not a massive spike");
 
     // Phase 2: Fire Proximal (Branch 2)
