@@ -154,6 +154,13 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
     
     n->energy_ATP -= passive_drain;
 
+    if (n->predictive_ticks > 0) {
+        n->predictive_ticks--;
+        if (n->predictive_ticks == 0) {
+            n->status_flags &= ~FLAG_IS_PREDICTIVE;
+        }
+    }
+
     // Glucose processing
     if (env.global_glucose_level > MIN_GLUCOSE_LEVEL && n->energy_ATP < n->max_atp * GLUCOSE_CONVERT_ATP_RATIO) {
         n->energy_ATP += GLUCOSE_CONVERSION_RATE;
@@ -256,12 +263,7 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     if (n->refractory_time_left > 0.0f) {
         n->refractory_time_left -= 1.0f; 
         n->current_voltage = n->resting_voltage - HYPERPOLARIZATION_OFFSET; // Hyperpolarization
-        if (n->predictive_ticks > 0) {
-            n->predictive_ticks--;
-            if (n->predictive_ticks == 0) {
-                n->status_flags &= ~FLAG_IS_PREDICTIVE;
-            }
-        }
+
         return; 
     }
 
@@ -270,12 +272,6 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         // Boost voltage to trigger easier
         if (n->current_voltage < n->resting_voltage + PREDICTIVE_VOLTAGE_BOOST) {
             n->current_voltage = n->resting_voltage + PREDICTIVE_VOLTAGE_BOOST;
-        }
-        n->predictive_ticks--;
-        if (n->predictive_ticks == 0) {
-            n->status_flags &= ~FLAG_IS_PREDICTIVE;
-            // Explicitly remove the predictive boost so we return to normal resting state
-            n->current_voltage = fmaxf(n->resting_voltage, n->current_voltage - PREDICTIVE_VOLTAGE_BOOST);
         }
     }
 
@@ -677,6 +673,7 @@ extern "C" {
 
     void tick_neuron_spike_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
         if (!neuron->is_alive) return;
+        if ((neuron->status_flags & (1 << 0)) != 0) return; // FLAG_IS_INHIBITED
         process_spike(neuron, env, current_tick);
     }
 
