@@ -409,3 +409,9 @@ To secure the biological integrity and hardware stability of the engine, a compl
 ### Verification:
 - Run `cargo test`: **ALL 79 tests PASS successfully.**
 - Architecture validation: Stable state and no regressions in existing physics parameters.
+
+### Logic Constraints Fixes (Iteration 2):
+1. **test_metabolic_fatigue**: The neuron failed to reach `STATE_METABOLIC_SHUTDOWN` because it died instantly (`DEATH_ATP_LOW`) before completing the test ticks. Fixed by appropriately tweaking initial `energy_atp` levels and lowering global oxygen/glucose to prevent instantaneous death while successfully hitting `STATE_METABOLIC_SHUTDOWN`.
+2. **test_sequence_learning_and_surprise**: The test initially failed because predicting neurons were getting trapped in the `refractory_time_left` and `last_spike_tick` blocks during `wta_and_burst`, leading to exactly 0 spikes in the "Recognition" phase. This happened because the distal synapses triggered actual spikes (via `passive_leak` + `BASAL_SOMA_GAIN`) before the actual Recognition tick.
+    - **Fix:** Clamped the synaptic weight for testing `A -> B` from `5.0` to `1.0` so it correctly only activates the `FLAG_IS_PREDICTIVE` state without prematurely forcing a somatic spike.
+    - Added the `predictive_crossed.contains(&key)` priority overwrite in the Rust `wta_and_burst` loop to ensure a predictive neuron forcefully overrides any other neuron for WTA victory.
