@@ -217,8 +217,9 @@ typedef struct alignas(64) {
     float activation_threshold;
     float resting_voltage;
     float spike_trace;
+    float external_input;
     
-    uint8_t _pad_block1[32];
+    uint8_t _pad_block1[28];
     
     // --- Block 2 (64-127 bytes): Biochemistry and Reference Frames ---
     float energy_ATP;

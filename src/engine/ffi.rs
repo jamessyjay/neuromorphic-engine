@@ -45,8 +45,9 @@ pub struct BaseNeuron {
     pub activation_threshold: f32,
     pub resting_voltage: f32,
     pub spike_trace: f32,
+    pub external_input: f32,
     
-    pub _pad_block1: [u8; 32],
+    pub _pad_block1: [u8; 28],
     
     // --- Block 2 (64-127 bytes): Biochemistry and Reference Frames ---
     pub energy_atp: f32,

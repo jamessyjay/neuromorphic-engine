@@ -307,8 +307,8 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         n->current_voltage += PACEMAKER_DEPOLARIZATION;
     } else if (n->type == TYPE_PHOTORECEPTOR) {
         // Sensory Input Summation (Phase 50.1)
-        // Allows incoming synaptic currents to sum with external stimuli
-        float target_v = PHOTO_HYPERPOLARIZED + (1.0f - env.light_level) * (PHOTO_DARK_CURRENT - PHOTO_HYPERPOLARIZED);
+        // Use individual external_input (0.0 = black, 1.0 = white pixel)
+        float target_v = PHOTO_HYPERPOLARIZED + (1.0f - n->external_input) * (PHOTO_DARK_CURRENT - PHOTO_HYPERPOLARIZED);
         float delta_v = (target_v - n->current_voltage) * PHOTO_ACTIVATION_SPEED;
         
         n->current_voltage += delta_v;
@@ -699,6 +699,7 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->type = type;
     neuron->spike_trace = 0.0f;
     neuron->predictive_ticks = 0; 
+    neuron->external_input = 0.0f; // Default black pixel
     
     uint32_t local_seed = seed + id;
 

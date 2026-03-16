@@ -57,8 +57,10 @@ fn test_photoreceptor_dark_current() {
 fn test_photoreceptor_light_bleach() {
     let mut graph = NetworkGraph::new();
     let id = graph.add_neuron(NeuronType::Photoreceptor);
-    let mut env = default_env();
-    env.light_level = 1.0; // Max light
+    let env = default_env();
+    
+    // Set individual pixel brightness to max
+    graph.neurons[id as usize].external_input = 1.0; 
     
     for tick in 1..=100 {
         graph.tick(tick, env.clone());
