@@ -172,3 +172,10 @@ This document outlines the testing strategy for the Neuromorphic Engine. It is d
 
 **Location:** `tests/htm_tests.rs`
 **Purpose:** Validate Minicolumn Bursting. When a new, unpredicted stimulus arrives at a minicolumn and no neuron is in a Predictive State, the entire minicolumn fires simultaneously (Bursting).
+
+### Logic Integrity Tests (`logic_integrity.rs`)
+
+- **76. test_prediction_decay:** Validates that HTM predictive state correctly decays after 20 ticks.
+- **77. test_sequence_learning_and_surprise:** Ensures sequence learning works, and unexpected stimuli trigger Minicolumn Bursting.
+- **78. test_cross_column_voting:** Verifies that multiple neurons in different columns voting for the same predictive state mutually reinforce each other.
+- **79. test_metabolic_fatigue:** Validates that high continuous firing reduces ATP, eventually triggering fatigue and dynamic threshold increases.

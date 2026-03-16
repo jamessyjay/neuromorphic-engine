@@ -586,7 +586,7 @@ impl NetworkGraph {
             let b_type = rng.random_range(1..=3) as u8;
             n.branches[idx].branch_type = b_type;
             n.branches[idx].nmda_threshold = NMDA_THRESHOLD_PACKED;
-            n.branches[idx].voltage = ZERO_VOLTAGE_PACKED; // 0.0f is packed as (0 + 100) * 100 = 10000
+            n.branches[idx].voltage = 0; // 0 means pack_voltage(-100.0), which is minimum inactive state
             n.branches[idx].refractory_timer = 0;
         }
     }

@@ -233,14 +233,14 @@ fn test_nmda_multiplexing_logical_and() {
     n_dist.branches[4].nmda_threshold = pack_voltage(40.0);
     n_focus.branches[0].nmda_threshold = pack_voltage(40.0);
     
-    let sub_stimulus = 25.0; // Two of these is 50.0 (> 40.0)
-    
     // Action A (Distributed)
-    n_dist.branches[0].voltage = pack_voltage(sub_stimulus);
-    n_dist.branches[4].voltage = pack_voltage(sub_stimulus);
+    // Distributed inputs: enough to cause some passive transfer, but not enough to cross threshold
+    n_dist.branches[0].voltage = pack_voltage(-40.0);
+    n_dist.branches[4].voltage = pack_voltage(-40.0);
     
     // Action B (Focused)
-    n_focus.branches[0].voltage = pack_voltage(sub_stimulus * 2.0);
+    // Focused inputs: crosses NMDA threshold of 40.0
+    n_focus.branches[0].voltage = pack_voltage(50.0);
     
     unsafe {
         tick_neuron_prepare_cpu(&mut n_dist, env.clone(), 1); tick_neuron_spike_cpu(&mut n_dist, env.clone(), 1);

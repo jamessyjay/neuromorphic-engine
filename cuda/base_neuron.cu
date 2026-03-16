@@ -191,7 +191,7 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         // Refractory period for branch
         if (b->refractory_timer > 0) {
             b->refractory_timer--;
-            b->voltage = pack_voltage(0.0f);
+            b->voltage = pack_voltage(-100.0f);
             continue;
         }
 
@@ -199,10 +199,12 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
         float threshold = unpack_voltage(b->nmda_threshold);
 
         // Branch Signal Decay (Phase 33/34)
-        v *= BRANCH_LEAK_COEFF;
+        // Decay towards resting voltage (-70mV approx), not 0.
+        v = -70.0f + (v - (-70.0f)) * BRANCH_LEAK_COEFF;
         
         // Passive Leak Gap (Small percentage leak every tick)
-        float passive_leak = v * PASSIVE_LEAK_PERCENT;
+        // Only leak the DEPOLARIZATION above resting potential
+        float passive_leak = fmaxf(0.0f, v - (-70.0f)) * PASSIVE_LEAK_PERCENT;
         n->current_voltage += passive_leak;
         v -= passive_leak;
         
@@ -220,19 +222,25 @@ static inline __device__ void evaluate_branches(BaseNeuron* n) {
                 // Instead, enter Predictive State for 20 ticks.
                 n->predictive_ticks = 20;
                 n->status_flags |= (1 << 1); // FLAG_IS_PREDICTIVE
+#ifndef USE_CUDA
+                if (n->id == 2) printf("Distal branch triggered. V before: %.2f\n", n->current_voltage);
+#endif
+
             }
             
-            v = 0.0f; // Reset branch after spike
+            v = -100.0f; // Reset branch after spike
             b->refractory_timer = BRANCH_REFRACTORY_TICKS; // Block for N ticks
         } else {
             // Passive transfer based on type
+            // Only transfer depolarization above resting (-70mV)
+            float v_above_rest = fmaxf(0.0f, v - (-70.0f));
             if (b->branch_type == 1) { // Basal
-                soma_impact = v * BASAL_SOMA_GAIN;
+                soma_impact = v_above_rest * BASAL_SOMA_GAIN;
             } else if (b->branch_type == 2) { // Trunk
-                soma_impact = v * TRUNK_MULTIPLIER;
+                soma_impact = v_above_rest * TRUNK_MULTIPLIER;
                 n->energy_ATP -= TRUNK_PASSIVE_COST_MULTIPLIER; // Trunk actively costs energy
             } else if (b->branch_type == 3) { // Tuft
-                soma_impact = v * TUFT_MULTIPLIER;
+                soma_impact = v_above_rest * TUFT_MULTIPLIER;
             }
             n->current_voltage += soma_impact;
         }
@@ -261,6 +269,8 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
         n->predictive_ticks--;
         if (n->predictive_ticks == 0) {
             n->status_flags &= ~FLAG_IS_PREDICTIVE;
+            // Explicitly remove the predictive boost so we return to normal resting state
+            n->current_voltage = fmaxf(n->resting_voltage, n->current_voltage - PREDICTIVE_VOLTAGE_BOOST);
         }
     }
 
