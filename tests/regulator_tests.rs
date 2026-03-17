@@ -1,5 +1,6 @@
 use neuromorphic_engine::engine::environment::EnvironmentRegulator;
 use neuromorphic_engine::engine::ffi::Environment;
+use serial_test::serial;
 
 fn mock_base_env() -> Environment {
     Environment {
@@ -14,6 +15,7 @@ fn mock_base_env() -> Environment {
 }
 
 #[test]
+#[serial]
 fn test_regulator_perfect_conditions() {
     let mut regulator = EnvironmentRegulator::new();
     let base = mock_base_env();
@@ -27,6 +29,7 @@ fn test_regulator_perfect_conditions() {
     assert_eq!(env.global_glucose_level, 1.0, "Glucose should remain at 100% under perfect conditions");
 }
 
+#[serial]
 #[test]
 fn test_regulator_sudden_lag() {
     let mut regulator = EnvironmentRegulator::new();

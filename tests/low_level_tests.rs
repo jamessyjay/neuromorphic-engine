@@ -1,6 +1,7 @@
 use neuromorphic_engine::network::graph::NetworkGraph;
 use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse};
 use std::time::Instant;
+use serial_test::serial;
 
 fn default_env() -> Environment {
     Environment {
@@ -15,6 +16,7 @@ fn default_env() -> Environment {
 
 // 36. Test "The Pure Grid"
 #[test]
+#[serial]
 fn test_pure_grid_neurogenesis() {
     let sizes = [1000, 2000, 4000, 8000];
     let mut prev_time = 0.0;
@@ -50,6 +52,7 @@ fn test_pure_grid_neurogenesis() {
 
 // 37. Test "Synaptic Saturation"
 #[test]
+#[serial]
 fn test_synaptic_saturation() {
     let size = 500;
     let syn_counts = [1_000, 10_000, 50_000, 100_000];
@@ -100,6 +103,7 @@ fn test_synaptic_saturation() {
 
 // 38. Test "Dendritic Branching Stress"
 #[test]
+#[serial]
 fn test_dendritic_branching_stress() {
     let size = 1000;
     let synapses = 10_000;
@@ -147,6 +151,7 @@ fn test_dendritic_branching_stress() {
 }
 
 // 39. Test "Serialization Backpressure"
+#[serial]
 #[test]
 fn test_serialization_backpressure() {
     use neuromorphic_engine::monitor::streamer;
@@ -201,6 +206,7 @@ fn test_serialization_backpressure() {
     }
 }
 
+#[serial]
 // 40. Test "Idle Drift"
 #[test]
 fn test_idle_drift() {

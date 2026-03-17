@@ -2,6 +2,7 @@ use neuromorphic_engine::network::graph::NetworkGraph;
 use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse, BaseNeuron};
 use std::mem;
 use std::time::Instant;
+use serial_test::serial;
 
 fn default_env() -> Environment {
     Environment {
@@ -457,6 +458,7 @@ fn test_stdp_associative_persistence_under_noise() {
     }
 }
 #[test]
+#[serial]
 fn bench_stdp_overhead() {
     let mut graph_zero = NetworkGraph::new();
     let mut graph_stdp = NetworkGraph::new();

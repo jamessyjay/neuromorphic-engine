@@ -322,7 +322,8 @@ fn test_inhibitory_stdp() {
     graph.add_neuron(NeuronType::Pyramidal); // Target P (0)
     graph.add_neuron(NeuronType::Interneuron); // Source I (1)
     
-    graph.connect(1, 0, -2.0, 0, true, false); 
+    // Inhibitory synapses use positive weights, but have the is_inhibitory flag set
+    graph.connect(1, 0, 2.0, 0, true, false); 
     
     let initial_weight = graph.synapses[0].weight;
     
