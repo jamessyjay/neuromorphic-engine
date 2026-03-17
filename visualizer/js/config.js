@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
+import * as THREE from 'three';
 
 export const FLAG_IS_INHIBITED = 1;
 export const FLAG_IS_PREDICTIVE = 2;
