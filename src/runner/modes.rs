@@ -1453,14 +1453,37 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         n.z = 0; // Ретина всегда на переднем плане
     }
     
-    // 2. Create 1000 Processing Neurons
-    for _ in 0..1000 {
-        let n_type = if rand::RngExt::random::<f32>(&mut rng) < 0.2 {
-            crate::engine::ffi::NeuronType::Interneuron
-        } else {
-            crate::engine::ffi::NeuronType::Pyramidal
-        };
-        graph.add_neuron(n_type);
+    // 2. Create 1000 Processing Neurons (10 columns x 100 neurons)
+    for col_id in 0..10 {
+        let center_x = ((col_id % 5) as f32) * 12000.0 + 10000.0;
+        let center_y = ((col_id / 5) as f32) * 20000.0 + 10000.0;
+
+        for i in 0..100 {
+            let proportion_idx = (i as f32 / 100.0 * 1000.0) as usize;
+            
+            let (n_type, layer_id, z_min, z_max) = if proportion_idx < 300 {
+                (crate::engine::ffi::NeuronType::Pyramidal, 6, 10000.0, 20000.0)
+            } else if proportion_idx < 500 {
+                (crate::engine::ffi::NeuronType::Purkinje, 5, 20001.0, 30000.0)
+            } else if proportion_idx < 800 {
+                (crate::engine::ffi::NeuronType::Pyramidal, 2, 30001.0, 50000.0)
+            } else {
+                (crate::engine::ffi::NeuronType::Interneuron, 1, 50001.0, 55000.0)
+            };
+
+            let id = graph.add_neuron(n_type);
+            let n = &mut graph.neurons[id as usize];
+            n.column_id = col_id as u16;
+            n.layer_id = layer_id as u8;
+            n.minicolumn_id = (i / 20) as u8;
+
+            let dx = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
+            let dy = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
+            
+            n.x = (center_x + dx).clamp(0.0, 65535.0) as u16;
+            n.y = (center_y + dy).clamp(0.0, 65535.0) as u16;
+            n.z = rand::RngExt::random_range(&mut rng, z_min..=z_max) as u16;
+        }
     }
     
     // 3. Create 10 Output Neurons (Labels 0-9)
