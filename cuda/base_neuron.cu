@@ -371,25 +371,25 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     if (source->type == TYPE_PHOTORECEPTOR) {
         if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
             s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK; // Photoreceptors leak constantly
-            uint8_t is_myelinated = (s->flags & 0x10) != 0;
+            uint8_t is_myelinated = (s->flags & 0x20) != 0;
             s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
         }
     } else {
         if (source->last_spike_tick == current_tick) {
             // Bulk release on spike
             s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
-            uint8_t is_myelinated = (s->flags & 0x10) != 0;
+            uint8_t is_myelinated = (s->flags & 0x20) != 0;
             s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS; // Myelin Bypass (Phase 26)
         }
     }
 
     // Phase 45: Spike-Timing-Dependent Plasticity (STDP) with Dopamine Modulation
-    uint8_t is_inhibitory = (s->flags & 0x08) != 0;
+    uint8_t is_inhibitory = (s->flags & 0x10) != 0;
     
     // Trace-based LTP (Potentiation)
     // If target just spiked, apply LTP based on source's existing trace
     if (!is_inhibitory && target->last_spike_tick == current_tick && source->last_spike_tick > 0 && source->last_spike_tick < target->last_spike_tick) {
-        int branch_id = s->flags & 0x07;
+        int branch_id = s->flags & 0x0F;
         float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
         float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
         
@@ -416,20 +416,32 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
             // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
-            uint32_t expected_delivery_delay = ((s->flags & 0x10) != 0) ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
+            uint32_t expected_delivery_delay = ((s->flags & 0x20) != 0) ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
                                                             if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= expected_delivery_delay + 2) {
                 // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
                 // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
-                // In acausal firing (LTD territory), target fired, then source fired, so target->last_spike_tick <= source->last_spike_tick
-                if (target->last_spike_tick > 0 && target->last_spike_tick <= source->last_spike_tick) {
+                // If target fired BEFORE source, target->last_spike_tick will be LESS than source->last_spike_tick (LTD territory)
+                if (target->last_spike_tick < source->last_spike_tick) {
+                    int branch_id = s->flags & 0x0F;
+                    float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
                     float delta_w = target->spike_trace * env.stdp_learning_rate * STDP_A_MINUS;
-                    // 3-Factor STDP for LTD: Penalize based on dopamine multiplier. Boost punishment if negative dopamine.
-                    s->weight -= delta_w * (env.dopamine_multiplier < 0.0f ? -env.dopamine_multiplier * 5.0f : 1.0f);
+                    
+                    // Phase 55: Dopamine gating for LTD too
+                    float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
+                    s->weight -= delta_w * dopa_factor * branch_activity;
                 }
-            } 
+            }
+            
+            // Phase 35: Resource Delivery Check
+            if (target->energy_ATP < 5.0f) {
+                // Synaptic failure! Target lacks ATP to process incoming neurotransmitters.
+                // Neurotransmitters are wasted (cleared by astrocytes later)
+                s->neurotransmitter_buffer = 0.0f;
+                return;
+            }
 
             // Reliability Check (Phase 30/31)
-                        // We use weight as a proxy for maturity
+            // We use weight as a proxy for maturity
             if (s->weight < SYNAPSE_RELIABILITY_THRESHOLD) {
                 float failure_roll = (float)((current_tick + s->source_id + s->target_id) % RANDOM_MODULO_BASE) / (float)RANDOM_MODULO_BASE;
                 if (failure_roll > SYNAPSE_RELIABILITY_THRESHOLD) {
@@ -442,7 +454,13 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             // 2. Buffer Capacity
             if (s->neurotransmitter_buffer > MAX_VESICLES) s->neurotransmitter_buffer = MAX_VESICLES;
 
-            // RECEPTOR SATURATION (Spec 08)
+            // Target consumes a tiny bit of ATP to process the signal
+            atomicAdd(&target->energy_ATP, -0.1f);
+            
+            // Apply bounds to weight (Phase 40 Performance)
+            s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
+
+            // Receptor Saturation check (Phase 24)
             float available_chemical = s->neurotransmitter_buffer * env.dopamine_multiplier;
             float receptor_limit = s->weight;
             
@@ -458,8 +476,8 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             
             float voltage_impact = effective_signal * RECEPTOR_SCALE_CONSTANT; 
             
-            int branch_id = s->flags & 0x07;
-            bool is_inhib = (s->flags & 0x08) != 0;
+            int branch_id = s->flags & 0x0F;
+            bool is_inhib = (s->flags & 0x10) != 0;
             
             if (is_inhib) {
                 atomic_add_packed_voltage(&target->branches[branch_id].voltage, -voltage_impact);

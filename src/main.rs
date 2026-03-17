@@ -209,6 +209,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         (setup_benchmark(parsed_neurons, parsed_synapses), 0, None)
     };
     
+    // Diagnostic output (ТЗ №26)
+    graph.print_synaptic_diagnostics();
+    
     if tx_option.is_some() {
         println!("\n=======================================================");
         println!("🚀 UI MODE ACTIVE: Open http://127.0.0.1:3030/index.html");

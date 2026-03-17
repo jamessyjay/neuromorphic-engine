@@ -50,7 +50,7 @@ fn test_network_generation_proportions() {
     for syn in &graph.synapses {
         let source_type = graph.neurons[syn.source_id as usize].type_;
         let is_inhibitory_type = source_type == NeuronType::Interneuron as u8;
-        let has_inhibitory_flag = (syn.flags & 0x08) != 0;
+        let has_inhibitory_flag = (syn.flags & 0x10) != 0;
 
         if is_inhibitory_type {
             assert!(syn.weight < 0.0, "Interneuron synapse must have negative weight, got {}", syn.weight);

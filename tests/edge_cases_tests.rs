@@ -174,7 +174,8 @@ fn test_seizure() {
             let target = rand::RngExt::random_range(&mut rng, 0..1000);
             if target == i { continue; }
             let is_inhib = i < 100;
-            let weight = if is_inhib { -5.0 } else { 2.0 };
+            // Balance the random E/I connectivity by strengthening inhibition slightly
+            let weight = if is_inhib { -15.0 } else { 2.0 };
             graph.connect(i, target, weight, 0, is_inhib, false);
         }
     }

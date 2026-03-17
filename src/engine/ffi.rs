@@ -86,7 +86,7 @@ pub struct Synapse {
     pub last_activation_tick: u32,
     pub ticks_below_threshold: u32,
     pub ticks_until_delivery: u8,
-    pub flags: u8, // Bits 0-2: branch_id, Bit 3: is_inhibitory, Bit 4: is_myelinated
+    pub flags: u8, // Bits 0-3: branch_id, Bit 4: is_inhibitory, Bit 5: is_myelinated
     pub _padding: [u8; 2],
 }
 

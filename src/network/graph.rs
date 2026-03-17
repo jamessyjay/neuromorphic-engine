@@ -412,13 +412,13 @@ impl NetworkGraph {
     }
 
     pub fn connect(&mut self, source_id: u32, target_id: u32, weight: f32, branch_id: u8, is_inhibitory: bool, is_myelinated: bool) {
-        let mut flags = branch_id & 0x07; // Bits 0-2
-        if is_inhibitory { flags |= 0x08; } // Bit 3
-        if is_myelinated { flags |= 0x10; } // Bit 4
+        let mut flags = branch_id & 0x0F; // Bits 0-3
+        if is_inhibitory { flags |= 0x10; } // Bit 4
+        if is_myelinated { flags |= 0x20; } // Bit 5
 
         // Prevent duplicates (same source, target, and branch)
         for synapse in &mut self.synapses {
-            if synapse.source_id == source_id && synapse.target_id == target_id && (synapse.flags & 0x07) == branch_id {
+            if synapse.source_id == source_id && synapse.target_id == target_id && (synapse.flags & 0x0F) == branch_id {
                 // If exists, just augment the weight and return
                 synapse.weight += weight;
                 return;
@@ -525,13 +525,38 @@ impl NetworkGraph {
                 if s_active && t_active {
                     // 4. Stochastic Growth (Phase 37: Use STOCHASTIC_GROWTH_PROB from constants)
                     if rng.random_bool(STOCHASTIC_GROWTH_PROB) {
-                        // Success! Connect these neurons with target branch
-                        let branch_id = rng.random_range(0..8) as u8;
+                        // Preferential Attachment (ТЗ №26):
+                        // "Rich get richer" for active branches, but if overloaded, find an empty/inactive one
+                        let mut branch_id = 0;
+                        if n_target.energy_atp < 70.0 { // threshold for "overloaded"
+                            // Seek the quietest branch to balance load
+                            let mut min_trace = 255;
+                            for b in 0..16 {
+                                if n_target.branches[b].local_trace < min_trace {
+                                    min_trace = n_target.branches[b].local_trace;
+                                    branch_id = b as u8;
+                                }
+                            }
+                        } else {
+                            // "Rich get richer": seek the most active branch
+                            let mut max_trace = 0;
+                            for b in 0..16 {
+                                if n_target.branches[b].local_trace >= max_trace {
+                                    max_trace = n_target.branches[b].local_trace;
+                                    branch_id = b as u8;
+                                }
+                            }
+                            // If everything is completely dead, pick a random branch among all 16
+                            if max_trace == 0 {
+                                branch_id = rng.random_range(0..16) as u8;
+                            }
+                        }
+                        
                         let is_inhib = rng.random_bool(0.1); 
                         self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
                         outgoing_counts[i] += 1;
                         if current_tick % 1000 == 0 {
-                            println!("NeuroGenesis: New synapse {} -> {} at tick {}", i, j, current_tick);
+                            println!("NeuroGenesis: New synapse {} -> {} on branch {} at tick {}", i, j, branch_id, current_tick);
                         }
                     }
                 }
@@ -609,6 +634,80 @@ impl NetworkGraph {
             n.branches[idx].voltage = 0; // 0 means pack_voltage(-100.0), which is minimum inactive state
             n.branches[idx].refractory_timer = 0;
         }
+    }
+
+    pub fn print_synaptic_diagnostics(&self) {
+        println!("\n=== SYNAPTIC DIAGNOSTICS (ТЗ №26) ===");
+        
+        let total_synapses = self.synapses.len();
+        if total_synapses == 0 {
+            println!("No synapses to diagnose.");
+            return;
+        }
+
+        // 1. Branch Utilization
+        let mut branch_counts = [0usize; 16];
+        
+        // 2. Weight Histogram
+        let mut weight_buckets = [0usize; 4]; 
+        
+        // 3. Topological Check
+        let mut total_length = 0.0;
+        let mut lengths = Vec::with_capacity(total_synapses);
+        
+        for s in &self.synapses {
+            let branch_id = (s.flags & 0x0F) as usize;
+            branch_counts[branch_id] += 1;
+            
+            let w = s.weight;
+            if w < 0.5 { weight_buckets[0] += 1; }
+            else if w < 1.0 { weight_buckets[1] += 1; }
+            else if w < 2.0 { weight_buckets[2] += 1; }
+            else { weight_buckets[3] += 1; }
+            
+            let n1 = &self.neurons[s.source_id as usize];
+            let n2 = &self.neurons[s.target_id as usize];
+            
+            let dx = (n1.x as f32 - n2.x as f32) / crate::engine::constants::COORD_SCALE;
+            let dy = (n1.y as f32 - n2.y as f32) / crate::engine::constants::COORD_SCALE;
+            let dz = (n1.z as f32 - n2.z as f32) / crate::engine::constants::COORD_SCALE;
+            
+            let dist = (dx*dx + dy*dy + dz*dz).sqrt();
+            total_length += dist;
+            lengths.push(dist);
+        }
+        
+        println!("1. Branch Utilization Histogram:");
+        for i in 0..16 {
+            let pct = (branch_counts[i] as f32 / total_synapses as f32) * 100.0;
+            println!("  Branch [{:2}]: {:6} synapses ({:5.1}%)", i, branch_counts[i], pct);
+        }
+        
+        println!("\n2. Weight Histogram (Expected ~80% weak):");
+        println!("  0.0 - 0.5  (Weak)  : {:5.1}%", (weight_buckets[0] as f32 / total_synapses as f32) * 100.0);
+        println!("  0.5 - 1.0  (Medium): {:5.1}%", (weight_buckets[1] as f32 / total_synapses as f32) * 100.0);
+        println!("  1.0 - 2.0  (Strong): {:5.1}%", (weight_buckets[2] as f32 / total_synapses as f32) * 100.0);
+        println!("  2.0 - 5.0+ (Max)   : {:5.1}%", (weight_buckets[3] as f32 / total_synapses as f32) * 100.0);
+        
+        println!("\n3. Topological Check (Law -3/2):");
+        let avg_len = total_length / total_synapses as f32;
+        println!("  Average connection length (L): {:.2}", avg_len);
+        
+        let mut len_buckets = [0usize; 5]; // <10, 10-20, 20-40, 40-80, 80+
+        for l in lengths {
+            if l < 10.0 { len_buckets[0] += 1; }
+            else if l < 20.0 { len_buckets[1] += 1; }
+            else if l < 40.0 { len_buckets[2] += 1; }
+            else if l < 80.0 { len_buckets[3] += 1; }
+            else { len_buckets[4] += 1; }
+        }
+        println!("  Length Distribution P(L) ~ L^(-3/2):");
+        println!("    L < 10:  {:5.1}%", (len_buckets[0] as f32 / total_synapses as f32) * 100.0);
+        println!("    10-20:   {:5.1}%", (len_buckets[1] as f32 / total_synapses as f32) * 100.0);
+        println!("    20-40:   {:5.1}%", (len_buckets[2] as f32 / total_synapses as f32) * 100.0);
+        println!("    40-80:   {:5.1}%", (len_buckets[3] as f32 / total_synapses as f32) * 100.0);
+        println!("    > 80:    {:5.1}%", (len_buckets[4] as f32 / total_synapses as f32) * 100.0);
+        println!("=====================================\n");
     }
 }
 
