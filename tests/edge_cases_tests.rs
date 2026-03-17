@@ -200,8 +200,8 @@ fn test_seizure() {
     // Wait for 500 ticks for self-regulation
     for tick in 6..=505 {
         graph.tick(tick, env);
-        if tick % 100 == 0 {
-            graph.run_astrocyte_service(tick);
+        if tick % 10 == 0 {
+            graph.run_astrocyte_service(&env);
         }
     }
     
@@ -296,8 +296,10 @@ fn test_metabolic_darwinism() {
     
     for tick in 1..=2000 {
         graph.tick(tick, env);
+        if tick % 10 == 0 {
+            graph.run_astrocyte_service(&env);
+        }
         if tick % 100 == 0 {
-            graph.run_astrocyte_service(tick);
             graph.run_microglia_service(tick);
             graph.run_neurogenesis_service(tick);
         }

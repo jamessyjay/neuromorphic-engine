@@ -135,6 +135,13 @@ extern "C" {
 #define SYNAPSE_RELIABILITY_THRESHOLD 0.5f
 #define SYNAPSE_RELIABILITY_PENALTY 0.8f
 
+// Background Services Constants
+#define ASTROCYTE_CLEAN_THRESHOLD 50.0f
+#define ASTROCYTE_CLEAN_AMOUNT 10.0f
+#define ASTROCYTE_ATP_SUPPLY 10.0f
+#define MIN_SYNAPSES_PER_NEURON 3
+#define PRUNING_THRESHOLD 0.25f
+
 // Phase Resonance Magic Numbers
 #define THERMAL_NOISE_MAGIC_A 747796405u
 #define THERMAL_NOISE_MAGIC_B 2891336453u
@@ -272,6 +279,8 @@ typedef struct {
 
 // Orchestrator Function declarations
 void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, Environment env, uint32_t current_tick);
+void launch_astrocyte_service(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, Environment env);
+void launch_microglia_service(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, uint32_t current_tick);
 void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed);
 
 } // extern "C"

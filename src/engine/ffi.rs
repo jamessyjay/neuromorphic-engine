@@ -113,6 +113,22 @@ extern "C" {
         current_tick: u32
     );
     
+    pub fn launch_astrocyte_service(
+        neurons: *mut BaseNeuron, 
+        count: c_int,
+        synapses: *mut Synapse,
+        syn_count: c_int,
+        env: Environment
+    );
+
+    pub fn launch_microglia_service(
+        neurons: *mut BaseNeuron, 
+        count: c_int,
+        synapses: *mut Synapse,
+        syn_count: c_int,
+        current_tick: u32
+    );
+    
     // CPU Fallback multi-threading bindings
     pub fn tick_neuron_prepare_cpu(neuron: *mut BaseNeuron, env: Environment, current_tick: u32);
     pub fn tick_neuron_spike_cpu(neuron: *mut BaseNeuron, env: Environment, current_tick: u32);

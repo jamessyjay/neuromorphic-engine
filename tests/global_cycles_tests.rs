@@ -206,7 +206,7 @@ fn test_pavlovian_success_rate() {
         graph.neurons[motor as usize].branches[1].voltage = pack_voltage(0.0);
 
         if tick % 10 == 0 {
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&env);
         }
     }
     

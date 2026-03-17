@@ -527,7 +527,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         let mut tick_rust_time = std::time::Duration::new(0, 0);
         if tick % SERVICE_TICK_INTERVAL == 0 {
             let rust_start = Instant::now();
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&current_env);
             graph.run_microglia_service(tick);
             graph.run_neurogenesis_service(tick);
             tick_rust_time = rust_start.elapsed();
@@ -676,7 +676,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
         }
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&current_env);
             graph.run_microglia_service(tick);
         }
         
@@ -894,7 +894,7 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
         graph.tick(tick, env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&env);
             graph.run_microglia_service(tick);
         }
 
@@ -948,7 +948,7 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
         graph.tick(tick, env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&env);
             graph.run_microglia_service(tick);
         }
 
@@ -1091,7 +1091,7 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         graph.tick(tick, current_env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&current_env);
             graph.run_microglia_service(tick);
         }
 
@@ -1134,7 +1134,7 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         graph.tick(tick, current_env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&current_env);
             graph.run_microglia_service(tick);
             graph.run_neurogenesis_service(tick);
         }
@@ -1175,7 +1175,7 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
         graph.tick(tick, current_env);
         
         if tick % SERVICE_TICK_INTERVAL == 0 {
-            graph.run_astrocyte_service(tick);
+            graph.run_astrocyte_service(&current_env);
             graph.run_microglia_service(tick);
         }
 

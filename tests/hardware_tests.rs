@@ -2,6 +2,7 @@ use neuromorphic_engine::network::graph::NetworkGraph;
 use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse};
 use neuromorphic_engine::monitor::streamer;
 use std::time::Instant;
+use serial_test::serial;
 
 fn default_env() -> Environment {
     Environment {
@@ -16,6 +17,7 @@ fn default_env() -> Environment {
 
 // 20. Test "Linear Scaling (Neurons)"
 #[test]
+#[serial]
 fn test_linear_scaling_neurons() {
     let sizes = [1_000, 5_000, 10_000, 50_000];
     let ticks = 50;
@@ -59,6 +61,7 @@ fn test_linear_scaling_neurons() {
 
 // 21. Test "Connectivity Explosion"
 #[test]
+#[serial]
 fn test_connectivity_explosion() {
     let size = 1000;
     let synapse_counts = [10_000, 100_000, 1_000_000];
@@ -100,6 +103,7 @@ fn test_connectivity_explosion() {
 
 // 22. Test "FFI Overhead"
 #[test]
+#[serial]
 fn test_ffi_overhead() {
     let size = 10_000;
     let mut graph = NetworkGraph::new();
@@ -121,6 +125,7 @@ fn test_ffi_overhead() {
 
 // 23. Test "JSON Saturation"
 #[test]
+#[serial]
 fn test_json_saturation() {
     let sizes = [1_000, 10_000, 50_000];
     
@@ -176,6 +181,7 @@ fn test_json_saturation() {
 
 // 24. Test "Memory Footprint"
 #[test]
+#[serial]
 fn test_memory_footprint() {
     let size = 100_000;
     let mut graph = NetworkGraph::new();
@@ -190,6 +196,7 @@ fn test_memory_footprint() {
 
 // 25. Test "Double Buffer Sync"
 #[test]
+#[serial]
 fn test_double_buffer_sync() {
     let mut graph = NetworkGraph::new();
     let src = graph.add_neuron(NeuronType::Pyramidal);
@@ -223,6 +230,7 @@ fn test_double_buffer_sync() {
 
 use neuromorphic_engine::engine::snapshot::BrainSnapshot;
 #[test]
+#[serial]
 fn test_true_snapshot_integrity() {
     let mut graph = NetworkGraph::new();
     for _ in 0..10 {
@@ -259,6 +267,7 @@ fn test_true_snapshot_integrity() {
 }
 
 #[test]
+#[serial]
 fn test_performance_scaling_tps() {
     let mut output_buffer = String::new();
     output_buffer.push_str("--- EXECUTING PERFORMANCE SCALING TPS TEST ---\n");
@@ -322,6 +331,7 @@ fn test_performance_scaling_tps() {
 }
 
 #[test]
+#[serial]
 fn test_resource_cleanup_no_double_free() {
     println!("--- EXECUTING RESOURCE CLEANUP TEST ---");
     // Create and drop the graph 100 times to ensure RAII logic works 

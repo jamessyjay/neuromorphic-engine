@@ -1,6 +1,7 @@
 // cuda/base_neuron.cu
 
 #include "base_neuron.h"
+#include <vector>
 #include <cmath>
 #include <cstdint>
 #include <stdio.h>
@@ -603,6 +604,9 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
     
     Synapse* s = &synapses[idx];
     
+    // Tombstoned synapses (Soft Delete) are ignored
+    if (s->weight < 0.0f) return;
+    
 #if __CUDA_ARCH__ >= 350
     // Use __ldg() for read-only access to neurons array
     uint8_t src_alive = __ldg((const uint8_t*)&neurons[s->source_id].is_alive);
@@ -619,6 +623,108 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
 
     process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], env, current_tick);
 }
+
+// --- MACRO BIOLOGY SERVICES ---
+
+__global__ void astrocyte_neurons_kernel(BaseNeuron* neurons, int count) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= count) return;
+    
+    BaseNeuron* n = &neurons[idx];
+    if (n->is_alive && n->energy_ATP < ASTROCYTE_CLEAN_THRESHOLD) {
+        n->energy_ATP += ASTROCYTE_ATP_SUPPLY;
+        if (n->energy_ATP > n->max_atp) {
+            n->energy_ATP = n->max_atp;
+        }
+    }
+    n->spikes_in_last_window = 0; // Reset homeostatic counter
+}
+
+__global__ void astrocyte_synapses_kernel(Synapse* synapses, int syn_count) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= syn_count) return;
+    
+    Synapse* s = &synapses[idx];
+    if (s->weight > 0.0f && s->neurotransmitter_buffer > ASTROCYTE_CLEAN_THRESHOLD) {
+        s->neurotransmitter_buffer -= ASTROCYTE_CLEAN_AMOUNT;
+        if (s->neurotransmitter_buffer < 0.0f) {
+            s->neurotransmitter_buffer = 0.0f;
+        }
+    }
+}
+
+// Microglia Global Storage
+__device__ int outgoing_counts[100000];
+
+__global__ void microglia_count_kernel(Synapse* synapses, int syn_count, int neuron_count) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    // First, clear the counts (map neuron count to threads)
+    if (idx < neuron_count) {
+        outgoing_counts[idx] = 0;
+    }
+    
+    __syncthreads(); // We can't safely __syncthreads across blocks here for the whole array.
+    // Instead, we will do the clearing in a separate step via host or specialized kernel if needed,
+    // but a fast way is to just let a separate kernel clear it.
+}
+
+__global__ void microglia_clear_counts_kernel(int neuron_count) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < neuron_count) {
+        outgoing_counts[idx] = 0;
+    }
+}
+
+__global__ void microglia_accumulate_counts_kernel(Synapse* synapses, int syn_count) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= syn_count) return;
+    
+    Synapse* s = &synapses[idx];
+    if (s->weight > 0.0f) {
+        atomicAdd(&outgoing_counts[s->source_id], 1);
+    }
+}
+
+__global__ void microglia_prune_kernel(Synapse* synapses, int syn_count, BaseNeuron* neurons, uint32_t current_tick) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= syn_count) return;
+    
+    Synapse* s = &synapses[idx];
+    if (s->weight < 0.0f) return; // Already soft-deleted
+    
+    BaseNeuron* src = &neurons[s->source_id];
+    BaseNeuron* tgt = &neurons[s->target_id];
+    
+    bool src_valid = src->is_alive || src->dead_ticks > 0;
+    bool tgt_valid = tgt->is_alive || tgt->dead_ticks > 0;
+    
+    if (!src_valid || !tgt_valid) {
+        s->weight = -1.0f; // Tombstone
+        return;
+    }
+    
+    if (outgoing_counts[s->source_id] <= MIN_SYNAPSES_PER_NEURON) {
+        return; // Competitive retention
+    }
+    
+    uint32_t time_since_spike = current_tick > s->last_activation_tick ? current_tick - s->last_activation_tick : 0;
+    
+    // Probabilistic pruning
+    if (s->weight < PRUNING_THRESHOLD && time_since_spike > 100) {
+        float inactivity_factor = fminf(1.0f, (float)time_since_spike / 1000.0f);
+        float p_drop = (PRUNING_THRESHOLD - s->weight) * inactivity_factor;
+        
+        uint32_t local_seed = s->source_id ^ s->target_id ^ current_tick;
+        float rand_val = get_random_float_01(&local_seed);
+        
+        if (rand_val < p_drop) {
+            atomicSub(&outgoing_counts[s->source_id], 1);
+            s->weight = -1.0f; // Tombstone
+        }
+    }
+}
+
 #endif
 
 extern "C" {
@@ -649,6 +755,102 @@ void launch_tick_neurons(BaseNeuron* neurons, int count, Synapse* synapses, int 
 #else
     // Removed CPU fallback loop from here. Rust will handle multithreading using Rayon.
     // Use tick_neuron_cpu and tick_synapse_cpu individually instead.
+#endif
+}
+
+void launch_astrocyte_service(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, Environment env) {
+    (void)env;
+#ifdef USE_CUDA
+    int t_per_b = THREADS_PER_BLOCK;
+    int n_blocks = (count + t_per_b - 1) / t_per_b;
+    int s_blocks = (syn_count + t_per_b - 1) / t_per_b;
+    
+    astrocyte_neurons_kernel<<<n_blocks, t_per_b>>>(neurons, count);
+    astrocyte_synapses_kernel<<<s_blocks, t_per_b>>>(synapses, syn_count);
+    
+    cudaDeviceSynchronize();
+#else
+    for (int i = 0; i < count; i++) {
+        BaseNeuron* n = &neurons[i];
+        if (n->is_alive && n->energy_ATP < ASTROCYTE_CLEAN_THRESHOLD) {
+            n->energy_ATP += ASTROCYTE_ATP_SUPPLY;
+            if (n->energy_ATP > n->max_atp) {
+                n->energy_ATP = n->max_atp;
+            }
+        }
+        n->spikes_in_last_window = 0;
+    }
+    for (int i = 0; i < syn_count; i++) {
+        Synapse* s = &synapses[i];
+        if (s->weight > 0.0f && s->neurotransmitter_buffer > ASTROCYTE_CLEAN_THRESHOLD) {
+            s->neurotransmitter_buffer -= ASTROCYTE_CLEAN_AMOUNT;
+            if (s->neurotransmitter_buffer < 0.0f) {
+                s->neurotransmitter_buffer = 0.0f;
+            }
+        }
+    }
+#endif
+}
+
+void launch_microglia_service(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, uint32_t current_tick) {
+#ifdef USE_CUDA
+    int t_per_b = THREADS_PER_BLOCK;
+    int n_blocks = (count + t_per_b - 1) / t_per_b;
+    int s_blocks = (syn_count + t_per_b - 1) / t_per_b;
+    
+    microglia_clear_counts_kernel<<<n_blocks, t_per_b>>>(count);
+    cudaDeviceSynchronize(); // Ensure counts are cleared
+    
+    microglia_accumulate_counts_kernel<<<s_blocks, t_per_b>>>(synapses, syn_count);
+    cudaDeviceSynchronize(); // Ensure counts are accumulated
+    
+    microglia_prune_kernel<<<s_blocks, t_per_b>>>(synapses, syn_count, neurons, current_tick);
+    cudaDeviceSynchronize();
+#else
+    // CPU Fallback
+    std::vector<int> cpu_outgoing_counts(count, 0);
+    
+    for (int i = 0; i < syn_count; i++) {
+        Synapse* s = &synapses[i];
+        if (s->weight > 0.0f) {
+            cpu_outgoing_counts[s->source_id]++;
+        }
+    }
+    
+    for (int i = 0; i < syn_count; i++) {
+        Synapse* s = &synapses[i];
+        if (s->weight < 0.0f) continue;
+        
+        BaseNeuron* src = &neurons[s->source_id];
+        BaseNeuron* tgt = &neurons[s->target_id];
+        
+        bool src_valid = src->is_alive || src->dead_ticks > 0;
+        bool tgt_valid = tgt->is_alive || tgt->dead_ticks > 0;
+        
+        if (!src_valid || !tgt_valid) {
+            s->weight = -1.0f; // Tombstone
+            continue;
+        }
+        
+        if (cpu_outgoing_counts[s->source_id] <= MIN_SYNAPSES_PER_NEURON) {
+            continue;
+        }
+        
+        uint32_t time_since_spike = current_tick > s->last_activation_tick ? current_tick - s->last_activation_tick : 0;
+        
+        if (s->weight < PRUNING_THRESHOLD && time_since_spike > 100) {
+            float inactivity_factor = fminf(1.0f, (float)time_since_spike / 1000.0f);
+            float p_drop = (PRUNING_THRESHOLD - s->weight) * inactivity_factor;
+            
+            uint32_t local_seed = s->source_id ^ s->target_id ^ current_tick;
+            float rand_val = get_random_float_01(&local_seed);
+            
+            if (rand_val < p_drop) {
+                cpu_outgoing_counts[s->source_id]--;
+                s->weight = -1.0f; // Tombstone
+            }
+        }
+    }
 #endif
 }
 
