@@ -1604,7 +1604,7 @@ pub async fn run_mnist_mode(
             }
             
             if let Some(tx_chan) = tx.as_ref() {
-                let mut predictions = Vec::with_capacity(10);
+                let mut predictions = Vec::with_capacity(11); // 10 neurons + 1 label
                 for i in 1784..1794 {
                     if i < graph.neurons.len() {
                         predictions.push(graph.neurons[i].current_voltage);
@@ -1612,6 +1612,9 @@ pub async fn run_mnist_mode(
                         predictions.push(0.0);
                     }
                 }
+                
+                // Hack: Pass current label as the 11th element of predictions array to avoid touching WS structure
+                predictions.push(current_label as f32);
                 
                 let current_synapse_count = graph.synapses.len();
                 let should_send_synapses = current_tick % crate::engine::constants::WS_SYNAPSE_FORCE_SYNC_INTERVAL == 0 || current_synapse_count != last_synapse_count;

@@ -87,21 +87,46 @@
             color: #00ffcc;
         }
         
-        /* Winner State */
-        .classifier-row.winner .digit-label {
-            color: #fff;
-            text-shadow: 0 0 8px #00ffcc;
+        /* State: Label (Gold) */
+        .classifier-row.bar-label .digit-label {
+            color: #ffd700;
+            text-shadow: 0 0 8px #ffd700;
+        }
+        .classifier-row.bar-label .bar-container {
+            border-color: rgba(255, 215, 0, 0.5);
+        }
+
+        /* State: Prediction (Neon Blue) */
+        .classifier-row.bar-prediction .digit-label {
+            color: #00fbff;
+            text-shadow: 0 0 8px #00fbff;
             font-size: 16px;
         }
-        .classifier-row.winner .bar {
-            background: #fff;
-            box-shadow: 0 0 15px #00ffcc, 0 0 5px #fff;
+        .classifier-row.bar-prediction .bar {
+            background: #00fbff;
+            box-shadow: 0 0 15px #00fbff;
             animation: pulse-bar 1s infinite alternate;
         }
-        .classifier-row.winner .digit-val {
-            color: #fff;
+        .classifier-row.bar-prediction .digit-val {
+            color: #00fbff;
             font-weight: bold;
-            text-shadow: 0 0 5px #00ffcc;
+            text-shadow: 0 0 5px #00fbff;
+        }
+
+        /* State: Correct (Bright Green) */
+        .classifier-row.bar-correct .digit-label {
+            color: #3fff00;
+            text-shadow: 0 0 10px #3fff00;
+            font-size: 16px;
+        }
+        .classifier-row.bar-correct .bar {
+            background: #3fff00;
+            box-shadow: 0 0 15px #3fff00, 0 0 5px #fff;
+        }
+        .classifier-row.bar-correct .digit-val {
+            color: #3fff00;
+            font-weight: bold;
+            text-shadow: 0 0 5px #3fff00;
         }
 
         @keyframes pulse-bar {

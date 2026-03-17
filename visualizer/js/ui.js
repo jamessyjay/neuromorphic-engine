@@ -1,6 +1,7 @@
 import { layerVisibility, colorMode, setColorMode, nodeMap, currentEnv } from './state.js';
 import { FLAG_IS_PREDICTIVE, FLAG_IS_INHIBITED } from './config.js';
 import { getWs } from './network.js';
+import { smoothedPredictions, lastDisplayedWinner, winnerHoldTicks, setLastDisplayedWinner, setWinnerHoldTicks } from './state.js';
 
 export let retinaCtx = null;
 
@@ -93,49 +94,88 @@ export function updatePassportStatus(node) {
 }
 
 export function updateClassifierPanel(predictions) {
-    if (!predictions || predictions.length !== 10) return;
+    if (!predictions || predictions.length < 10) return;
     
+    // Check if label is provided as 11th element (if not, it's undefined)
+    const currentLabel = predictions.length > 10 ? predictions[10] : -1;
+
     const panel = document.getElementById('classifier-panel');
     if (panel) panel.style.display = 'block';
+
+    // 1. Exponential Moving Average Smoothing
+    for (let i = 0; i < 10; i++) {
+        smoothedPredictions[i] = (smoothedPredictions[i] * 0.8) + (predictions[i] * 0.2);
+    }
 
     let maxVal = -Infinity;
     let maxIdx = -1;
     let minVal = Infinity;
 
     for (let i = 0; i < 10; i++) {
-        if (predictions[i] > maxVal) { maxVal = predictions[i]; maxIdx = i; }
-        if (predictions[i] < minVal) { minVal = predictions[i]; }
+        if (smoothedPredictions[i] > maxVal) { maxVal = smoothedPredictions[i]; maxIdx = i; }
+        if (smoothedPredictions[i] < minVal) { minVal = smoothedPredictions[i]; }
+    }
+
+    // 2. Winner Hysteresis & Hold logic
+    if (winnerHoldTicks > 0) {
+        setWinnerHoldTicks(winnerHoldTicks - 1);
+    } else {
+        if (lastDisplayedWinner !== -1) {
+            // Require 15% margin over the current winner to switch
+            const currentWinnerVal = smoothedPredictions[lastDisplayedWinner];
+            const range = Math.max(1.0, maxVal - minVal);
+            if (maxVal > currentWinnerVal + (range * 0.15)) {
+                setLastDisplayedWinner(maxIdx);
+                setWinnerHoldTicks(30);
+            }
+        } else {
+            setLastDisplayedWinner(maxIdx);
+            setWinnerHoldTicks(30);
+        }
     }
 
     const range = Math.max(1.0, maxVal - minVal);
 
+    // 3. UI Update
     for (let i = 0; i < 10; i++) {
         const row = document.getElementById(`class-row-${i}`);
         const bar = document.getElementById(`bar-${i}`);
         const valText = document.getElementById(`val-${i}`);
         
         if (row && bar && valText) {
-            // Normalize to 0-100% relative to min/max
-            let pct = ((predictions[i] - minVal) / range) * 100;
+            let pct = ((smoothedPredictions[i] - minVal) / range) * 100;
             pct = Math.max(0, Math.min(100, pct));
             
             bar.style.width = `${pct}%`;
             valText.innerText = `${Math.round(pct)}%`;
             
-            if (i === maxIdx && pct > 50) {
-                row.classList.add('winner');
-            } else {
-                row.classList.remove('winner');
+            // Reset classes
+            row.classList.remove('winner', 'bar-label', 'bar-prediction', 'bar-correct');
+            
+            // Apply new classes
+            if (i === currentLabel) {
+                row.classList.add('bar-label');
+            }
+            if (i === lastDisplayedWinner && pct > 20) {
+                row.classList.add('bar-prediction');
+                if (i === currentLabel) {
+                    row.classList.add('bar-correct');
+                }
             }
         }
     }
 
     const guessText = document.getElementById('network-guess');
     if (guessText) {
-        if (maxVal > -50.0) { // arbitrary threshold above resting potential
-            guessText.innerText = `[${maxIdx}]`;
-            guessText.style.color = '#00ffcc';
-            guessText.style.textShadow = '0 0 10px #00ffcc';
+        if (maxVal > -50.0 && lastDisplayedWinner !== -1) {
+            guessText.innerText = `[${lastDisplayedWinner}]`;
+            if (lastDisplayedWinner === currentLabel) {
+                guessText.style.color = '#3fff00';
+                guessText.style.textShadow = '0 0 10px #3fff00';
+            } else {
+                guessText.style.color = '#00fbff';
+                guessText.style.textShadow = '0 0 10px #00fbff';
+            }
         } else {
             guessText.innerText = `[-]`;
             guessText.style.color = 'white';
