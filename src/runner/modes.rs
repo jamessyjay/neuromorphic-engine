@@ -1451,6 +1451,7 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         n.x = (col as f32 * (65535.0 / 28.0)) as u16;
         n.y = (row as f32 * (65535.0 / 28.0)) as u16;
         n.z = 0; // Ретина всегда на переднем плане
+        n.layer_id = 4; // L4 - Input
     }
     
     // 2. Create 1000 Processing Neurons (10 columns x 100 neurons)
@@ -1493,6 +1494,7 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         n.x = (32768i32 + (i as i32 * 3000 - 15000)).clamp(0, 65535) as u16; // В ряд по X
         n.y = 32768; // По центру Y
         n.z = 60000; // На заднем плане
+        n.layer_id = 5; // L5 - Output
     }
     
     // 4. Connect photoreceptors to Processing neurons
