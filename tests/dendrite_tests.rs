@@ -277,6 +277,10 @@ fn test_dendritic_role_separation() {
     graph.neurons[2].branches[6].branch_type = 3; // Tuft/Distal
     graph.neurons[2].branches[6].nmda_threshold = pack_voltage(10.0);
 
+    // Make the test deterministic since neurons are initialized with random thresholds
+    graph.neurons[2].resting_voltage = -70.0;
+    graph.neurons[2].activation_threshold = -50.0;
+
     let target_resting = graph.neurons[2].resting_voltage;
 
     // Phase 1: Fire Distal (Branch 6)

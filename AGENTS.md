@@ -43,7 +43,7 @@ The project uses a strict domain-driven module structure. Do not place everythin
 
 **BEFORE WRITING ANY CODE — CHECK:**
 
-1. **IS THERE ALREADY A READY-MADE FUNCTION?** Use repository search. NEVER write new code if a solution already exists.
+1. **IS THERE ALREADY A READY-MADE FUNCTION?** Use repository search.
 2. **CAN AN EXISTING FUNCTION BE EXTENDED?** Add a parameter instead of copy-pasting.
 
 ---
@@ -105,7 +105,7 @@ Any new feature must pass the rigorous validation suites in `tests/`:
 1. **Task Analysis:** Do I understand the task? Which formula from `./specs/` is needed? If not — ASK!
 2. **Search for existing code:** Check `src/` (in proper subdirectories) and `cuda/` folders for ready-made tools.
 3. **Planning (FFI):** Ensure that types `f32` (Rust) and `float` (C++) match exactly. Be hyper-aware of `#[repr(C)]` alignment!
-4. **Create tasks checklist** Create checklist with a list of tasks whicb are about to be executed. After every completed task mark the task in the checklist as completed. Review the checklist before proceeding with the next task (maybe it is already done)
+4. **Create tasks checklist** Create checklist with a list of tasks whicb are about to be executed. After every completed task mark the task in the checklist as completed.
 5. **Implementation:** Write atomic functions. Follow SOLID.
 6. **Verification:** Run `cargo test`. Ensure 100% tests pass.
 
