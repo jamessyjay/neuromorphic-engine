@@ -17,22 +17,25 @@
 <body>
     <div id="ui-layer">
         <div class="panel">
-            <div>STATUS: <span id="status" style="color: #ffaa00;">Connecting...</span></div>
-            <div>TICK: <span id="tick" class="val-display">0</span></div>
-            <div>POPULATION: <span id="live-count" class="val-display">0 / 0</span></div>
-            <hr style="border-color: #4ade80; opacity: 0.3; margin: 8px 0;">
-            <div>AVG ATP: <span id="avg-atp" class="val-display">0.0</span></div>
-            <div>AVG CALCIUM: <span id="avg-calcium" class="val-display">0.0</span></div>
-            <div>AVG VOLTAGE: <span id="avg-voltage" class="val-display">0.0</span></div>
+            <div><span class="label">ENGINE:</span> THOUSAND BRAINS v0.5.0</div>
+            <div id="status" style="color: #ffaa00; font-weight: bold;">STATUS: CONNECTING...</div>
+            <div id="tick">Tick: 0</div>
+            <hr style="border: 0; border-top: 1px solid rgba(74, 222, 128, 0.2); margin: 5px 0;">
+            <div><span class="label">NEURONS:</span> <span id="neurons" class="val-display">0</span></div>
+            <div><span class="label">SYNAPSES:</span> <span id="synapses" class="val-display">0</span></div>
+            <div><span class="label" style="color: #ff4444;">DECEASED:</span> <span id="dead-count" class="val-display">0</span></div>
+            <div><span class="label" style="color: #fff;">SPIKE RATE:</span> <span id="spike-rate" class="val-display">0</span></div>
         </div>
-        
+
         <div class="panel">
-            <div class="label">LAYERS (Cortical)</div>
-            <label><input type="checkbox" checked onchange="toggleLayer(1)"> L1 (Feedback)</label><br>
-            <label><input type="checkbox" checked onchange="toggleLayer(2)"> L2/3 (Identity)</label><br>
-            <label><input type="checkbox" checked onchange="toggleLayer(4)"> L4 (Input/Sensory)</label><br>
-            <label><input type="checkbox" checked onchange="toggleLayer(5)"> L5 (Output/Motor)</label><br>
-            <label><input type="checkbox" checked onchange="toggleLayer(6)"> L6 (Location)</label>
+            <div class="control-group">
+                <label style="color: #0ff;">OXYGEN: <span id="v-oxygen" class="val-display">1.00</span></label>
+                <progress id="prog-oxygen" value="1" max="1" style="width: 100%; height: 10px; accent-color: #0ff;"></progress>
+            </div>
+            <div class="control-group">
+                <label style="color: #4ade80;">GLUCOSE: <span id="v-glucose" class="val-display">1.00</span></label>
+                <progress id="prog-glucose" value="1" max="1" style="width: 100%; height: 10px; accent-color: #4ade80;"></progress>
+            </div>
         </div>
 
         <div class="panel">
@@ -44,6 +47,17 @@
             <div class="control-group">
                 <label>LEARNING RATE: <span id="v-lr">0.10</span></label>
                 <input type="range" id="inp-lr" min="0.0" max="1.0" step="0.01" value="0.10">
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="label">LAYER VISIBILITY:</div>
+            <div id="layer-filters" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px;">
+                <label><input type="checkbox" checked onchange="toggleLayer(6)"> L6 - Location</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(5)"> L5 - Output</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(4)"> L4 - Input</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(2)"> L2/3 - Feature</label>
+                <label><input type="checkbox" checked onchange="toggleLayer(1)"> L1 - Comm</label>
             </div>
         </div>
 
@@ -70,7 +84,7 @@
     </div>
 
     <!-- Virtual Retina Monitor -->
-    <div id="retina-container" style="position: absolute; bottom: 20px; left: 20px; width: 128px; height: 128px; background: rgba(0,0,0,0.8); border: 1px solid #00ffcc; border-radius: 4px; box-shadow: 0 0 10px rgba(0,255,204,0.2);">
+    <div id="retina-container" style="position: absolute; bottom: 20px; left: 300px; width: 128px; height: 128px; background: rgba(0,0,0,0.8); border: 1px solid #00ffcc; border-radius: 4px; box-shadow: 0 0 10px rgba(0,255,204,0.2);">
         <canvas id="retina-canvas" width="32" height="32" style="width: 100%; height: 100%; image-rendering: pixelated;"></canvas>
         <div style="position: absolute; top: -20px; left: 0; color: #00ffcc; font-size: 10px; font-family: monospace; letter-spacing: 1px; text-shadow: 0 0 5px #00ffcc;">VIRTUAL RETINA</div>
     </div>

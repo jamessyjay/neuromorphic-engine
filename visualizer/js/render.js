@@ -200,14 +200,10 @@ function animate() {
     neuronMeshes.forEach(m => {
         let matrixUpdated = false;
         
-        // Use visible count optimization if all instances are active, 
-        // else we check per instance visibility below via scaling
-        const isLayerVisible = layerVisibility[m.layerId];
-
         nodeMap.forEach((n, id) => {
-            if (n.layerId === m.layerId) {
+            if (n.type === m.type) {
                 
-                if (!isLayerVisible) {
+                if (!layerVisibility[n.layerId]) {
                     if (n.isVisible !== false) {
                         _dummy.position.set(n.x, n.y, n.z);
                         _dummy.scale.set(0, 0, 0); // Hide
@@ -216,6 +212,7 @@ function animate() {
                         n.isVisible = false;
                         matrixUpdated = true;
                     }
+                    return; // Skip drawing when hidden
                 } else {
                     if (n.isVisible === false) {
                         _dummy.position.set(n.x, n.y, n.z);

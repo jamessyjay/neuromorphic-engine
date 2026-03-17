@@ -90,6 +90,21 @@ export function buildLegend() {
     });
 }
 
+export function updateLegendCounts() {
+    const counts = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, dead:0, dead_calcium:0, dead_atp:0, dead_regen:0};
+    nodeMap.forEach(n => { 
+        if(!n.isAlive) {
+            counts[n.deathReason || 'dead']++;
+        } else { 
+            counts[n.type]++; 
+        }
+    });
+    Object.keys(counts).forEach(t => {
+        const el = document.getElementById(`count-${t}`);
+        if(el) el.innerText = `[${counts[t]}]`;
+    });
+}
+
 export function initUIEventListeners() {
     const dSlider = document.getElementById('inp-dopamine');
     if (dSlider) {
