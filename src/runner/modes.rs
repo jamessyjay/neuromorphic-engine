@@ -1552,6 +1552,7 @@ pub async fn run_mnist_mode(
     let mut current_image_idx = 0;
     let mut image_pixels: Vec<f32> = vec![0.0; 784];
     let mut current_label = 0;
+    let mut last_synapse_count = graph.synapses.len();
     
     while current_tick < total_ticks {
         if use_ui && current_tick % 10 == 0 {
@@ -1612,6 +1613,10 @@ pub async fn run_mnist_mode(
                     }
                 }
                 
+                let current_synapse_count = graph.synapses.len();
+                let should_send_synapses = current_tick % crate::engine::constants::WS_SYNAPSE_FORCE_SYNC_INTERVAL == 0 || current_synapse_count != last_synapse_count;
+                last_synapse_count = current_synapse_count;
+                
                 crate::runner::modes::broadcast_tick_update(
                     tx_chan,
                     &graph,
@@ -1620,7 +1625,7 @@ pub async fn run_mnist_mode(
                     current_tick,
                     new_spikes,
                     &env,
-                    true,
+                    should_send_synapses,
                     current_synapse_count,
                 );
             }

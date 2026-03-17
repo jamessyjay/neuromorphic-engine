@@ -1,7 +1,7 @@
 import { nodeMap, activePulses, currentEnv } from './state.js';
 import { VISUAL_SAMPLING, MAX_PULSES } from './config.js';
 import { initNetwork } from './render.js';
-import { retinaCtx } from './ui.js';
+import { retinaCtx, updateLegendCounts } from './ui.js';
 
 
 
@@ -148,10 +148,7 @@ export function connect(host) {
                 document.getElementById('v-lr').innerText = currentEnv.lr.toFixed(2);
             }
 
-            Object.keys(typeCounts).forEach(k => {
-                const el = document.getElementById(`count-${k}`);
-                if (el) el.innerText = `[${typeCounts[k]}]`;
-            });
+            updateLegendCounts();
         }
     };
     
