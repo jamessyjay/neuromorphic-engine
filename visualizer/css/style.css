@@ -49,3 +49,62 @@
         .color-dot { width: 10px; height: 10px; margin-right: 8px; border-radius: 2px; }
         .desc { color: #666; margin-left: 5px; text-transform: none; }
         .pop-count { color: #4ade80; font-weight: bold; margin-left: auto; }
+
+        /* Classifier Panel Styles */
+        .classifier-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-family: monospace;
+        }
+        .digit-label {
+            width: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ccc;
+        }
+        .bar-container {
+            flex-grow: 1;
+            height: 12px;
+            background: rgba(0, 50, 50, 0.5);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            border-radius: 2px;
+            margin: 0 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        .bar {
+            height: 100%;
+            width: 0%;
+            background: #00ffcc;
+            transition: width 0.1s ease-out, background-color 0.2s;
+            box-shadow: 0 0 5px rgba(0, 255, 204, 0.5);
+        }
+        .digit-val {
+            width: 40px;
+            text-align: right;
+            font-size: 12px;
+            color: #00ffcc;
+        }
+        
+        /* Winner State */
+        .classifier-row.winner .digit-label {
+            color: #fff;
+            text-shadow: 0 0 8px #00ffcc;
+            font-size: 16px;
+        }
+        .classifier-row.winner .bar {
+            background: #fff;
+            box-shadow: 0 0 15px #00ffcc, 0 0 5px #fff;
+            animation: pulse-bar 1s infinite alternate;
+        }
+        .classifier-row.winner .digit-val {
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00ffcc;
+        }
+
+        @keyframes pulse-bar {
+            0% { opacity: 0.8; }
+            100% { opacity: 1.0; }
+        }

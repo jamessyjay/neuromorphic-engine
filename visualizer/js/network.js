@@ -1,7 +1,7 @@
 import { nodeMap, activePulses, currentEnv } from './state.js';
 import { VISUAL_SAMPLING, MAX_PULSES } from './config.js';
 import { initNetwork } from './render.js';
-import { retinaCtx, updateLegendCounts } from './ui.js';
+import { retinaCtx, updateLegendCounts, updateClassifierPanel } from './ui.js';
 
 
 
@@ -79,6 +79,11 @@ export function connect(host) {
                     imgData.data[idx+3] = 255;
                 }
                 retinaCtx.putImageData(imgData, 0, 0);
+            }
+
+            // Classifier Panel
+            if (data.predictions) {
+                updateClassifierPanel(data.predictions);
             }
 
 

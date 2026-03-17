@@ -445,8 +445,12 @@ To secure the biological integrity and hardware stability of the engine, a compl
    - Fixed `retinaCtx` Canvas initialization flow to prevent crashes before the DOM successfully rendered the Retina window (`ui.js`).
    - Upgraded `network.js` to parse `data.retina_frame`, processing it frame by frame as `ImageData` to display real-time visually reconstructed input in the browser.
    - Resolved `imageSmoothingEnabled` typos and instantiation blockings to properly enforce blocky 28x28 rendering style.
+   - Assigned proper `layer_id` values to Retina (L4) and Output (L5) neurons to ensure they are visible under the UI's Layer Visibility filters.
+   - Changed Photoreceptor color to a bright neon red (`0xff0044`) to strongly contrast with processing neurons.
+   - Distributed the 1000 processing neurons pseudo-randomly across 10 cortical columns between the Retina and Output layers, fixing a massive 3D mesh rendering artifact where all neurons were stacked at `(0, 0, 0)`.
+   - Fixed synapse data serialization so they are periodically synchronized and rendered correctly via WebGL.
 
-### Verification
+### Verification steps
 
 - Run `cargo run -- --neurons 1000 --synapses 10000 --ui --ticks 50000`. Server remains stable and WebSocket clients can successfully connect and reconnect cleanly.
 - Visualizer gracefully handles missing fields like `data.events` or `data.retina_frame` based on context.

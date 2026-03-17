@@ -10,6 +10,22 @@ window.addEventListener('load', () => {
         retinaCtx = canvas.getContext('2d');
         retinaCtx.imageSmoothingEnabled = false;
     }
+
+    // Initialize Classifier Rows
+    const classifierRowsContainer = document.getElementById('classifier-rows');
+    if (classifierRowsContainer) {
+        for (let i = 0; i < 10; i++) {
+            const row = document.createElement('div');
+            row.className = 'classifier-row';
+            row.id = `class-row-${i}`;
+            row.innerHTML = `
+                <span class="digit-label">${i}</span>
+                <div class="bar-container"><div id="bar-${i}" class="bar"></div></div>
+                <span id="val-${i}" class="digit-val">0%</span>
+            `;
+            classifierRowsContainer.appendChild(row);
+        }
+    }
 });
 
 export function toggleLayer(layer) {
@@ -76,6 +92,57 @@ export function updatePassportStatus(node) {
     document.getElementById('np-status').innerText = status.join(" | ");
 }
 
+export function updateClassifierPanel(predictions) {
+    if (!predictions || predictions.length !== 10) return;
+    
+    const panel = document.getElementById('classifier-panel');
+    if (panel) panel.style.display = 'block';
+
+    let maxVal = -Infinity;
+    let maxIdx = -1;
+    let minVal = Infinity;
+
+    for (let i = 0; i < 10; i++) {
+        if (predictions[i] > maxVal) { maxVal = predictions[i]; maxIdx = i; }
+        if (predictions[i] < minVal) { minVal = predictions[i]; }
+    }
+
+    const range = Math.max(1.0, maxVal - minVal);
+
+    for (let i = 0; i < 10; i++) {
+        const row = document.getElementById(`class-row-${i}`);
+        const bar = document.getElementById(`bar-${i}`);
+        const valText = document.getElementById(`val-${i}`);
+        
+        if (row && bar && valText) {
+            // Normalize to 0-100% relative to min/max
+            let pct = ((predictions[i] - minVal) / range) * 100;
+            pct = Math.max(0, Math.min(100, pct));
+            
+            bar.style.width = `${pct}%`;
+            valText.innerText = `${Math.round(pct)}%`;
+            
+            if (i === maxIdx && pct > 50) {
+                row.classList.add('winner');
+            } else {
+                row.classList.remove('winner');
+            }
+        }
+    }
+
+    const guessText = document.getElementById('network-guess');
+    if (guessText) {
+        if (maxVal > -50.0) { // arbitrary threshold above resting potential
+            guessText.innerText = `[${maxIdx}]`;
+            guessText.style.color = '#00ffcc';
+            guessText.style.textShadow = '0 0 10px #00ffcc';
+        } else {
+            guessText.innerText = `[-]`;
+            guessText.style.color = 'white';
+            guessText.style.textShadow = 'none';
+        }
+    }
+}
 export function buildLegend() {
     const container = document.getElementById('legend-content');
     if (!container) return;
