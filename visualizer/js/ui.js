@@ -1,4 +1,5 @@
-import { layerVisibility, colorMode, setColorMode, nodeMap, currentEnv, TYPE_COLORS, FLAG_IS_PREDICTIVE, FLAG_IS_INHIBITED } from './state.js';
+import { layerVisibility, colorMode, setColorMode, nodeMap, currentEnv } from './state.js';
+import { FLAG_IS_PREDICTIVE, FLAG_IS_INHIBITED } from './config.js';
 import { getWs } from './network.js';
 
 export let retinaCtx = null;

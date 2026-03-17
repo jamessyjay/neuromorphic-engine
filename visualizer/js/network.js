@@ -10,17 +10,18 @@ export function getWs() {
 }
 
 export function connect(host) {
-    ws = new WebSocket(`ws://${host}/ws`);
+    ws = new WebSocket(`ws://${host}/stream`);
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.type === "InitialState") {
-            document.getElementById('status').innerText = "Running";
-            document.getElementById('total-n').innerText = msg.payload.total_neurons;
-            document.getElementById('total-s').innerText = msg.payload.total_synapses;
+            document.getElementById('status').innerText = "STATUS: ACTIVE";
+            document.getElementById('status').style.color = '#4ade80';
+            document.getElementById('neurons').innerText = msg.payload.total_neurons;
+            document.getElementById('synapses').innerText = msg.payload.total_synapses;
             initNetwork(msg.payload);
         } else if (msg.type === "TickUpdate") {
             const data = msg.payload;
-            document.getElementById('tick').innerText = data.tick;
+            document.getElementById('tick').innerText = "Tick: " + data.tick;
             
             // Log panel
             if (data.events && data.events.length > 0) {
@@ -79,43 +80,59 @@ export function connect(host) {
             }
 
             // Status updates
-            if (data.statuses && data.statuses.length > 0) {
-                for (let i = 0; i < data.statuses.length; i += 5) {
-                    const nid = data.statuses[i];
-                    const flags = data.statuses[i+1];
-                    const atp = data.statuses[i+2];
-                    const calc = data.statuses[i+3];
-                    const v = data.statuses[i+4];
-                    const n = nodeMap.get(nid);
-                    if (n) {
-                        n.statusFlags = flags;
-                        // Map internal engine signals to visual ones
-                        // Check if DEAD (is_alive == 0 => flags usually indicate this or v == -70 with 0 atp in old logic)
-                        // This would need proper mapping based on engine output. 
-                        // For now we assume if flags & 0x04 == DEAD (hypothetical)
-                        // Actually, backend now returns death reason. Let's assume isAlive logic is handled by specific events or flags.
-                        // Assuming Phase 53: we trust the engine's events for death.
-                        h_atp += atp;
-                        h_calc += calc;
-                        h_v += v;
-                        
-                        if (!n.isAlive) {
-                            deathCount++;
-                            typeCounts[n.deathReason || 'dead']++;
+            if (data.global_oxygen !== undefined) {
+                document.getElementById('v-oxygen').innerText = data.global_oxygen.toFixed(2);
+                document.getElementById('prog-oxygen').value = data.global_oxygen;
+            }
+            if (data.global_glucose !== undefined) {
+                document.getElementById('v-glucose').innerText = data.global_glucose.toFixed(2);
+                document.getElementById('prog-glucose').value = data.global_glucose;
+            }
+            if (data.synapse_count !== undefined) {
+                document.getElementById('synapses').innerText = data.synapse_count;
+            }
+
+            let spikesToday = 0, deadToday = 0, activeCount = 0;
+            if (data.neurons && data.neurons.length > 0) {
+                for (let i = 0; i < data.neurons.length; i++) {
+                    const nDataArr = data.neurons[i];
+                    const id = nDataArr[0], state = nDataArr[1], atp = nDataArr[2], flags = nDataArr[3] || 0;
+                    const nData = nodeMap.get(id);
+                    if (nData) {
+                        if (state >= 3.0 && nData.isAlive) {
+                            nData.isAlive = false;
+                            deadToday++;
+                            if (state === 3.0) nData.deathReason = 'calcium';
+                            else if (state === 4.0) nData.deathReason = 'atp';
+                            else nData.deathReason = 'regen';
                         } else {
-                            typeCounts[n.type]++;
+                            nData.isAlive = true;
+                            nData.visualActivity = (state === 1.0) ? 1.0 : nData.visualActivity;
+                        }
+                        nData.atp = atp;
+                        nData.vState = state;
+                        nData.statusFlags = flags;
+
+                        if (state === 1.0 && nData.isAlive) {
+                            spikesToday++; 
+                            activeCount++;
+                            nData.visualActivity = 1.0;
+                            if (activePulses.length < MAX_PULSES) {
+                                nData.outgoing.forEach(syn => {
+                                    if (Math.random() < VISUAL_SAMPLING && activePulses.length < MAX_PULSES) {
+                                        const t = nodeMap.get(syn.targetId);
+                                        if (t) activePulses.push({ s: nData, t, p: 0 });
+                                    }
+                                });
+                            }
+                        } else if (state > 0.5 && nData.isAlive) {
+                            activeCount++;
                         }
                     }
                 }
                 
-                const avg_atp = h_atp / (data.statuses.length/5);
-                const avg_calc = h_calc / (data.statuses.length/5);
-                const avg_v = h_v / (data.statuses.length/5);
-                
-                document.getElementById('live-count').innerText = `${liveCount} / ${deathCount}`;
-                document.getElementById('avg-atp').innerText = avg_atp.toFixed(1);
-                document.getElementById('avg-calcium').innerText = avg_calc.toFixed(1);
-                document.getElementById('avg-voltage').innerText = avg_v.toFixed(1);
+                document.getElementById('dead-count').innerText = Array.from(nodeMap.values()).filter(n => !n.isAlive).length;
+                document.getElementById('spike-rate').innerText = spikesToday;
             }
 
             // Sync Environment back from server
