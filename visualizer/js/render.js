@@ -240,20 +240,28 @@ function animate() {
                     baseColor = TYPE_COLORS[n.type] || new THREE.Color(0x444444);
                 }
 
+                if (n.statusFlags & FLAG_IS_INHIBITED) {
+                    activeWtaCount++;
+                }
+
                 if (!n.isAlive) {
                     if (n.deathReason === 'calcium') _tempColor.copy(TYPE_COLORS.dead_calcium);
                     else if (n.deathReason === 'atp') _tempColor.copy(TYPE_COLORS.dead_atp);
                     else if (n.deathReason === 'regen') _tempColor.copy(TYPE_COLORS.dead_regen);
                     else _tempColor.copy(TYPE_COLORS.dead);
                 } else {
-                    if (n.statusFlags & FLAG_IS_INHIBITED) {
-                        _tempColor.copy(baseColor).multiplyScalar(0.1);
-                        activeWtaCount++;
-                    } else if (n.statusFlags & FLAG_IS_PREDICTIVE) {
-                        const predColor = new THREE.Color(0xff00ff);
-                        _tempColor.copy(predColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
-                    } else {
+                    if (colorMode === 'layer') {
+                        // В режиме LAYER игнорим предиктив стейт и ингибирование - показываем чистые цвета слоев + вспышки спайков
                         _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
+                    } else {
+                        if (n.statusFlags & FLAG_IS_INHIBITED) {
+                            _tempColor.copy(baseColor).multiplyScalar(0.1);
+                        } else if (n.statusFlags & FLAG_IS_PREDICTIVE) {
+                            const predColor = new THREE.Color(0xff00ff);
+                            _tempColor.copy(predColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
+                        } else {
+                            _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
+                        }
                     }
                 }
                 
