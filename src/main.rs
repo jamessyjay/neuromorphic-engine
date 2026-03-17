@@ -31,10 +31,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_bench_io = args.contains(&String::from("--bench-io"));
     let is_ui_test = args.contains(&String::from("--ui-test"));
     let is_mnist = args.contains(&String::from("--mnist"));
+    let is_inference = args.contains(&String::from("--inference"));
 
     let mut parsed_neurons = DEFAULT_BENCHMARK_NEURONS;
     let mut parsed_synapses = DEFAULT_BENCHMARK_SYNAPSES;
     let mut parsed_ticks = DEFAULT_SIMULATION_TICKS;
+    let mut save_path: Option<String> = None;
+    let mut load_path: Option<String> = None;
+    
     if is_ui_test {
         parsed_ticks = 50_000;
     }
@@ -48,6 +52,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         if args[i] == "--ticks" && i + 1 < args.len() {
             parsed_ticks = args[i+1].parse().unwrap_or(parsed_ticks);
+        }
+        if args[i] == "--save-path" && i + 1 < args.len() {
+            save_path = Some(args[i+1].clone());
+        }
+        if args[i] == "--load-path" && i + 1 < args.len() {
+            load_path = Some(args[i+1].clone());
         }
     }
 
@@ -92,7 +102,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("=======================================================\n");
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
-        neuromorphic_engine::runner::modes::run_mnist_mode(parsed_ticks, tx_option.clone(), shared_env.clone(), true, is_ui_enabled).await?;
+        neuromorphic_engine::runner::modes::run_mnist_mode(
+            parsed_ticks, 
+            tx_option.clone(), 
+            shared_env.clone(), 
+            true, 
+            is_ui_enabled,
+            is_inference,
+            save_path.clone(),
+            load_path.clone()
+        ).await?;
         if is_ui_enabled {
             println!("MNIST simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
             loop { tokio::time::sleep(tokio::time::Duration::from_secs(1)).await; }

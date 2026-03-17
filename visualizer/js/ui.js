@@ -241,3 +241,14 @@ export function initUIEventListeners() {
     window.toggleLayer = toggleLayer;
     window.toggleColorMode = toggleColorMode;
 }
+
+export function saveBrain() {
+    const ws = getWs();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "SaveBrain" }));
+        console.log("Save brain request sent");
+    } else {
+        console.warn("WebSocket not connected, cannot save brain.");
+    }
+}
+window.saveBrain = saveBrain;

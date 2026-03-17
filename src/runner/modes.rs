@@ -1530,7 +1530,7 @@ pub async fn run_mnist_mode(
     tx: Option<tokio::sync::broadcast::Sender<String>>,
     shared_env: std::sync::Arc<std::sync::Mutex<crate::engine::ffi::Environment>>,
     _use_dynamic_homeostasis: bool,
-    use_ui: bool,
+    use_ui: bool, is_inference: bool, save_path: Option<String>, load_path: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING MNIST MODE ---");
     
@@ -1538,7 +1538,17 @@ pub async fn run_mnist_mode(
     let images = crate::mnist::load_mnist_images("data/train-images-idx3-ubyte")?;
     let labels = crate::mnist::load_mnist_labels("data/train-labels-idx1-ubyte")?;
     
-    let mut graph = setup_mnist_network();
+    let mut graph = if let Some(path) = &load_path {
+        if let Some(snapshot) = crate::engine::snapshot::BrainSnapshot::load_from_disk(path) {
+            println!("Brain loaded from {}", path);
+            snapshot.graph
+        } else {
+            println!("Failed to load brain from {}, falling back to new network", path);
+            setup_mnist_network()
+        }
+    } else {
+        setup_mnist_network()
+    };
     
     let mut current_tick = 0;
     let start_time = std::time::Instant::now();
@@ -1555,6 +1565,8 @@ pub async fn run_mnist_mode(
     let mut current_label = 0;
     let mut last_synapse_count = graph.synapses.len();
     let mut correct_guesses_history: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(100);
+    let mut total_correct_guesses = 0;
+    let mut total_images_processed = 0;
     
     while current_tick < total_ticks {
         if use_ui && current_tick % 10 == 0 {
@@ -1576,13 +1588,42 @@ pub async fn run_mnist_mode(
             }
         }
 
-        // Force correct output neuron to spike for STDP
-        if current_label < 10 {
-            graph.neurons[1784 + current_label as usize].external_input = 1.5;
+        // Force correct output neuron to spike for STDP or apply burst feedback
+        if !is_inference && current_label < 10 {
+            let guess = if current_tick > 0 && correct_guesses_history.len() > 0 {
+                // Determine previous best guess to check if bursting is needed
+                let mut best_guess = 0;
+                let mut max_trace = -100.0;
+                for i in 0..10 {
+                    let n = &graph.neurons[1784 + i];
+                    let score = n.spike_trace * 100.0 + n.current_voltage;
+                    if score > max_trace {
+                        max_trace = score;
+                        best_guess = i as u8;
+                    }
+                }
+                best_guess
+            } else {
+                current_label
+            };
+
+            if guess != current_label && current_tick % 500 < 10 {
+                // Bursting on incorrect guess
+                graph.neurons[1784 + current_label as usize].external_input = 3.0;
+            } else {
+                // Normal teacher signal
+                graph.neurons[1784 + current_label as usize].external_input = 1.5;
+            }
+        } else if is_inference && current_label < 10 {
+             // Ensure no external input in inference mode
+             graph.neurons[1784 + current_label as usize].external_input = 0.0;
         }
         
         let env = {
-            let guard = shared_env.lock().unwrap();
+            let mut guard = shared_env.lock().unwrap();
+            if is_inference {
+                guard.stdp_learning_rate = 0.0;
+            }
             *guard
         };
         
@@ -1610,6 +1651,11 @@ pub async fn run_mnist_mode(
                 
                 let is_correct = best_guess == current_label;
                 
+                total_images_processed += 1;
+                if is_correct {
+                    total_correct_guesses += 1;
+                }
+                
                 if correct_guesses_history.len() >= 100 {
                     correct_guesses_history.pop_front();
                 }
@@ -1627,6 +1673,39 @@ pub async fn run_mnist_mode(
             }
         }
         
+        // Export metrics every 100 ticks
+        if current_tick > 0 && current_tick % 100 == 0 {
+            let correct_count = correct_guesses_history.iter().filter(|&&c| c).count();
+            let accuracy = if correct_guesses_history.len() > 0 {
+                (correct_count as f32 / correct_guesses_history.len() as f32) * 100.0
+            } else {
+                0.0
+            };
+            
+            let mut active_spikes = 0;
+            let mut sum_atp = 0.0;
+            for n in &graph.neurons {
+                if n.last_spike_tick > current_tick.saturating_sub(100) {
+                    active_spikes += 1;
+                }
+                sum_atp += n.energy_atp;
+            }
+            let avg_atp = sum_atp / graph.neurons.len() as f32;
+            
+            let dopamine = env.dopamine_multiplier;
+            let tick = current_tick;
+            
+            let json_line = format!(r#"{{"tick":{},"accuracy":{},"avg_atp":{},"active_spikes":{},"dopamine":{}}}"#, 
+                tick, accuracy, avg_atp, active_spikes, dopamine);
+                
+            tokio::spawn(async move {
+                if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open("metrics.jsonl") {
+                    use std::io::Write;
+                    let _ = writeln!(file, "{}", json_line);
+                }
+            });
+        }
+        
         current_tick += 1;
         
         if current_tick % sampling_interval == 0 {
@@ -1640,6 +1719,13 @@ pub async fn run_mnist_mode(
                 if current_tick > 0 && n.last_spike_tick == current_tick - 1 {
                     new_spikes += 1;
                 }
+            }
+            
+            if std::path::Path::new("SAVE_BRAIN_NOW").exists() {
+                let _ = std::fs::remove_file("SAVE_BRAIN_NOW");
+                let path = save_path.clone().unwrap_or_else(|| "brain_snapshot.bin".to_string());
+                println!("UI requested save. Saving brain to {}", path);
+                crate::engine::snapshot::BrainSnapshot::save_test_snapshot(current_tick, &graph, &path);
             }
             
             if let Some(tx_chan) = tx.as_ref() {
@@ -1673,6 +1759,17 @@ pub async fn run_mnist_mode(
             }
             tokio::task::yield_now().await;
         }
+    }
+    
+    if let Some(path) = save_path {
+        crate::engine::snapshot::BrainSnapshot::save_test_snapshot(current_tick, &graph, &path);
+    }
+    
+    if total_images_processed > 0 {
+        let avg_accuracy = (total_correct_guesses as f32 / total_images_processed as f32) * 100.0;
+        println!("\n=======================================================");
+        println!("🎯 FINAL SESSION ACCURACY: {:.2}% ({} / {} correct)", avg_accuracy, total_correct_guesses, total_images_processed);
+        println!("=======================================================\n");
     }
     
     Ok(())

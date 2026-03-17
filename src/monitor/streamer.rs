@@ -12,6 +12,7 @@ pub enum IncomingMsg {
         dopamine_multiplier: f32,
         stdp_learning_rate: f32,
     },
+    SaveBrain,
 }
 
 #[derive(Serialize, Clone)]
@@ -108,12 +109,16 @@ async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String
                                         println!("Chemistry updated: Dopamine x{}, LR: {}", dopamine_multiplier, stdp_learning_rate);
                                     }
                                 }
+                                IncomingMsg::SaveBrain => {
+                                    println!("SAVE BRAIN trigger received from UI.");
+                                    let _ = std::fs::write("SAVE_BRAIN_NOW", "1");
+                                }
                             }
                         }
                     }
                 }
-                Err(e) => {
-                    println!("Error receiving from websocket: {}", e);
+                Err(_) => {
+                    // silently break on WS error (browser refresh)
                     break;
                 }
             }
@@ -134,8 +139,8 @@ async fn handle_client(ws: warp::ws::WebSocket, tx: Arc<broadcast::Sender<String
     loop {
         match rx.recv().await {
             Ok(msg) => {
-                if let Err(e) = client_ws_sender.send(warp::ws::Message::text(msg)).await {
-                    println!("WebSocket send error: {}. Closing connection.", e);
+                if let Err(_) = client_ws_sender.send(warp::ws::Message::text(msg)).await {
+                    // WebSocket send error - quiet close on refresh
                     break;
                 }
             }

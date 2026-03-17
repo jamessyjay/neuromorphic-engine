@@ -1,3 +1,28 @@
+# Walkthrough - Phase 35: Brain Persistence & Inference Mode (v2.0)
+
+## Overview
+Implemented core features to transition the prototype to v2.0, adding capabilities to save/load trained models, evaluate performance in inference mode, accelerate supervised learning via bursting, and export telemetry for Grafana.
+
+## Key Implementation Details
+
+1. **Brain Persistence (Save/Load)**:
+   - Handled serialization/deserialization of `NetworkGraph` along with environment states using `bincode`.
+   - Added CLI flags `--save-path <file>` to dump the state post-training, and `--load-path <file>` to skip setup and start from a pre-trained brain.
+   - Extended the UI and WebSocket (`streamer.rs`) to process a `SaveBrain` message when clicking the "SAVE BRAIN" button.
+
+2. **Inference Mode (`--inference`)**:
+   - Freezes network weights by dynamically setting `stdp_learning_rate = 0.0`.
+   - Silences teacher hints: overrides the normal label feed to send `0.0` input to output neurons, relying purely on learned synaptic pathways.
+
+3. **Supervised Bursting (Feedback v2)**:
+   - If the network fails to classify the current digit, the correct target neuron receives a massively boosted spike signal (`3.0` instead of `1.5`) for the first 10 ticks to trigger a fast STDP cascade and force association.
+
+4. **Metrics Export (`metrics.jsonl`)**:
+   - Implemented an asynchronous periodic logging task every 100 ticks that appends JSON formatted analytics to `metrics.jsonl`, tracking `tick`, `accuracy`, `avg_atp`, `active_spikes`, and `dopamine`.
+
+5. **Robust UI Connectivity**:
+   - Hardened `streamer.rs` WebSocket connection handler to silently suppress generic connection drops (e.g., during a browser refresh) and wait for reconnection instead of crashing the process or printing repetitive errors.
+
 # Walkthrough - Phase 33 & 34: Dendritic Compartments & Architecture Stability
 
 ## Overview
