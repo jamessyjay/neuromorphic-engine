@@ -41,8 +41,8 @@ fn test_stdp_trace_decay() {
     }
 
     let final_trace = graph.neurons[n as usize].spike_trace;
-    assert!(final_trace < 0.5 && final_trace > 0.0, "Trace should have decayed to approx 0.1215: {}", final_trace);
-    assert!((final_trace - 0.1215).abs() < 0.05, "Trace value incorrect: {}", final_trace);
+    assert!(final_trace < 0.9 && final_trace > 0.0, "Trace should have decayed to approx 0.8179: {}", final_trace);
+    assert!((final_trace - 0.8179).abs() < 0.05, "Trace value incorrect: {}", final_trace);
 }
 
 #[test]

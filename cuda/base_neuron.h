@@ -118,7 +118,7 @@ extern "C" {
 #define STDP_TAU_MINUS 20.0f
 #define STDP_A_PLUS 0.005f
 #define STDP_A_MINUS 0.007f
-#define STDP_DECAY 0.90f
+#define STDP_DECAY 0.99f
 #define MIN_SYNAPSE_WEIGHT 0.01f
 
 #define CONSTANT_PHOTORECEPTOR_LEAK 2.0f

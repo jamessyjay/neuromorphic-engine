@@ -1,3 +1,23 @@
+# Walkthrough - Phase 37: "Wake Up, Neo" (Stochastic Babbling & Trace Persistence)
+
+## Overview
+Addressed the issue of the network remaining silent ("10.7% Acc") after the transition to the Amygdala Reward Loop. The output neurons weren't firing on their own, meaning the Winner-Takes-All (WTA) logic never triggered, and no useful synaptic associations could form.
+
+## Key Implementation Details
+
+1. **WTA Output Threshold Lowering**:
+   - Lowered the default `activation_threshold` of the 10 MNIST output neurons (indices 1784..1793) from `50.0` to `20.0` in `setup_mnist_network()`. This makes them hyper-sensitive during initial training, encouraging baseline firing.
+
+2. **Stochastic Babbling (Exploration)**:
+   - Added a "babbling" mechanism in `run_mnist_mode()`. If the network remains completely silent (no output spikes) during the first 100 ticks of an image exposure, a small exogenous current (`external_input = 0.5`) is injected into a randomly selected output neuron. This forces the network to "guess" something and kickstart the STDP feedback loop.
+
+3. **Eligibility Trace Persistence**:
+   - Updated `STDP_DECAY` in `base_neuron.h` from `0.90` to `0.99`. This drastically increases the lifespan of the eligibility trace (it now lasts ~300-400 ticks instead of ~30). The trace now comfortably bridges the gap between an early spike and the delayed reward/punishment at tick 499.
+   - Updated corresponding assertions in `test_stdp_trace_decay`.
+
+4. **Dopamine Maintenance**:
+   - Instead of a one-tick dopamine burst, `modes.rs` now maintains the active dopamine state (either `1.0` for reward or `-0.2` for punishment) for **50 consecutive ticks** after an evaluation. This ensures that all active traces have time to securely undergo Long-Term Potentiation (LTP) or Depression (LTD).
+
 # Walkthrough - Phase 36: Project "Amygdala" & 3-Factor STDP (v3.0)
 
 ## Overview

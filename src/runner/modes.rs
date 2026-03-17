@@ -1497,6 +1497,7 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         n.y = 32768; // По центру Y
         n.z = 60000; // На заднем плане
         n.layer_id = 5; // L5 - Output
+        n.activation_threshold = 20.0; // Phase 56: Lower threshold for outputs to encourage initial babbling
     }
     
     // 4. Connect photoreceptors to Processing neurons
@@ -1569,6 +1570,8 @@ pub async fn run_mnist_mode(
     let mut correct_guesses_history: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(100);
     let mut total_correct_guesses = 0;
     let mut total_images_processed = 0;
+    let mut dopamine_timer = 0;
+    let mut current_dopamine_level = 0.0;
     
     while current_tick < total_ticks {
         if use_ui && current_tick % 10 == 0 {
@@ -1597,6 +1600,23 @@ pub async fn run_mnist_mode(
             // will evaluate it at the end of the window (tick 499) and reward/punish.
             for i in 0..10 {
                 graph.neurons[1784 + i].external_input = 0.0;
+            }
+            
+            // Phase 56: Stochastic Babbling
+            // If network is completely silent during the first 100 ticks of a frame, 
+            // randomly inject a tiny bit of current to force some random association.
+            if current_tick % 500 == 100 {
+                let mut any_spiked = false;
+                for i in 0..10 {
+                    if graph.neurons[1784 + i].last_spike_tick > current_tick - 100 {
+                        any_spiked = true;
+                        break;
+                    }
+                }
+                if !any_spiked {
+                    let rand_idx = (current_tick % 10) as usize; // Pseudo-random based on tick
+                    graph.neurons[1784 + rand_idx].external_input = 0.5;
+                }
             }
         } else if is_inference && current_label < 10 {
              // Ensure no external input in inference mode
@@ -1643,10 +1663,12 @@ pub async fn run_mnist_mode(
                 // Phase 55: Amygdala Reward/Punishment
                 let mut guard = shared_env.lock().unwrap();
                 if is_correct {
-                    guard.dopamine_multiplier = 1.0; // Reward!
+                    current_dopamine_level = 1.0; // Reward!
                 } else {
-                    guard.dopamine_multiplier = -0.2; // Punishment!
+                    current_dopamine_level = -0.2; // Punishment!
                 }
+                guard.dopamine_multiplier = current_dopamine_level;
+                dopamine_timer = 50; // Maintain for 50 ticks
                 drop(guard);
                 
                 if correct_guesses_history.len() >= 100 {
@@ -1664,6 +1686,14 @@ pub async fn run_mnist_mode(
                     current_image_idx - 1, current_label, best_guess, is_correct, accuracy, atp
                 );
             }
+        }
+        
+        // Maintain dopamine for dopamine_timer ticks
+        if dopamine_timer > 0 {
+            dopamine_timer -= 1;
+            let mut guard = shared_env.lock().unwrap();
+            guard.dopamine_multiplier = current_dopamine_level;
+            drop(guard);
         }
         
         // Export metrics every 100 ticks
