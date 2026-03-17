@@ -22,7 +22,7 @@ impl BrainSnapshot {
                 dopamine_multiplier: 1.0, 
                 toxin_levels: 0.0, 
                 light_level: 0.0, 
-                stdp_learning_rate: 0.1, 
+                stdp_learning_rate: 0.01, 
                 wakefulness_multiplier: 1.0 
             },
             graph: graph.clone()

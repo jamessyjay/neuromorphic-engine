@@ -218,6 +218,35 @@ impl NetworkGraph {
         id
     }
 
+    pub fn apply_synaptic_scaling(&mut self) {
+        let mut weight_sums = vec![0.0f32; self.neurons.len()];
+        let mut synapse_counts = vec![0u32; self.neurons.len()];
+        
+        for s in &self.synapses {
+            let tid = s.target_id as usize;
+            if tid < weight_sums.len() {
+                weight_sums[tid] += s.weight;
+                synapse_counts[tid] += 1;
+            }
+        }
+        
+        for s in &mut self.synapses {
+            let tid = s.target_id as usize;
+            if tid < weight_sums.len() {
+                let count = synapse_counts[tid] as f32;
+                if count > 0.0 {
+                    let target_sum = count * 2.0; // Target average weight is 2.0
+                    let current_sum = weight_sums[tid];
+                    // If sum of weights exceeds the target, scale them down proportionally
+                    if current_sum > target_sum {
+                        let scale = target_sum / current_sum;
+                        s.weight *= scale;
+                    }
+                }
+            }
+        }
+    }
+
     pub fn tick(&mut self, current_tick: u32, env: crate::engine::ffi::Environment) {
         // Phase 3: Reset (happens at the beginning of tick)
         for n in &mut self.neurons {
@@ -300,6 +329,9 @@ impl NetworkGraph {
         }
 
         self.apply_sdr_tuning(current_tick);
+        if current_tick % 100 == 0 {
+            self.apply_synaptic_scaling();
+        }
     }
 
     pub fn apply_sdr_tuning(&mut self, current_tick: u32) {
@@ -326,6 +358,24 @@ impl NetworkGraph {
                     n.activation_threshold += adjustment;
                     // Clamp threshold to reasonable biological limits
                     n.activation_threshold = n.activation_threshold.clamp(-65.0, 10.0);
+                }
+            }
+        }
+
+        // Homeostatic threshold penalty for Output Layer (L5 / MNIST Labels)
+        // If a label neuron fires too often, we increase its threshold to give others a chance
+        for i in 1784..1794 {
+            if i < self.neurons.len() {
+                let n = &mut self.neurons[i];
+                if n.is_alive == 1 {
+                    // Decay threshold back to baseline slowly
+                    if n.activation_threshold > n.resting_voltage + 15.0 {
+                        n.activation_threshold -= 0.001; 
+                    }
+                    // Increase threshold on recent spike to prevent monopolization (The "7" Demon)
+                    if n.last_spike_tick == current_tick {
+                        n.activation_threshold += 0.5; // Adaptive homeostasis
+                    }
                 }
             }
         }

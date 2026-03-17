@@ -431,7 +431,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS,
-        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
     };
     
@@ -583,7 +583,7 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
             dopamine_multiplier: 1.0,
             toxin_levels: 0.0,
             light_level: 0.0,
-            stdp_learning_rate: 0.1,
+            stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
         }));
         let _ = run_benchmark_mode(num_neurons, num_synapses, crate::engine::constants::SCALING_BENCHMARK_TICKS, None, dummy_env, false).await?;
@@ -624,7 +624,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
-        light_level: 0.0, stdp_learning_rate: 0.1,
+        light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
     });
     
@@ -722,7 +722,7 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
-        light_level: 0.0, stdp_learning_rate: 0.1,
+        light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
     };
 
@@ -795,7 +795,7 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
-        light_level: 0.0, stdp_learning_rate: 0.1,
+        light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
     };
 
@@ -840,7 +840,7 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0, 
     };
 
@@ -886,7 +886,7 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS,
-        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
     };
 
@@ -934,7 +934,7 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0, 
-        light_level: 0.0, stdp_learning_rate: 0.1,
+        light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0, 
     };
 
@@ -984,7 +984,7 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE, 
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0, 
     };
 
@@ -1036,7 +1036,7 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0, 
     };
 
@@ -1084,7 +1084,7 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0,
-        light_level: 0.0, stdp_learning_rate: 0.1,
+        light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
     };
     
@@ -1124,7 +1124,7 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE, 
         dopamine_multiplier: EMERGENCE_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0, 
     };
 
@@ -1167,7 +1167,7 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
         global_glucose_level: DEFAULT_GLUCOSE,
         dopamine_multiplier: MORPHOLOGY_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
-        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.1,
+        light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0, 
     };
 
@@ -1232,7 +1232,7 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
             global_glucose_level: 1.0,
             dopamine_multiplier: 1.0,
             toxin_levels: 0.0,
-            light_level: 0.0, stdp_learning_rate: 0.1,
+            light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
         };
         
@@ -1364,7 +1364,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         global_glucose_level: 1.0,
         dopamine_multiplier: 1.0,
         toxin_levels: 0.0,
-        light_level: 0.0, stdp_learning_rate: 0.1,
+        light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
     };
 
@@ -1586,6 +1586,33 @@ pub async fn run_mnist_mode(
         
         // Tick the network
         graph.tick(current_tick, env.clone());
+        
+        // Output Layer Winner-Take-All (WTA) logic for MNIST Classifier (Indices 1784..1794)
+        if graph.neurons.len() >= 1794 {
+            let mut winner_id: Option<usize> = None;
+            let mut highest_v = -100.0;
+            
+            // Find the first spiking neuron or the one with the highest voltage
+            for i in 1784..1794 {
+                let n = &graph.neurons[i];
+                if n.is_alive == 1 && n.current_voltage > highest_v {
+                    highest_v = n.current_voltage;
+                    winner_id = Some(i);
+                }
+            }
+            
+            // Apply massive lateral inhibition to all other output neurons if the winner spiked
+            if let Some(w_id) = winner_id {
+                let winner = &graph.neurons[w_id];
+                if winner.current_voltage >= winner.activation_threshold || winner.last_spike_tick == current_tick {
+                    for i in 1784..1794 {
+                        if i != w_id && graph.neurons[i].is_alive == 1 {
+                            graph.neurons[i].current_voltage -= 20.0; // Hard suppression penalty
+                        }
+                    }
+                }
+            }
+        }
         
         current_tick += 1;
         
