@@ -2,6 +2,10 @@
 
 This document outlines the testing strategy for the Neuromorphic Engine. It is divided into 7 blocks, covering everything from basic biological accuracy to low-level hardware performance and non-linear scaling detection.
 
+**IMPORTANT NOTE**
+All tests should be run with `cargo test --release` to ensure they are testing the optimized code.
+Also, for pure results there must be no other heavy processes running on the system. Ensure that CPU load is less than 5% before starting the testing.
+
 ## Block 1: Metabolic Terror (ATP & Death)
 
 *Goal: Ensure `base_neuron.cu` correctly calculates the price of life.*

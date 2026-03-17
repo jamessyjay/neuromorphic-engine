@@ -428,6 +428,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
                 float failure_roll = (float)((current_tick + s->source_id + s->target_id) % RANDOM_MODULO_BASE) / (float)RANDOM_MODULO_BASE;
                 if (failure_roll > SYNAPSE_RELIABILITY_THRESHOLD) {
                     s->neurotransmitter_buffer *= SYNAPSE_RELIABILITY_PENALTY; 
+                    s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
                     return; 
                 }
             }
