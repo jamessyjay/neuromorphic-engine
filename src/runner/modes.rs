@@ -1553,6 +1553,7 @@ pub async fn run_mnist_mode(
     let mut image_pixels: Vec<f32> = vec![0.0; 784];
     let mut current_label = 0;
     let mut last_synapse_count = graph.synapses.len();
+    let mut correct_guesses_history: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(100);
     
     while current_tick < total_ticks {
         if use_ui && current_tick % 10 == 0 {
@@ -1611,6 +1612,41 @@ pub async fn run_mnist_mode(
                         }
                     }
                 }
+            }
+        }
+        
+        // Log telemetry at the end of the image exposure (tick 499, 999, etc.)
+        if (current_tick + 1) % 500 == 0 && current_tick > 0 && current_image_idx > 0 {
+            if graph.neurons.len() >= 1794 {
+                let mut best_guess = 0;
+                let mut max_trace = -100.0;
+                
+                // Determine guess based on spike_trace or voltage
+                for i in 0..10 {
+                    let n = &graph.neurons[1784 + i];
+                    let score = n.spike_trace * 100.0 + n.current_voltage; // prioritize recent spikes
+                    if score > max_trace {
+                        max_trace = score;
+                        best_guess = i as u8;
+                    }
+                }
+                
+                let is_correct = best_guess == current_label;
+                
+                if correct_guesses_history.len() >= 100 {
+                    correct_guesses_history.pop_front();
+                }
+                correct_guesses_history.push_back(is_correct);
+                
+                let correct_count = correct_guesses_history.iter().filter(|&&c| c).count();
+                let accuracy = (correct_count as f32 / correct_guesses_history.len() as f32) * 100.0;
+                
+                let atp = graph.neurons[1784 + current_label as usize].energy_atp;
+                
+                println!(
+                    "[TRAINING] Image: #{:<4} | Label: {} | Guess: {} | Correct: {:>5} | Acc (100): {:>5.1}% | Target ATP: {:.1}",
+                    current_image_idx - 1, current_label, best_guess, is_correct, accuracy, atp
+                );
             }
         }
         

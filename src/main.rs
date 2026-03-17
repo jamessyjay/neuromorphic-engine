@@ -35,6 +35,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut parsed_neurons = DEFAULT_BENCHMARK_NEURONS;
     let mut parsed_synapses = DEFAULT_BENCHMARK_SYNAPSES;
     let mut parsed_ticks = DEFAULT_SIMULATION_TICKS;
+    if is_ui_test {
+        parsed_ticks = 50_000;
+    }
 
     for i in 1..args.len() {
         if args[i] == "--neurons" && i + 1 < args.len() {
@@ -97,10 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     } else if is_ui_test {
         run_ui_test(tx_option.clone(), shared_env.clone()).await?;
-        println!("Simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-        }
+        println!("UI test simulation finished.");
     } else if is_sleep_test {
         run_sleep_test()?;
         return Ok(());
