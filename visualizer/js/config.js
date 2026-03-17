@@ -6,7 +6,7 @@ export const FLAG_IS_PREDICTIVE = 2;
 export const TYPE_COLORS = {
     0: new THREE.Color(0x00aaff), 1: new THREE.Color(0x44ff44),
     2: new THREE.Color(0xffaa00), 3: new THREE.Color(0xff00ff),
-    4: new THREE.Color(0xff4444), 5: new THREE.Color(0xffff00),
+    4: new THREE.Color(0xff4444), 5: new THREE.Color(0xff0044), // Photoreceptor (Bright Neon Red)
     6: new THREE.Color(0x00ffff), 
     dead_calcium: new THREE.Color(0xff2222), // Red for calcium overload
     dead_atp: new THREE.Color(0x2222ff),     // Blue for hypoxia/starvation
