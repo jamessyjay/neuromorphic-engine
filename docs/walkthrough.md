@@ -1,3 +1,35 @@
+# Walkthrough - TK #26 & TK #27: Synaptic X-Ray & Circuits Topology
+
+## Overview
+Implemented deep topological diagnostics and completely restructured the synaptic connection rules to support reverberating memory circuits and realistic axonal delivery delays.
+
+## TK #26: Synaptic X-Ray
+1. **Dendritic Array Expansion**:
+   - Expanded `branches` to 16 in `Compartment` array.
+   - Updated bitmasks in `Synapse` flags: `0-3` for `branch_id`, `4` for `is_inhibitory`, `5` for `is_myelinated`.
+2. **Diagnostic Telemetry**:
+   - Added `print_synaptic_diagnostics` to calculate the mathematical topological distribution of connections ($P(L) \propto L^{-1.5}$) verifying biological clustering.
+   - Outputs histograms of branch utilization and synaptic weight distribution to ensure the "long tail" (80% weak, 20% strong) rule holds.
+3. **Preferential Attachment**:
+   - Overhauled `run_neurogenesis_service`.
+   - "Rich get richer": new synapses seek the most active dendritic branches (`local_trace`).
+   - "Load balancing": if the target neuron is metabolically stressed (`energy_ATP < 70.0`), new synapses hunt for the quietest branch to distribute the processing load.
+
+## TK #27: Synaptic Circuits & Axonal Topology
+1. **The Axonal Bottleneck**:
+   - Introduced `axonal_delay` into `BaseNeuron` (randomized between 1-5 ticks during `init_neuron`).
+   - Replaced hardcoded `UNMYELINATED_DELIVERY_TICKS` with dynamic `source->axonal_delay` in `process_synapse` (CUDA/C++).
+   - This creates natural propagation desynchronization across the brain mesh.
+2. **Multi-synaptic Connections**:
+   - Stripped the deduplication guard out of `graph.connect()`.
+   - Two neurons can now maintain multiple parallel synaptic projections targeting different dendritic branches, vastly increasing combinatorial capacity.
+3. **The -3/2 Topological Law**:
+   - Injected distance-based decay $P(L) \propto L^{-1.5}$ into `run_neurogenesis_service`.
+   - Synapses now primarily grow locally (creating dense functional clusters) but occasionally project long-range axon terminals across the grid.
+4. **Reverberating Circuits Validation**:
+   - Created `test_reverberating_circuit` in `edge_cases_tests.rs`.
+   - A closed `A -> B -> C -> A` loop with an exact delay of 5 ticks successfully circulates a single injected spike indefinitely, proving that **Hebb's reverberating memory rings** are fully functional inside the CUDA engine without exogenous energy input.
+
 # Walkthrough - Phase 37: "Wake Up, Neo" (Stochastic Babbling & Trace Persistence)
 
 ## Overview
