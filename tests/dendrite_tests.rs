@@ -120,6 +120,12 @@ fn test_trunk_vs_tuft_penalty() {
     let id_tuft = graph_tuft.add_neuron(NeuronType::Pyramidal);
     let env = default_env();
     
+    // Equalize randomly initialized properties
+    graph_trunk.neurons[id_trunk as usize].max_atp = 100.0;
+    graph_tuft.neurons[id_tuft as usize].max_atp = 100.0;
+    graph_trunk.neurons[id_trunk as usize].leak_coeff = 1.0;
+    graph_tuft.neurons[id_tuft as usize].leak_coeff = 1.0;
+    
     graph_trunk.neurons[id_trunk as usize].energy_atp = 100.0;
     graph_tuft.neurons[id_tuft as usize].energy_atp = 100.0;
     
