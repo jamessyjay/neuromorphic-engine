@@ -576,7 +576,7 @@ fn test_stdp_ltd_forgetting() {
     let src = graph.add_neuron(NeuronType::Pyramidal);
     let tgt = graph.add_neuron(NeuronType::Pyramidal);
     
-    let mut env = default_env();
+    let env = default_env();
     
     let synapse = Synapse {
         source_id: src,

@@ -1539,6 +1539,7 @@ pub async fn run_mnist_mode(
     let labels = crate::mnist::load_mnist_labels("data/train-labels-idx1-ubyte")?;
     
     let mut graph = setup_mnist_network();
+    
     let mut current_tick = 0;
     let start_time = std::time::Instant::now();
     let total_elements = graph.neurons.len() + graph.synapses.len();
@@ -1589,31 +1590,7 @@ pub async fn run_mnist_mode(
         graph.tick(current_tick, env.clone());
         
         // Output Layer Winner-Take-All (WTA) logic for MNIST Classifier (Indices 1784..1794)
-        if graph.neurons.len() >= 1794 {
-            let mut winner_id: Option<usize> = None;
-            let mut highest_v = -100.0;
-            
-            // Find the first spiking neuron or the one with the highest voltage
-            for i in 1784..1794 {
-                let n = &graph.neurons[i];
-                if n.is_alive == 1 && n.current_voltage > highest_v {
-                    highest_v = n.current_voltage;
-                    winner_id = Some(i);
-                }
-            }
-            
-            // Apply massive lateral inhibition to all other output neurons if the winner spiked
-            if let Some(w_id) = winner_id {
-                let winner = &graph.neurons[w_id];
-                if winner.current_voltage >= winner.activation_threshold || winner.last_spike_tick == current_tick {
-                    for i in 1784..1794 {
-                        if i != w_id && graph.neurons[i].is_alive == 1 {
-                            graph.neurons[i].current_voltage -= 20.0; // Hard suppression penalty
-                        }
-                    }
-                }
-            }
-        }
+        graph.apply_classifier_wta(current_tick, 1784, 1794);
         
         // Log telemetry at the end of the image exposure (tick 499, 999, etc.)
         if (current_tick + 1) % 500 == 0 && current_tick > 0 && current_image_idx > 0 {
