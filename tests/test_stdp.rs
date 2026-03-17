@@ -237,8 +237,12 @@ fn test_stdp_weight_clamping() {
     graph.neurons[tgt as usize].branches[0].local_trace = 255;
     graph.tick(4, env.clone());
     
+    // Delivery takes time because of axonal delay
     graph.neurons[tgt as usize].spikes_in_last_window = 10;
-    graph.tick(5, env.clone()); // Delivery
+    graph.tick(5, env.clone());
+    graph.tick(6, env.clone());
+    graph.tick(7, env.clone());
+    graph.tick(8, env.clone());
 
     let final_weight = graph.synapses[0].weight;
     // float cmp with epsilon or round
