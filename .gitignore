@@ -14,3 +14,4 @@ output.log
 # Keep golden states for regression testing
 !reports/neuron_golden_state.json
 doce/todo/backlog.mddata/
+data/

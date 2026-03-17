@@ -1594,7 +1594,6 @@ pub async fn run_mnist_mode(
             let _simulation_speed = (current_tick as f32) / (elapsed_ms / 1000.0);
             
             let _current_neuron_count = graph.neurons.len();
-            let current_synapse_count = graph.synapses.len();
             
             let mut new_spikes = 0;
             for n in &graph.neurons {

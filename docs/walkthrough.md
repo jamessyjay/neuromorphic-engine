@@ -455,3 +455,21 @@ To secure the biological integrity and hardware stability of the engine, a compl
 - Run `cargo run -- --neurons 1000 --synapses 10000 --ui --ticks 50000`. Server remains stable and WebSocket clients can successfully connect and reconnect cleanly.
 - Visualizer gracefully handles missing fields like `data.events` or `data.retina_frame` based on context.
 - Payload footprint optimizations are intact, maintaining high FPS.
+
+---
+
+## [Phase 14] The First Prototype
+
+**Objective:** Finalize the MNIST integration and polish the UI layer to form the first coherent MVP of the Neuromorphic Engine.
+
+1. **Neural Classifier Dashboard:**
+   - Added a real-time progress bar UI panel to `index.html` to visualize the firing states of the 10 output L5 Pyramidal neurons.
+   - Implemented Exponential Moving Average (EMA) smoothing for visual stability of the output bars.
+   - Added Hysteresis and Winner-Hold logic to prevent rapid flickering of the predicted digit.
+   - Introduced dynamic color-coding: **Neon Blue** for network's current prediction, **Golden** for the actual label, and **Bright Green** when the network successfully guesses the label.
+
+2. **Cleanups:**
+   - Fixed `unused_variable` warnings inside the Rust engine `run_mnist_mode`.
+   - Cleaned up the `.gitignore` to explicitly ignore the `data/` directory since MNIST binaries are massive and shouldn't be tracked by git.
+
+This phase concludes the foundation of the architecture. The simulation now functionally parses external input, maps it topologically across pseudo-cortical columns, processes the signal through biologically-inspired mechanisms, and visually presents the predictive classification in real-time.
