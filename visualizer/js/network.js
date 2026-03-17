@@ -96,6 +96,11 @@ export function connect(host) {
                 document.getElementById('v-glucose').innerText = data.global_glucose.toFixed(2);
                 document.getElementById('prog-glucose').value = data.global_glucose;
             }
+            if (data.global_dopamine !== undefined) {
+                document.getElementById('v-dopamine-val').innerText = data.global_dopamine.toFixed(2);
+                // Convert -1.0 to 2.0 range into 0 to 1 progress bar for visual
+                document.getElementById('prog-dopamine').value = Math.max(0, Math.min(1, (data.global_dopamine + 1.0) / 3.0));
+            }
             if (data.synapse_count !== undefined) {
                 document.getElementById('synapses').innerText = data.synapse_count;
             }

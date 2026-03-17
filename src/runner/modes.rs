@@ -105,6 +105,7 @@ pub fn broadcast_tick_update(
         total_spikes: accumulated_spikes,
         global_oxygen: current_env.global_oxygen_level,
         global_glucose: current_env.global_glucose_level,
+        global_dopamine: current_env.dopamine_multiplier,
         neurons: Vec::with_capacity(graph.neurons.len()),
         synapses: if should_send_synapses {
             let mut syn_vec = Vec::with_capacity(graph.synapses.len());
@@ -1405,6 +1406,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                     total_spikes: 0,
                     global_oxygen: env.global_oxygen_level,
                     global_glucose: env.global_glucose_level,
+                    global_dopamine: env.dopamine_multiplier,
                     neurons: Vec::new(),
                     synapses: None,
                     synapse_count: graph.synapses.len(),
@@ -1588,31 +1590,13 @@ pub async fn run_mnist_mode(
             }
         }
 
-        // Force correct output neuron to spike for STDP or apply burst feedback
+        // Phase 55: Amygdala - Remove hardcoded teacher forcing
         if !is_inference && current_label < 10 {
-            let guess = if current_tick > 0 && correct_guesses_history.len() > 0 {
-                // Determine previous best guess to check if bursting is needed
-                let mut best_guess = 0;
-                let mut max_trace = -100.0;
-                for i in 0..10 {
-                    let n = &graph.neurons[1784 + i];
-                    let score = n.spike_trace * 100.0 + n.current_voltage;
-                    if score > max_trace {
-                        max_trace = score;
-                        best_guess = i as u8;
-                    }
-                }
-                best_guess
-            } else {
-                current_label
-            };
-
-            if guess != current_label && current_tick % 500 < 10 {
-                // Bursting on incorrect guess
-                graph.neurons[1784 + current_label as usize].external_input = 3.0;
-            } else {
-                // Normal teacher signal
-                graph.neurons[1784 + current_label as usize].external_input = 1.5;
+            // In Phase 55, we no longer inject `1.5` or `3.0` directly into the correct neuron.
+            // The network must fire on its own based on the image input, and the Amygdala 
+            // will evaluate it at the end of the window (tick 499) and reward/punish.
+            for i in 0..10 {
+                graph.neurons[1784 + i].external_input = 0.0;
             }
         } else if is_inference && current_label < 10 {
              // Ensure no external input in inference mode
@@ -1655,6 +1639,15 @@ pub async fn run_mnist_mode(
                 if is_correct {
                     total_correct_guesses += 1;
                 }
+
+                // Phase 55: Amygdala Reward/Punishment
+                let mut guard = shared_env.lock().unwrap();
+                if is_correct {
+                    guard.dopamine_multiplier = 1.0; // Reward!
+                } else {
+                    guard.dopamine_multiplier = -0.2; // Punishment!
+                }
+                drop(guard);
                 
                 if correct_guesses_history.len() >= 100 {
                     correct_guesses_history.pop_front();

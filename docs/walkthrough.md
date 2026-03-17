@@ -1,3 +1,28 @@
+# Walkthrough - Phase 36: Project "Amygdala" & 3-Factor STDP (v3.0)
+
+## Overview
+Replaced the traditional 2-Factor STDP with Dopamine-modulated 3-Factor STDP to enable true associative reinforcement learning. Removed mechanical teacher forcing ("electroshock") in favor of an Amygdala reward/punishment loop. 
+
+## Key Implementation Details
+
+1. **3-Factor STDP (CUDA Core)**:
+   - Modified `base_neuron.cu` to gate both LTP (Potentiation) and LTD (Depression) with the `env.dopamine_multiplier`.
+   - Positive dopamine (`> 0.0`) reinforces recently active traces.
+   - Negative dopamine (`< 0.0`) actively punishes and depresses synapses that contributed to a wrong answer.
+   - Zero dopamine effectively freezes synaptic weights, preventing random noise from destroying learned associations.
+
+2. **Amygdala Reward Loop (`modes.rs`)**:
+   - Removed direct `external_input = 1.5` / `3.0` injections into target neurons during MNIST training.
+   - The network now guesses independently. The Amygdala checks the answer at the end of the exposure window.
+   - Success triggers a dopamine rush (`dopamine_multiplier = 1.0`). Failure triggers disappointment/punishment (`dopamine_multiplier = -0.2`).
+   
+3. **Environment & Homeostasis Updates**:
+   - Implemented a 5% exponential decay (`0.95` multiplier) for dopamine per tick inside `EnvironmentRegulator` so the chemical washes out naturally after a reward spike.
+   - Expanded WebSocket payloads to continuously stream `global_dopamine` down to the UI.
+
+4. **UI Visuals**:
+   - Added a dynamic **Dopamine (Reward)** progress bar to the `index.html` frontend, turning golden-yellow when the Amygdala dispenses rewards.
+
 # Walkthrough - Phase 35: Brain Persistence & Inference Mode (v2.0)
 
 ## Overview

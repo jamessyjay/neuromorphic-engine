@@ -36,6 +36,7 @@ pub struct TickUpdatePayload {
     pub total_spikes: u32,
     pub global_oxygen: f32,
     pub global_glucose: f32,
+    pub global_dopamine: f32,
     pub neurons: Vec<(u32, f32, f32, u32)>, // id, visual_state, atp_pct, status_flags
     #[serde(skip_serializing_if = "Option::is_none")]
     pub synapses: Option<Vec<(u32, u32, f32)>>, // source_id, target_id, weight

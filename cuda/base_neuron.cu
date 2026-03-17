@@ -392,7 +392,12 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         int branch_id = s->flags & 0x07;
         float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
         float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
-        s->weight += delta_w * env.dopamine_multiplier * branch_activity;
+        
+        // Phase 55: Amygdala 3-Factor STDP
+        // Dopamine operates as a gating multiplier. If dopamine is <= 0.0 or neutral, 
+        // STDP shouldn't blindly reinforce things anymore.
+        float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
+        s->weight += delta_w * dopa_factor * branch_activity;
     }
 
     
@@ -418,7 +423,8 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
                 // In acausal firing (LTD territory), target fired, then source fired, so target->last_spike_tick <= source->last_spike_tick
                 if (target->last_spike_tick > 0 && target->last_spike_tick <= source->last_spike_tick) {
                     float delta_w = target->spike_trace * env.stdp_learning_rate * STDP_A_MINUS;
-                    s->weight -= delta_w * env.dopamine_multiplier;
+                    // 3-Factor STDP for LTD: Penalize based on dopamine multiplier. Boost punishment if negative dopamine.
+                    s->weight -= delta_w * (env.dopamine_multiplier < 0.0f ? -env.dopamine_multiplier * 5.0f : 1.0f);
                 }
             } 
 
