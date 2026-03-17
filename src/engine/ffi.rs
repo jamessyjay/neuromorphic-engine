@@ -68,9 +68,10 @@ pub struct BaseNeuron {
     pub metabolic_wear: u16,
     pub spikes_in_last_window: u8,
     pub predictive_ticks: u8,
-    pub last_spike_tick: u32, // Changed order to fit 4 bytes correctly without padding issues if any, wait, 2+1+1=4, 4+4=8. So metabolic_wear(2)+spikes(1)+pred(1) = 4 bytes. last_spike(4) = 4 bytes. Perfect 8 byte alignment.
+    pub last_spike_tick: u32,
     
-    pub _pad_block2: [u8; 16],
+    pub axonal_delay: u8,
+    pub _pad_block2: [u8; 15],
     
     // --- Blocks 3-4 (128-255 bytes): Expanded Dendritic Array ---
     pub branches: [Compartment; 16],

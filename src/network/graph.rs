@@ -197,7 +197,8 @@ impl NetworkGraph {
             _pad_block1: [0; 28],
             ref_coord_x: 0.0,
             ref_coord_y: 0.0,
-            _pad_block2: [0; 16],
+            axonal_delay: 2,
+            _pad_block2: [0; 15],
             branches: [crate::engine::ffi::Compartment {
                 branch_type: 0,
                 refractory_timer: 0,
@@ -416,15 +417,8 @@ impl NetworkGraph {
         if is_inhibitory { flags |= 0x10; } // Bit 4
         if is_myelinated { flags |= 0x20; } // Bit 5
 
-        // Prevent duplicates (same source, target, and branch)
-        for synapse in &mut self.synapses {
-            if synapse.source_id == source_id && synapse.target_id == target_id && (synapse.flags & 0x0F) == branch_id {
-                // If exists, just augment the weight and return
-                synapse.weight += weight;
-                return;
-            }
-        }
-
+        // TЗ №27: Allow multi-synaptic connections! We no longer block duplicates or augment them.
+        // A single source neuron can now synapse onto multiple different branches (or even the same branch multiple times biologically) of the target.
         let synapse = Synapse {
             source_id,
             target_id,
@@ -518,45 +512,58 @@ impl NetworkGraph {
             let dist_sq = dx*dx + dy*dy + dz*dz;
 
             if dist_sq < CLUSTERING_RADIUS_SQ * 1.5 { 
-                // 3. Activity Correlation: Both spiked recently? (Window: 500 ticks)
-                let s_active = current_tick.saturating_sub(n_source.last_spike_tick) < 500; 
-                let t_active = current_tick.saturating_sub(n_target.last_spike_tick) < 500;
+                // TЗ №27: -3/2 Topological Law (P(L) ~ L^(-3/2))
+                let distance = dist_sq.sqrt();
+                // Prevent division by zero
+                let safe_dist = if distance < 1.0 { 1.0 } else { distance };
+                
+                // Probability roughly proportional to L^(-1.5)
+                // We normalize it slightly to keep it within a reasonable range [0.0, 1.0]
+                // If distance is 1.0, prob is 1.0. If distance is 10.0, prob is ~0.031.
+                let topo_prob = 1.0 / safe_dist.powf(1.5);
+                
+                // Only proceed if we pass the topological probability check
+                if rng.random_bool(topo_prob.clamp(0.01, 1.0) as f64) {
+                    // 3. Activity Correlation: Both spiked recently? (Window: 500 ticks)
+                    let s_active = current_tick.saturating_sub(n_source.last_spike_tick) < 500; 
+                    let t_active = current_tick.saturating_sub(n_target.last_spike_tick) < 500;
 
-                if s_active && t_active {
-                    // 4. Stochastic Growth (Phase 37: Use STOCHASTIC_GROWTH_PROB from constants)
-                    if rng.random_bool(STOCHASTIC_GROWTH_PROB) {
-                        // Preferential Attachment (ТЗ №26):
-                        // "Rich get richer" for active branches, but if overloaded, find an empty/inactive one
-                        let mut branch_id = 0;
-                        if n_target.energy_atp < 70.0 { // threshold for "overloaded"
-                            // Seek the quietest branch to balance load
-                            let mut min_trace = 255;
-                            for b in 0..16 {
-                                if n_target.branches[b].local_trace < min_trace {
-                                    min_trace = n_target.branches[b].local_trace;
-                                    branch_id = b as u8;
+                    if s_active && t_active {
+                        // 4. Stochastic Growth (Phase 37: Use STOCHASTIC_GROWTH_PROB from constants)
+                        if rng.random_bool(STOCHASTIC_GROWTH_PROB) {
+                            // Preferential Attachment (ТЗ №26):
+                            // "Rich get richer" for active branches, but if overloaded, find an empty/inactive one
+                            let mut branch_id = 0;
+                            if n_target.energy_atp < 70.0 { // threshold for "overloaded"
+                                // Seek the quietest branch to balance load
+                                let mut min_trace = 255;
+                                for b in 0..16 {
+                                    if n_target.branches[b].local_trace < min_trace {
+                                        min_trace = n_target.branches[b].local_trace;
+                                        branch_id = b as u8;
+                                    }
+                                }
+                            } else {
+                                // "Rich get richer": seek the most active branch
+                                let mut max_trace = 0;
+                                for b in 0..16 {
+                                    if n_target.branches[b].local_trace >= max_trace {
+                                        max_trace = n_target.branches[b].local_trace;
+                                        branch_id = b as u8;
+                                    }
+                                }
+                                // If everything is completely dead, pick a random branch among all 16
+                                if max_trace == 0 {
+                                    branch_id = rng.random_range(0..16) as u8;
                                 }
                             }
-                        } else {
-                            // "Rich get richer": seek the most active branch
-                            let mut max_trace = 0;
-                            for b in 0..16 {
-                                if n_target.branches[b].local_trace >= max_trace {
-                                    max_trace = n_target.branches[b].local_trace;
-                                    branch_id = b as u8;
-                                }
+                            
+                            let is_inhib = rng.random_bool(0.1); 
+                            self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
+                            outgoing_counts[i] += 1;
+                            if current_tick % 1000 == 0 {
+                                println!("NeuroGenesis: New synapse {} -> {} on branch {} at tick {}", i, j, branch_id, current_tick);
                             }
-                            // If everything is completely dead, pick a random branch among all 16
-                            if max_trace == 0 {
-                                branch_id = rng.random_range(0..16) as u8;
-                            }
-                        }
-                        
-                        let is_inhib = rng.random_bool(0.1); 
-                        self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
-                        outgoing_counts[i] += 1;
-                        if current_tick % 1000 == 0 {
-                            println!("NeuroGenesis: New synapse {} -> {} on branch {} at tick {}", i, j, branch_id, current_tick);
                         }
                     }
                 }

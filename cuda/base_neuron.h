@@ -247,7 +247,8 @@ typedef struct alignas(64) {
     uint8_t predictive_ticks;
     uint32_t last_spike_tick;
     
-    uint8_t _pad_block2[16];
+    uint8_t axonal_delay;
+    uint8_t _pad_block2[15];
     
     // --- Blocks 3-4 (128-255 bytes): Expanded Dendritic Array ---
     Compartment branches[16];

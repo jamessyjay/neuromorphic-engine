@@ -372,14 +372,14 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
             s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK; // Photoreceptors leak constantly
             uint8_t is_myelinated = (s->flags & 0x20) != 0;
-            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
+            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
         }
     } else {
         if (source->last_spike_tick == current_tick) {
             // Bulk release on spike
             s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
             uint8_t is_myelinated = (s->flags & 0x20) != 0;
-            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS; // Myelin Bypass (Phase 26)
+            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay; // Myelin Bypass (Phase 26)
         }
     }
 
@@ -416,7 +416,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
             // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
-            uint32_t expected_delivery_delay = ((s->flags & 0x20) != 0) ? MYELINATED_DELIVERY_TICKS : UNMYELINATED_DELIVERY_TICKS;
+            uint32_t expected_delivery_delay = ((s->flags & 0x20) != 0) ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
                                                             if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= expected_delivery_delay + 2) {
                 // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
                 // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
@@ -985,6 +985,10 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     neuron->death_reason = DEATH_NONE;
     neuron->internal_phase = 0;
     neuron->dead_ticks = 0;
+    
+    // Axonal delay is randomized slightly to create asynchronous propagation
+    neuron->axonal_delay = (uint8_t)(get_gaussian(&local_seed, 2.0f, 1.0f));
+    if (neuron->axonal_delay < 1) neuron->axonal_delay = 1; // Minimum 1 tick delay
     
     float x_f = get_gaussian(&local_seed, DEFAULT_COORD_CENTER, DEFAULT_COORD_VAR);
     float y_f = get_gaussian(&local_seed, DEFAULT_COORD_CENTER, DEFAULT_COORD_VAR);

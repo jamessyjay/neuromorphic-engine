@@ -23,7 +23,8 @@ fn create_test_neuron(id: u32, type_: NeuronType) -> BaseNeuron {
         _pad_block1: [0; 28],
         ref_coord_x: 0.0,
         ref_coord_y: 0.0,
-        _pad_block2: [0; 16],
+        axonal_delay: 2,
+        _pad_block2: [0; 15],
         branches: [Compartment { 
             branch_type: 0, refractory_timer: 0, voltage: 0, nmda_threshold: 0, local_trace: 0, _pad: 0 
         }; 16],

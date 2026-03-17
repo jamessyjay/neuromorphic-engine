@@ -352,3 +352,88 @@ fn test_inhibitory_stdp() {
     assert!(final_weight != initial_weight, "Inhibitory STDP did not adapt weight! Initial: {}, Final: {}", initial_weight, final_weight);
     println!("✅ TEST 70 PASS: Inhibitory STDP is responsive.");
 }
+
+#[test]
+fn test_reverberating_circuit() {
+    println!("--- EXECUTING TEST 71: REVERBERATING CIRCUIT (AXONAL DELAYS) ---");
+    let mut graph = NetworkGraph::new();
+    
+    // Create a loop: A -> B -> C -> A
+    let a = graph.add_neuron(NeuronType::Pyramidal); // 0
+    let b = graph.add_neuron(NeuronType::Pyramidal); // 1
+    let c = graph.add_neuron(NeuronType::Pyramidal); // 2
+
+    // Set axonal delays specifically to create a slow loop
+    // Also reset random properties to ensure reliable looping
+    for i in 0..3 {
+        let n = &mut graph.neurons[i as usize];
+        n.axonal_delay = 5;
+        n.activation_threshold = -50.0;
+        n.resting_voltage = -70.0;
+        n.current_voltage = -70.0;
+        n.energy_atp = 1000.0;
+        n.max_atp = 1000.0;
+        n.vesicles_pool = 1000.0; // High vesicles so they don't fatigue
+        n.branches[0].branch_type = 1; // Basal dendrite to trigger spike directly
+    }
+
+    // Connect them strongly
+    graph.connect(a, b, 50.0, 0, false, false);
+    graph.connect(b, c, 50.0, 0, false, false);
+    graph.connect(c, a, 50.0, 0, false, false);
+
+    let env = Environment {
+        global_oxygen_level: 1.0,
+        global_glucose_level: 1.0,
+        dopamine_multiplier: 1.0,
+        toxin_levels: 0.0,
+        light_level: 1.0,
+        stdp_learning_rate: 0.0,
+        wakefulness_multiplier: 1.0,
+    };
+
+    // Give them a pre-loaded buffer so they don't fail transmission
+    for s in &mut graph.synapses {
+        s.neurotransmitter_buffer = 100.0;
+    }
+
+    // Inject one initial spike into A
+    graph.neurons[a as usize].current_voltage = 200.0; // Over-spike to guarantee transmission
+    
+    let mut spikes_recorded = 0;
+    
+    for tick in 1..=50 {
+        // Feed them to prevent fatigue
+        graph.neurons[a as usize].energy_atp = 100.0;
+        graph.neurons[b as usize].energy_atp = 100.0;
+        graph.neurons[c as usize].energy_atp = 100.0;
+        
+        graph.tick(tick, env);
+        
+        if graph.neurons[a as usize].last_spike_tick == tick { spikes_recorded += 1; }
+        if graph.neurons[b as usize].last_spike_tick == tick { spikes_recorded += 1; }
+        if graph.neurons[c as usize].last_spike_tick == tick { spikes_recorded += 1; }
+        
+        // Debug output to trace the loop
+        if tick % 5 == 0 {
+            let va = graph.neurons[a as usize].current_voltage;
+            let vb = graph.neurons[b as usize].current_voltage;
+            let vc = graph.neurons[c as usize].current_voltage;
+            println!("Tick {:2}: A={:5.1} | B={:5.1} | C={:5.1}", tick, va, vb, vc);
+        }
+    }
+    
+    // In 50 ticks with delays of 5 each (total loop 15 ticks), 
+    // we expect at least 3 loops (9 total spikes)
+    println!("Total spikes recorded in 50 ticks: {}", spikes_recorded);
+    assert!(spikes_recorded >= 9, "Spike died out before completing reverberating loops! Recorded: {}", spikes_recorded);
+    
+    // Check if there was recent activity near the end of the simulation
+    let latest_spike = graph.neurons[a as usize].last_spike_tick
+        .max(graph.neurons[b as usize].last_spike_tick)
+        .max(graph.neurons[c as usize].last_spike_tick);
+        
+    assert!(latest_spike > 40, "Signal did not survive until the end of the 50 tick window!");
+    
+    println!("✅ TEST 71 PASS: Reverberating circuit successfully maintained signal.");
+}
