@@ -503,7 +503,6 @@ __global__ void tick_neurons_prep_and_vote_kernel(BaseNeuron* neurons, int count
     if (idx >= count) return;
 
     BaseNeuron* n = &neurons[idx];
-    n->status_flags &= ~FLAG_IS_INHIBITED;
 
     if (!n->is_alive) {
         n->spike_trace = 0.0f;
@@ -867,7 +866,6 @@ extern "C" {
 
     
     void tick_neuron_prepare_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
-        neuron->status_flags &= ~FLAG_IS_INHIBITED;
 
         if (!neuron->is_alive) {
             neuron->spike_trace = 0.0f;
