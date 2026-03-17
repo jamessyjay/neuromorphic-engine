@@ -891,6 +891,7 @@ extern "C" {
     }
 
     void tick_synapse_cpu(Synapse* synapse, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
+        if (synapse->weight < 0.0f) return;
         process_synapse(synapse, &neurons[synapse->source_id], &neurons[synapse->target_id], env, current_tick);
     }
 }
