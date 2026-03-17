@@ -96,32 +96,31 @@ export function initNetwork(data) {
 
     if (!data.neurons) return;
 
-    const layerCounts = { 1: 0, 2: 0, 4: 0, 5: 0, 6: 0 };
-    data.neurons.forEach(n => {
-        const lId = n[6];
-        if (layerCounts[lId] !== undefined) layerCounts[lId]++;
-    });
+    const counts = {};
+    data.neurons.forEach(n => counts[n[4]] = (counts[n[4]] || 0) + 1);
 
+    const geometries = { 5: new THREE.TetrahedronGeometry(2), 4: new THREE.OctahedronGeometry(2), 3: new THREE.BoxGeometry(3,3,3), default: new THREE.SphereGeometry(1.5,8,8) };
+    
     const newMeshes = [];
-    Object.keys(layerCounts).forEach(layerId => {
-        const count = layerCounts[layerId];
-        if (count > 0) {
-            const geo = new THREE.PlaneGeometry(1.5, 1.5);
-            const mat = new THREE.MeshBasicMaterial({ 
-                map: glowTexture, transparent: true, opacity: 0.8,
-                depthWrite: false, blending: THREE.AdditiveBlending 
-            });
-            const mesh = new THREE.InstancedMesh(geo, mat, count);
-            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-            scene.add(mesh);
-            newMeshes.push({ layerId: parseInt(layerId), mesh: mesh, currentIndex: 0, count: count });
-        }
+    Object.keys(counts).forEach(t => {
+        const mesh = new THREE.InstancedMesh(geometries[t] || geometries.default, new THREE.MeshBasicMaterial({color: 0xffffff}), counts[t]);
+        scene.add(mesh);
+        newMeshes.push({ type: parseInt(t), mesh, currentIndex: 0 });
     });
     setNeuronMeshes(newMeshes);
 
     data.neurons.forEach(n => {
-        const [id, x, y, z, type, columnId, layerId, minicolumnId, statusFlags] = n;
-        const mData = neuronMeshes.find(m => m.layerId === layerId);
+        const id = n[0], type = n[4];
+        const columnId = n[5];
+        const layerId = n[6];
+        const minicolumnId = n[7];
+        const statusFlags = n[8] || 0;
+
+        let x = (n[1] / 65535) * 600 - 300;
+        let y = (n[2] / 65535) * 600 - 300;
+        let z = (n[3] / 65535) * 400 - 200;
+
+        const mData = neuronMeshes.find(m => m.type === type);
         
         if (mData) {
             _dummy.position.set(x, y, z);
