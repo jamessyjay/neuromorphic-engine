@@ -1,6 +1,25 @@
 use std::fs::File;
 use std::io::{Read, Result, Error, ErrorKind};
 
+pub fn load_mnist_labels(path: &str) -> Result<Vec<u8>> {
+    let mut file = File::open(path)?;
+    let mut magic_bytes = [0u8; 4];
+    file.read_exact(&mut magic_bytes)?;
+    let magic = u32::from_be_bytes(magic_bytes);
+    if magic != 2049 {
+        return Err(Error::new(ErrorKind::InvalidData, "Invalid magic number for MNIST labels file"));
+    }
+
+    let mut num_labels_bytes = [0u8; 4];
+    file.read_exact(&mut num_labels_bytes)?;
+    let num_labels = u32::from_be_bytes(num_labels_bytes);
+
+    let mut labels = vec![0u8; num_labels as usize];
+    file.read_exact(&mut labels)?;
+
+    Ok(labels)
+}
+
 pub fn load_mnist_images(path: &str) -> Result<Vec<Vec<f32>>> {
     let mut file = File::open(path)?;
     let mut magic_bytes = [0u8; 4];

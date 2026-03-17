@@ -41,6 +41,8 @@ pub struct TickUpdatePayload {
     pub synapse_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retina_frame: Option<Vec<f32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub predictions: Option<Vec<f32>>,
 }
 
 pub async fn start_server(tx: broadcast::Sender<String>, shared_env: Arc<Mutex<crate::engine::ffi::Environment>>) {

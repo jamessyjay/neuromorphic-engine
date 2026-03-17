@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("=======================================================\n");
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
-        neuromorphic_engine::runner::modes::run_mnist_mode(parsed_ticks, tx_option.clone(), shared_env.clone(), true).await?;
+        neuromorphic_engine::runner::modes::run_mnist_mode(parsed_ticks, tx_option.clone(), shared_env.clone(), true, is_ui_enabled).await?;
         if is_ui_enabled {
             println!("MNIST simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
             loop { tokio::time::sleep(tokio::time::Duration::from_secs(1)).await; }

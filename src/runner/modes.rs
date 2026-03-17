@@ -93,6 +93,7 @@ pub fn broadcast_tick_update(
     tx: &broadcast::Sender<String>,
     graph: &NetworkGraph,
     _retina_frame: Option<Vec<f32>>,
+    _predictions: Option<Vec<f32>>,
     tick: u32,
     accumulated_spikes: u32,
     current_env: &Environment,
@@ -114,6 +115,7 @@ pub fn broadcast_tick_update(
         } else { None },
         synapse_count: current_synapse_count,
         retina_frame: _retina_frame,
+        predictions: _predictions,
     };
     for n in &graph.neurons {
         let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
@@ -499,6 +501,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
                     tx, 
                     &graph, 
                     None,
+                    None,
                     tick, 
                     accumulated_spikes, 
                     &current_env, 
@@ -661,6 +664,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
                 broadcast_tick_update(
                     tx, 
                     &graph, 
+                    None,
                     None,
                     tick, 
                     accumulated_spikes, 
@@ -1405,6 +1409,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                     synapses: None,
                     synapse_count: graph.synapses.len(),
                     retina_frame: None,
+                    predictions: None,
                 };
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * crate::engine::constants::METRIC_MAX_F32;
@@ -1437,8 +1442,15 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
             let mut rng = rand::rng();
     
     // 1. Create 784 Photoreceptors (28x28 grid)
-    for _ in 0..784 {
-        graph.add_neuron(crate::engine::ffi::NeuronType::Photoreceptor);
+    for i in 0..784 {
+        let id = graph.add_neuron(crate::engine::ffi::NeuronType::Photoreceptor);
+        let n = &mut graph.neurons[id as usize];
+        let row = i / 28;
+        let col = i % 28;
+        // Располагаем сетку в плоскости XY с небольшим отступом
+        n.x = (col as f32 * (65535.0 / 28.0)) as u16;
+        n.y = (row as f32 * (65535.0 / 28.0)) as u16;
+        n.z = 0; // Ретина всегда на переднем плане
     }
     
     // 2. Create 1000 Processing Neurons
@@ -1451,7 +1463,16 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         graph.add_neuron(n_type);
     }
     
-    // 3. Connect photoreceptors to Pyramidal neurons
+    // 3. Create 10 Output Neurons (Labels 0-9)
+    for i in 0..10 {
+        let id = graph.add_neuron(crate::engine::ffi::NeuronType::Pyramidal);
+        let n = &mut graph.neurons[id as usize];
+        n.x = (32768i32 + (i as i32 * 3000 - 15000)).clamp(0, 65535) as u16; // В ряд по X
+        n.y = 32768; // По центру Y
+        n.z = 60000; // На заднем плане
+    }
+    
+    // 4. Connect photoreceptors to Processing neurons
     // Photoreceptors: indices 0..784
     // Processing neurons: indices 784..1784
     for pr_idx in 0..784 {
@@ -1466,6 +1487,15 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         }
     }
     
+    // 5. Connect Processing neurons to Output neurons
+    // Output neurons: 1784..1794
+    for out_idx in 1784..1794 {
+        for _ in 0..20 {
+            let src_idx = rand::RngExt::random_range(&mut rng, 784..1784);
+            graph.connect(src_idx as u32, out_idx as u32, 1.0, 0, false, false);
+        }
+    }
+    
     graph.optimize_memory_layout();
     graph
 }
@@ -1475,11 +1505,13 @@ pub async fn run_mnist_mode(
     tx: Option<tokio::sync::broadcast::Sender<String>>,
     shared_env: std::sync::Arc<std::sync::Mutex<crate::engine::ffi::Environment>>,
     _use_dynamic_homeostasis: bool,
+    use_ui: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING MNIST MODE ---");
     
     // Load MNIST
     let images = crate::mnist::load_mnist_images("data/train-images-idx3-ubyte")?;
+    let labels = crate::mnist::load_mnist_labels("data/train-labels-idx1-ubyte")?;
     
     let mut graph = setup_mnist_network();
     let mut current_tick = 0;
@@ -1494,12 +1526,18 @@ pub async fn run_mnist_mode(
 
     let mut current_image_idx = 0;
     let mut image_pixels: Vec<f32> = vec![0.0; 784];
+    let mut current_label = 0;
     
     while current_tick < total_ticks {
+        if use_ui && current_tick % 10 == 0 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        }
+
         // Feed new image every 500 ticks
         if current_tick % 500 == 0 {
             if current_image_idx < images.len() {
                 image_pixels = images[current_image_idx].clone();
+                current_label = labels[current_image_idx];
                 // Set external_input for photoreceptors
                 for (i, pixel) in image_pixels.iter().enumerate() {
                     if i < 784 {
@@ -1508,6 +1546,11 @@ pub async fn run_mnist_mode(
                 }
                 current_image_idx += 1;
             }
+        }
+
+        // Force correct output neuron to spike for STDP
+        if current_label < 10 {
+            graph.neurons[1784 + current_label as usize].external_input = 1.5;
         }
         
         let env = {
@@ -1535,10 +1578,20 @@ pub async fn run_mnist_mode(
             }
             
             if let Some(tx_chan) = tx.as_ref() {
+                let mut predictions = Vec::with_capacity(10);
+                for i in 1784..1794 {
+                    if i < graph.neurons.len() {
+                        predictions.push(graph.neurons[i].current_voltage);
+                    } else {
+                        predictions.push(0.0);
+                    }
+                }
+                
                 crate::runner::modes::broadcast_tick_update(
                     tx_chan,
                     &graph,
                     Some(image_pixels.clone()),
+                    Some(predictions),
                     current_tick,
                     new_spikes,
                     &env,
