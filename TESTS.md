@@ -183,3 +183,8 @@ Also, for pure results there must be no other heavy processes running on the sys
 - **77. test_sequence_learning_and_surprise:** Ensures sequence learning works, and unexpected stimuli trigger Minicolumn Bursting.
 - **78. test_cross_column_voting:** Verifies that multiple neurons in different columns voting for the same predictive state mutually reinforce each other.
 - **79. test_metabolic_fatigue:** Validates that high continuous firing reduces ATP, eventually triggering fatigue and dynamic threshold increases.
+
+### Classifier & Functional Testing (`test_stdp.rs` / `modes.rs`)
+
+- **80. test_mnist_classifier_competition:** Validates Winner-Take-All (WTA) logic. Simulates output neurons competing; ensures the neuron with the highest voltage/trace wins, and all others are penalized heavily (-20mV) and flagged with `FLAG_IS_INHIBITED`.
+- **81. test_stdp_ltd_forgetting:** Validates LTD-based forgetting mechanism. Proves that if a target neuron spikes repeatedly while a specific source neuron remains silent, the synapse weight from that source correctly decreases over time.

@@ -473,3 +473,31 @@ To secure the biological integrity and hardware stability of the engine, a compl
    - Cleaned up the `.gitignore` to explicitly ignore the `data/` directory since MNIST binaries are massive and shouldn't be tracked by git.
 
 This phase concludes the foundation of the architecture. The simulation now functionally parses external input, maps it topologically across pseudo-cortical columns, processes the signal through biologically-inspired mechanisms, and visually presents the predictive classification in real-time.
+
+---
+
+## [Phase 15] Training Telemetry & Functional STDP/WTA Testing
+
+**Objective:** Validate the classification loop via functional testing and expose accuracy metrics during MNIST training.
+
+### What was done
+
+1. **Training Telemetry & Live Accuracy (`modes.rs`)**:
+   - Added telemetry logs outputting to terminal at the end of every image exposure (every 500 ticks) in `--mnist` mode.
+   - Outputs Current Image ID, True Label, Network's Guess, Correctness boolean, Current ATP levels of the target neuron, and a rolling 100-image Accuracy percentage (`[TRAINING] Image: #42 | Label: 3 | Guess: 7 | Correct: false | Acc (100): 10.0%`).
+   - The network "Guess" is computed using a combination of `spike_trace` and `current_voltage` to capture the most recently and intensely active output neuron.
+
+2. **Functional Classifier Tests (`test_stdp.rs` / `graph.rs`)**:
+   - Extracted the Winner-Take-All logic from the runner into a core method `NetworkGraph::apply_classifier_wta()` so it can be effectively tested.
+   - Added `test_mnist_classifier_competition`: A functional test verifying that during simultaneous activation, the neuron with the strongest signal successfully suppresses its competitors via lateral inhibition, applying a `-20.0` mV penalty and setting `FLAG_IS_INHIBITED`.
+   - Added `test_stdp_ltd_forgetting`: A critical functional test ensuring that if a target neuron spikes repeatedly while the source neuron is silent, the synapse weight decreases (LTD), ensuring the network can "forget" and prevent dominant neurons from monopolizing the classifier.
+
+3. **UI Test Mode Fixes (`main.rs`)**:
+   - Removed the blocking infinite loop (`loop { sleep }`) when running `--ui-test`, allowing CI/CD to finish and exit naturally when the specified ticks are completed.
+   - Added a default value of `50,000` ticks for `--ui-test` if the user does not specify `--ticks` explicitly, preventing it from running just 10 ticks and dying immediately.
+
+### Verification steps
+- All 62+ tests are passing, including the new functional tests.
+- Terminal outputs proper telemetry logs during MNIST training.
+- `--ui-test` finishes and exits cleanly.
+
