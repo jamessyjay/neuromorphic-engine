@@ -92,6 +92,7 @@ pub fn broadcast_initial_state(tx: &broadcast::Sender<String>, graph: &NetworkGr
 pub fn broadcast_tick_update(
     tx: &broadcast::Sender<String>,
     graph: &NetworkGraph,
+    _retina_frame: Option<Vec<f32>>,
     tick: u32,
     accumulated_spikes: u32,
     current_env: &Environment,
@@ -112,6 +113,7 @@ pub fn broadcast_tick_update(
             Some(syn_vec)
         } else { None },
         synapse_count: current_synapse_count,
+        retina_frame: _retina_frame,
     };
     for n in &graph.neurons {
         let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
@@ -177,7 +179,7 @@ pub fn finalize_and_save_snapshot(
 
 pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph {
     let mut graph = NetworkGraph::new();
-    let mut rng = rand::rng();
+            let mut rng = rand::rng();
 
     println!("Generating Benchmark Network (Cortical Columns v0.5.2): {} neurons, {} synapses...", neurons_count, synapses_count);
 
@@ -496,6 +498,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
                 broadcast_tick_update(
                     tx, 
                     &graph, 
+                    None,
                     tick, 
                     accumulated_spikes, 
                     &current_env, 
@@ -658,6 +661,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
                 broadcast_tick_update(
                     tx, 
                     &graph, 
+                    None,
                     tick, 
                     accumulated_spikes, 
                     &current_env, 
@@ -1400,6 +1404,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                     neurons: Vec::new(),
                     synapses: None,
                     synapse_count: graph.synapses.len(),
+                    retina_frame: None,
                 };
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * crate::engine::constants::METRIC_MAX_F32;
@@ -1419,6 +1424,129 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         if start_time.elapsed().as_secs() >= UI_TEST_DURATION_SECS {
             println!("UI Test limit reached (5 minutes). Exiting.");
             break;
+        }
+    }
+    
+    Ok(())
+}
+
+
+pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
+    
+    let mut graph = crate::network::graph::NetworkGraph::new();
+            let mut rng = rand::rng();
+    
+    // 1. Create 784 Photoreceptors (28x28 grid)
+    for _ in 0..784 {
+        graph.add_neuron(crate::engine::ffi::NeuronType::Photoreceptor);
+    }
+    
+    // 2. Create 1000 Processing Neurons
+    for _ in 0..1000 {
+        let n_type = if rand::RngExt::random::<f32>(&mut rng) < 0.2 {
+            crate::engine::ffi::NeuronType::Interneuron
+        } else {
+            crate::engine::ffi::NeuronType::Pyramidal
+        };
+        graph.add_neuron(n_type);
+    }
+    
+    // 3. Connect photoreceptors to Pyramidal neurons
+    // Photoreceptors: indices 0..784
+    // Processing neurons: indices 784..1784
+    for pr_idx in 0..784 {
+        let synapses_count = rand::RngExt::random_range(&mut rng, 5..=10);
+        for _ in 0..synapses_count {
+            // target pyramidal
+            let mut target_idx = rand::RngExt::random_range(&mut rng, 784..1784);
+            while graph.neurons[target_idx].type_ == crate::engine::ffi::NeuronType::Interneuron as u8 {
+                target_idx = rand::RngExt::random_range(&mut rng, 784..1784);
+            }
+            graph.connect(pr_idx as u32, target_idx as u32, 1.0, 0, false, false);
+        }
+    }
+    
+    graph.optimize_memory_layout();
+    graph
+}
+
+pub async fn run_mnist_mode(
+    total_ticks: u32,
+    tx: Option<tokio::sync::broadcast::Sender<String>>,
+    shared_env: std::sync::Arc<std::sync::Mutex<crate::engine::ffi::Environment>>,
+    _use_dynamic_homeostasis: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("--- EXECUTING MNIST MODE ---");
+    
+    // Load MNIST
+    let images = crate::mnist::load_mnist_images("data/train-images-idx3-ubyte")?;
+    
+    let mut graph = setup_mnist_network();
+    let mut current_tick = 0;
+    let start_time = std::time::Instant::now();
+    let total_elements = graph.neurons.len() + graph.synapses.len();
+    let sampling_interval = (total_elements as f32 / crate::engine::constants::UI_SAMPLING_DIVISOR).ceil() as u32;
+    
+
+    if let Some(tx_chan) = tx.as_ref() {
+        crate::runner::modes::broadcast_initial_state(tx_chan, &graph);
+    }
+
+    let mut current_image_idx = 0;
+    let mut image_pixels: Vec<f32> = vec![0.0; 784];
+    
+    while current_tick < total_ticks {
+        // Feed new image every 500 ticks
+        if current_tick % 500 == 0 {
+            if current_image_idx < images.len() {
+                image_pixels = images[current_image_idx].clone();
+                // Set external_input for photoreceptors
+                for (i, pixel) in image_pixels.iter().enumerate() {
+                    if i < 784 {
+                        graph.neurons[i].external_input = *pixel;
+                    }
+                }
+                current_image_idx += 1;
+            }
+        }
+        
+        let env = {
+            let guard = shared_env.lock().unwrap();
+            *guard
+        };
+        
+        // Tick the network
+        graph.tick(current_tick, env.clone());
+        
+        current_tick += 1;
+        
+        if current_tick % sampling_interval == 0 {
+            let elapsed_ms = start_time.elapsed().as_secs_f32() * 1000.0;
+            let _simulation_speed = (current_tick as f32) / (elapsed_ms / 1000.0);
+            
+            let _current_neuron_count = graph.neurons.len();
+            let current_synapse_count = graph.synapses.len();
+            
+            let mut new_spikes = 0;
+            for n in &graph.neurons {
+                if current_tick > 0 && n.last_spike_tick == current_tick - 1 {
+                    new_spikes += 1;
+                }
+            }
+            
+            if let Some(tx_chan) = tx.as_ref() {
+                crate::runner::modes::broadcast_tick_update(
+                    tx_chan,
+                    &graph,
+                    Some(image_pixels.clone()),
+                    current_tick,
+                    new_spikes,
+                    &env,
+                    true,
+                    current_synapse_count,
+                );
+            }
+            tokio::task::yield_now().await;
         }
     }
     

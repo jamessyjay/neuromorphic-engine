@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_bench_scaling = args.contains(&String::from("--bench-scaling"));
     let is_bench_io = args.contains(&String::from("--bench-io"));
     let is_ui_test = args.contains(&String::from("--ui-test"));
+    let is_mnist = args.contains(&String::from("--mnist"));
 
     let mut parsed_neurons = DEFAULT_BENCHMARK_NEURONS;
     let mut parsed_synapses = DEFAULT_BENCHMARK_SYNAPSES;
@@ -80,6 +81,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         run_bench_scaling().await?;
     } else if is_bench_io {
         run_bench_io().await?;
+    } else if is_mnist {
+        if tx_option.is_some() {
+            println!("\n=======================================================");
+            println!("🚀 UI MODE ACTIVE: Open http://127.0.0.1:3030/index.html");
+            println!("⏳ Waiting 5 seconds for WebSocket connection before starting ticks...");
+            println!("=======================================================\n");
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        }
+        neuromorphic_engine::runner::modes::run_mnist_mode(parsed_ticks, tx_option.clone(), shared_env.clone(), true).await?;
+        if is_ui_enabled {
+            println!("MNIST simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
+            loop { tokio::time::sleep(tokio::time::Duration::from_secs(1)).await; }
+        }
+        return Ok(());
     } else if is_ui_test {
         run_ui_test(tx_option.clone(), shared_env.clone()).await?;
         println!("Simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");

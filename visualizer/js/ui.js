@@ -6,7 +6,10 @@ export let retinaCtx = null;
 
 window.addEventListener('load', () => {
     const canvas = document.getElementById('retina-canvas');
-    if (canvas) retinaCtx = canvas.getContext('2d');
+    if (canvas) {
+        retinaCtx = canvas.getContext('2d');
+        retinaCtx.imageSmoothingEnabled = false;
+    }
 });
 
 export function toggleLayer(layer) {

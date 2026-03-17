@@ -3,6 +3,8 @@ import { VISUAL_SAMPLING, MAX_PULSES } from './config.js';
 import { initNetwork } from './render.js';
 import { retinaCtx } from './ui.js';
 
+
+
 let ws = null;
 
 export function getWs() {
@@ -64,13 +66,13 @@ export function connect(host) {
                     }
                 });
             }
-
             // Retina Processing
-            if (data.retina && retinaCtx) {
-                const imgData = retinaCtx.createImageData(32, 32);
-                for (let i=0; i<32*32; i++) {
-                    const val = data.retina[i];
-                    const idx = i*4;
+            if (data.retina_frame && retinaCtx) {
+                const frame = data.retina_frame;
+                const imgData = retinaCtx.createImageData(28, 28);
+                for (let i = 0; i < 784; i++) {
+                    const val = Math.floor(frame[i] * 255);
+                    const idx = i * 4;
                     imgData.data[idx] = val;
                     imgData.data[idx+1] = val;
                     imgData.data[idx+2] = val;
@@ -78,6 +80,7 @@ export function connect(host) {
                 }
                 retinaCtx.putImageData(imgData, 0, 0);
             }
+
 
             // Status updates
             if (data.global_oxygen !== undefined) {
