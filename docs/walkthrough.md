@@ -423,3 +423,31 @@ To secure the biological integrity and hardware stability of the engine, a compl
 2. **test_sequence_learning_and_surprise**: The test initially failed because predicting neurons were getting trapped in the `refractory_time_left` and `last_spike_tick` blocks during `wta_and_burst`, leading to exactly 0 spikes in the "Recognition" phase. This happened because the distal synapses triggered actual spikes (via `passive_leak` + `BASAL_SOMA_GAIN`) before the actual Recognition tick.
     - **Fix:** Clamped the synaptic weight for testing `A -> B` from `5.0` to `1.0` so it correctly only activates the `FLAG_IS_PREDICTIVE` state without prematurely forcing a somatic spike.
     - Added the `predictive_crossed.contains(&key)` priority overwrite in the Rust `wta_and_burst` loop to ensure a predictive neuron forcefully overrides any other neuron for WTA victory.
+
+---
+
+## Phase 14: MNIST Integration & Visualizer Upgrades (Live UI Telemetry)
+
+### Actions Taken
+
+1. **MNIST Dataset Integration (`src/mnist/`)**:
+   - Implemented binary IDX parser in `src/mnist/mod.rs` to read the standard MNIST IDX3 dataset format (`train-images-idx3-ubyte`).
+   - Created `setup_mnist_network` which automatically constructs a 784-input Photoreceptor grid (representing a 28x28 retina) feeding into 1000 processing neurons (mixed Pyramidal/Interneurons) using memory-optimized connections.
+   - Introduced a new runtime mode `--mnist` handled by `run_mnist_mode` which feeds image frames into the simulation dynamically based on simulated ticks (updating every 500 ticks).
+
+2. **WebSocket & Payload Synchronization (`src/monitor/streamer.rs` & `modes.rs`)**:
+   - Upgraded `TickUpdatePayload` to handle continuous `retina_frame` arrays, efficiently skipped with `serde(skip_serializing_if = "Option::is_none")` when not running MNIST tests.
+   - Fixed panic and UI freezing issues related to `serde_json` field serialization mismatches between the Host and the Visualizer client.
+   - Implemented a `tokio::task::yield_now()` loop correctly inside heavy async tick processing to unblock the internal WebSocket ping-pong and avoid client connection drops ("ECONNREFUSED").
+   - Implemented `InitialState` caching for late UI joiners, allowing the client to instantly download the graph snapshot if connecting mid-simulation.
+
+3. **JS Visualizer & Retina UI Fixes (`visualizer/js/`)**:
+   - Fixed `retinaCtx` Canvas initialization flow to prevent crashes before the DOM successfully rendered the Retina window (`ui.js`).
+   - Upgraded `network.js` to parse `data.retina_frame`, processing it frame by frame as `ImageData` to display real-time visually reconstructed input in the browser.
+   - Resolved `imageSmoothingEnabled` typos and instantiation blockings to properly enforce blocky 28x28 rendering style.
+
+### Verification
+
+- Run `cargo run -- --neurons 1000 --synapses 10000 --ui --ticks 50000`. Server remains stable and WebSocket clients can successfully connect and reconnect cleanly.
+- Visualizer gracefully handles missing fields like `data.events` or `data.retina_frame` based on context.
+- Payload footprint optimizations are intact, maintaining high FPS.
