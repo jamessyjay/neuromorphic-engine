@@ -334,6 +334,35 @@ impl NetworkGraph {
         }
     }
 
+    pub fn apply_classifier_wta(&mut self, current_tick: u32, start_idx: usize, end_idx: usize) {
+        if self.neurons.len() >= end_idx {
+            let mut winner_id: Option<usize> = None;
+            let mut highest_v = -100.0;
+            
+            // Find the first spiking neuron or the one with the highest voltage
+            for i in start_idx..end_idx {
+                let n = &self.neurons[i];
+                if n.is_alive == 1 && n.current_voltage > highest_v {
+                    highest_v = n.current_voltage;
+                    winner_id = Some(i);
+                }
+            }
+            
+            // Apply massive lateral inhibition to all other output neurons if the winner spiked
+            if let Some(w_id) = winner_id {
+                let winner = &self.neurons[w_id];
+                if winner.current_voltage >= winner.activation_threshold || winner.last_spike_tick == current_tick {
+                    for i in start_idx..end_idx {
+                        if i != w_id && self.neurons[i].is_alive == 1 {
+                            self.neurons[i].current_voltage -= 20.0; // Hard suppression penalty
+                            self.neurons[i].status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn apply_sdr_tuning(&mut self, current_tick: u32) {
         // SDR Tuning for L4 (Target Sparsity 5%)
         let mut l4_total = 0;

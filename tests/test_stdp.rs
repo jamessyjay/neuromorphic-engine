@@ -533,3 +533,76 @@ fn bench_stdp_overhead() {
     
     assert!(drop_ratio < 0.40, "Performance drop is too high: {:.2}% (Limit is 40%)", drop_ratio * 100.0);
 }
+
+#[test]
+fn test_mnist_classifier_competition() {
+    let mut graph = NetworkGraph::new();
+    
+    // Create 1794 neurons to simulate MNIST network structure
+    for _ in 0..1794 {
+        graph.add_neuron(NeuronType::Pyramidal);
+    }
+    
+    // Set up provocation
+    // Neuron 3 gets a strong signal
+    graph.neurons[1784 + 3].current_voltage = 50.0;
+    graph.neurons[1784 + 3].activation_threshold = 30.0;
+    graph.neurons[1784 + 3].is_alive = 1;
+    
+    // Neuron 7 gets a slightly weaker signal
+    graph.neurons[1784 + 7].current_voltage = 45.0;
+    graph.neurons[1784 + 7].activation_threshold = 30.0;
+    graph.neurons[1784 + 7].is_alive = 1;
+    
+    // Apply WTA
+    graph.apply_classifier_wta(1, 1784, 1794);
+    
+    // Expectation: Neuron 3 wins, Neuron 7 is suppressed
+    assert!(graph.neurons[1784 + 3].current_voltage > graph.neurons[1784 + 7].current_voltage, "Neuron 3 should have higher voltage than Neuron 7");
+    
+    let flags_3 = graph.neurons[1784 + 3].status_flags;
+    let flags_7 = graph.neurons[1784 + 7].status_flags;
+    
+    assert_eq!((flags_3 & neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED), 0, "Neuron 3 should NOT be inhibited");
+    assert_eq!((flags_7 & neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED), neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED, "Neuron 7 SHOULD be inhibited by lateral inhibition");
+    
+    // Voltage of 7 should be reduced by 20.0
+    assert_eq!(graph.neurons[1784 + 7].current_voltage, 25.0, "Neuron 7 voltage should be penalized by 20.0mV");
+}
+
+#[test]
+fn test_stdp_ltd_forgetting() {
+    let mut graph = NetworkGraph::new();
+    let src = graph.add_neuron(NeuronType::Pyramidal);
+    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    
+    let mut env = default_env();
+    
+    let synapse = Synapse {
+        source_id: src,
+        target_id: tgt,
+        weight: 5.0,
+        neurotransmitter_buffer: 0.0,
+        last_activation_tick: 0,
+        ticks_below_threshold: 0,
+        ticks_until_delivery: 0,
+        flags: 0, 
+        _padding: [0; 2],
+    };
+    graph.synapses.push(synapse);
+    
+    let initial_weight = graph.synapses[0].weight;
+    
+    // Provocation: target neuron spikes continuously, source is silent.
+    for tick in 1..=100 {
+        // Source is completely silent
+        graph.neurons[src as usize].current_voltage = -70.0;
+        
+        // Target spikes as much as possible
+        graph.neurons[tgt as usize].current_voltage = 50.0;
+        graph.tick(tick, env.clone());
+    }
+    
+    let final_weight = graph.synapses[0].weight;
+    assert!(final_weight < initial_weight, "LTD/Homeostasis failed! Weight did not decrease. Initial: {}, Final: {}", initial_weight, final_weight);
+}
