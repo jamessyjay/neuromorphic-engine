@@ -121,13 +121,13 @@ static inline void atomic_add_packed_voltage(uint16_t* address, float voltage_im
 
 
 // Fast stateless PRNG (PCG32-lite) for Thermal Noise
-static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t current_tick) {
+static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t current_tick, float noise_scale) {
     uint32_t state = (neuron_id ^ current_tick) * THERMAL_NOISE_MAGIC_A + THERMAL_NOISE_MAGIC_B;
     uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * THERMAL_NOISE_MAGIC_C;
     uint32_t rand_int = (word >> 22u) ^ word;
     // Map to [-1.0, 1.5]
     float normalized = (float)(rand_int & 0xFFFF) / 65535.0f; 
-    return (normalized * THERMAL_NOISE_SCALE) - 1.0f;
+    return (normalized * THERMAL_NOISE_SCALE * noise_scale) - 1.0f;
 }
 
 // Atomic function: Apoptosis / Death Handler
@@ -596,7 +596,7 @@ __global__ void tick_neurons_prep_and_vote_kernel(BaseNeuron* neurons, int count
     evaluate_branches(n);
     
     // Thermal Noise
-    n->current_voltage += get_thermal_noise(n->id, current_tick);
+    n->current_voltage += get_thermal_noise(n->id, current_tick, env.thermal_noise_scale);
     
     // WTA Voting Phase
     if (n->type != TYPE_PYRAMIDAL && n->type != TYPE_INTERNEURON) return;
@@ -911,7 +911,7 @@ extern "C" {
         update_calcium(neuron, current_tick);
         evaluate_branches(neuron);
         
-        neuron->current_voltage += get_thermal_noise(neuron->id, current_tick);
+        neuron->current_voltage += get_thermal_noise(neuron->id, current_tick, env.thermal_noise_scale);
     }
 
     void tick_neuron_spike_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
@@ -941,7 +941,7 @@ extern "C" {
             update_calcium(&neurons[i], current_tick);
             evaluate_branches(&neurons[i]);
             
-            neurons[i].current_voltage += get_thermal_noise(neurons[i].id, current_tick);
+            neurons[i].current_voltage += get_thermal_noise(neurons[i].id, current_tick, env.thermal_noise_scale);
             
             if (neurons[i].spikes_in_last_window > 0 && current_tick % 1000 == 0) {
                 neurons[i].spikes_in_last_window = 0;
