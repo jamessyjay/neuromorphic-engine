@@ -197,8 +197,9 @@ impl NetworkGraph {
             _pad_block1: [0; 28],
             ref_coord_x: 0.0,
             ref_coord_y: 0.0,
-            axonal_delay: 2,
-            _pad_block2: [0; 15],
+            axonal_delay: 2, // Will be overridden by init_neuron C++ call later if using CUDA
+            _pad_block2: [0; 11],
+            active_branches_mask: 0,
             branches: [crate::engine::ffi::Compartment {
                 branch_type: 0,
                 refractory_timer: 0,
@@ -416,6 +417,11 @@ impl NetworkGraph {
         let mut flags = branch_id & 0x0F; // Bits 0-3
         if is_inhibitory { flags |= 0x10; } // Bit 4
         if is_myelinated { flags |= 0x20; } // Bit 5
+        
+        // Ensure the branch is marked active in the mask so evaluate_branches doesn't skip it
+        if target_id < self.neurons.len() as u32 {
+            self.neurons[target_id as usize].active_branches_mask |= 1 << branch_id;
+        }
 
         // TЗ №27: Allow multi-synaptic connections! We no longer block duplicates or augment them.
         // A single source neuron can now synapse onto multiple different branches (or even the same branch multiple times biologically) of the target.
@@ -637,6 +643,7 @@ impl NetworkGraph {
             let idx = indices[i];
             let b_type = rng.random_range(1..=3) as u8;
             n.branches[idx].branch_type = b_type;
+            n.active_branches_mask |= 1 << idx;
             n.branches[idx].nmda_threshold = NMDA_THRESHOLD_PACKED;
             n.branches[idx].voltage = 0; // 0 means pack_voltage(-100.0), which is minimum inactive state
             n.branches[idx].refractory_timer = 0;

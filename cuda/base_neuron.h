@@ -178,7 +178,7 @@ extern "C" {
 #define NOCICEPTOR_THRESHOLD -45.0f
 
 // Runtime configurations
-#define NUM_BRANCHES 8
+#define NUM_BRANCHES 16
 #define THREADS_PER_BLOCK 256
 #define MYELINATED_DELIVERY_TICKS 0
 #define UNMYELINATED_DELIVERY_TICKS 2
@@ -248,7 +248,8 @@ typedef struct alignas(64) {
     uint32_t last_spike_tick;
     
     uint8_t axonal_delay;
-    uint8_t _pad_block2[15];
+    uint8_t _pad_block2[11];
+    uint32_t active_branches_mask;
     
     // --- Blocks 3-4 (128-255 bytes): Expanded Dendritic Array ---
     Compartment branches[16];

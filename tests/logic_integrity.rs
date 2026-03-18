@@ -28,6 +28,7 @@ fn test_prediction_decay() {
     let target_idx = graph.neurons.iter().position(|n| n.layer_id == 2 && n.type_ == NeuronType::Pyramidal as u8).unwrap();
     println!("Selected target L2/3 neuron ID: {}", target_idx);
     
+    graph.neurons[target_idx].active_branches_mask |= 1 << 4;
     graph.neurons[target_idx].branches[4].branch_type = 1;
     graph.neurons[target_idx].branches[4].nmda_threshold = pack_voltage(-30.0);
     graph.neurons[target_idx].branches[4].voltage = pack_voltage(10.0); 

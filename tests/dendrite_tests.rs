@@ -32,6 +32,7 @@ fn test_spatial_summation_basal() {
     let env = default_env();
     
     // Set up branch 1 as Basal
+    graph.neurons[id as usize].active_branches_mask |= 1 << 1;
     graph.neurons[id as usize].branches[1] = Compartment {
         branch_type: 1, // Basal
         refractory_timer: 0,
@@ -68,6 +69,7 @@ fn test_nmda_spike_trigger() {
     graph.neurons[id as usize].current_voltage = -70.0;
     let initial_voltage = -70.0;
 
+    graph.neurons[id as usize].active_branches_mask |= 1 << 0;
     graph.neurons[id as usize].branches[0] = Compartment {
         branch_type: 1, // Any branch type > 0 works
         refractory_timer: 0,
@@ -90,6 +92,7 @@ fn test_branch_isolation() {
     let id = graph.add_neuron(NeuronType::Pyramidal);
     let env = default_env();
     
+    graph.neurons[id as usize].active_branches_mask |= 1 << 1;
     graph.neurons[id as usize].branches[1] = Compartment {
         branch_type: 1,
         refractory_timer: 0,
@@ -99,6 +102,7 @@ fn test_branch_isolation() {
             _pad: 0,
     };
     
+    graph.neurons[id as usize].active_branches_mask |= 1 << 2;
     graph.neurons[id as usize].branches[2] = Compartment {
         branch_type: 1,
         refractory_timer: 0,
@@ -132,6 +136,7 @@ fn test_trunk_vs_tuft_penalty() {
     graph_trunk.neurons[id_trunk as usize].energy_atp = 100.0;
     graph_tuft.neurons[id_tuft as usize].energy_atp = 100.0;
     
+    graph_trunk.neurons[id_trunk as usize].active_branches_mask |= 1 << 1;
     graph_trunk.neurons[id_trunk as usize].branches[1] = Compartment {
         branch_type: 2, // Trunk
         refractory_timer: 0,
@@ -141,6 +146,7 @@ fn test_trunk_vs_tuft_penalty() {
             _pad: 0,
     };
     
+    graph_tuft.neurons[id_tuft as usize].active_branches_mask |= 1 << 1;
     graph_tuft.neurons[id_tuft as usize].branches[1] = Compartment {
         branch_type: 3, // Tuft
         refractory_timer: 0,
@@ -165,6 +171,7 @@ fn test_branch_refractory_period() {
     let id = graph.add_neuron(NeuronType::Pyramidal);
     let env = default_env();
     
+    graph.neurons[id as usize].active_branches_mask |= 1 << 1;
     graph.neurons[id as usize].branches[1] = Compartment {
         branch_type: 1,
         refractory_timer: 0,
@@ -195,6 +202,7 @@ fn test_passive_leak_diffusion() {
     
     graph.neurons[id as usize].current_voltage = -70.0;
     
+    graph.neurons[id as usize].active_branches_mask |= 1 << 1;
     graph.neurons[id as usize].branches[1] = Compartment {
         branch_type: 1,
         refractory_timer: 0,
@@ -275,6 +283,7 @@ fn test_dendritic_role_separation() {
     for b in &mut graph.neurons[2].branches {
         b.voltage = pack_voltage(-100.0);
     }
+    graph.neurons[2].active_branches_mask |= (1 << 2) | (1 << 6);
     graph.neurons[2].branches[2].branch_type = 2; // Trunk/Proximal
     graph.neurons[2].branches[2].nmda_threshold = pack_voltage(10.0);
     graph.neurons[2].branches[6].branch_type = 3; // Tuft/Distal

@@ -1,9 +1,11 @@
 # Walkthrough - TK #26 & TK #27: Synaptic X-Ray & Circuits Topology
 
 ## Overview
+
 Implemented deep topological diagnostics and completely restructured the synaptic connection rules to support reverberating memory circuits and realistic axonal delivery delays.
 
 ## TK #26: Synaptic X-Ray
+
 1. **Dendritic Array Expansion**:
    - Expanded `branches` to 16 in `Compartment` array.
    - Updated bitmasks in `Synapse` flags: `0-3` for `branch_id`, `4` for `is_inhibitory`, `5` for `is_myelinated`.
@@ -16,6 +18,7 @@ Implemented deep topological diagnostics and completely restructured the synapti
    - "Load balancing": if the target neuron is metabolically stressed (`energy_ATP < 70.0`), new synapses hunt for the quietest branch to distribute the processing load.
 
 ## TK #27: Synaptic Circuits & Axonal Topology
+
 1. **The Axonal Bottleneck**:
    - Introduced `axonal_delay` into `BaseNeuron` (randomized between 1-5 ticks during `init_neuron`).
    - Replaced hardcoded `UNMYELINATED_DELIVERY_TICKS` with dynamic `source->axonal_delay` in `process_synapse` (CUDA/C++).
@@ -30,9 +33,10 @@ Implemented deep topological diagnostics and completely restructured the synapti
    - Created `test_reverberating_circuit` in `edge_cases_tests.rs`.
    - A closed `A -> B -> C -> A` loop with an exact delay of 5 ticks successfully circulates a single injected spike indefinitely, proving that **Hebb's reverberating memory rings** are fully functional inside the CUDA engine without exogenous energy input.
 
-# Walkthrough - Phase 37: "Wake Up, Neo" (Stochastic Babbling & Trace Persistence)
+## Walkthrough - Phase 37: "Wake Up, Neo" (Stochastic Babbling & Trace Persistence)
 
-## Overview
+## Overview Phase 37
+
 Addressed the issue of the network remaining silent ("10.7% Acc") after the transition to the Amygdala Reward Loop. The output neurons weren't firing on their own, meaning the Winner-Takes-All (WTA) logic never triggered, and no useful synaptic associations could form.
 
 ## Key Implementation Details
@@ -50,12 +54,13 @@ Addressed the issue of the network remaining silent ("10.7% Acc") after the tran
 4. **Dopamine Maintenance**:
    - Instead of a one-tick dopamine burst, `modes.rs` now maintains the active dopamine state (either `1.0` for reward or `-0.2` for punishment) for **50 consecutive ticks** after an evaluation. This ensures that all active traces have time to securely undergo Long-Term Potentiation (LTP) or Depression (LTD).
 
-# Walkthrough - Phase 36: Project "Amygdala" & 3-Factor STDP (v3.0)
+## Walkthrough - Phase 36: Project "Amygdala" & 3-Factor STDP (v3.0)
 
-## Overview
-Replaced the traditional 2-Factor STDP with Dopamine-modulated 3-Factor STDP to enable true associative reinforcement learning. Removed mechanical teacher forcing ("electroshock") in favor of an Amygdala reward/punishment loop. 
+### Overview Phase 38
 
-## Key Implementation Details
+Replaced the traditional 2-Factor STDP with Dopamine-modulated 3-Factor STDP to enable true associative reinforcement learning. Removed mechanical teacher forcing ("electroshock") in favor of an Amygdala reward/punishment loop.
+
+### Key Implementation Details Phase 38
 
 1. **3-Factor STDP (CUDA Core)**:
    - Modified `base_neuron.cu` to gate both LTP (Potentiation) and LTD (Depression) with the `env.dopamine_multiplier`.
@@ -67,7 +72,7 @@ Replaced the traditional 2-Factor STDP with Dopamine-modulated 3-Factor STDP to 
    - Removed direct `external_input = 1.5` / `3.0` injections into target neurons during MNIST training.
    - The network now guesses independently. The Amygdala checks the answer at the end of the exposure window.
    - Success triggers a dopamine rush (`dopamine_multiplier = 1.0`). Failure triggers disappointment/punishment (`dopamine_multiplier = -0.2`).
-   
+
 3. **Environment & Homeostasis Updates**:
    - Implemented a 5% exponential decay (`0.95` multiplier) for dopamine per tick inside `EnvironmentRegulator` so the chemical washes out naturally after a reward spike.
    - Expanded WebSocket payloads to continuously stream `global_dopamine` down to the UI.
@@ -75,12 +80,13 @@ Replaced the traditional 2-Factor STDP with Dopamine-modulated 3-Factor STDP to 
 4. **UI Visuals**:
    - Added a dynamic **Dopamine (Reward)** progress bar to the `index.html` frontend, turning golden-yellow when the Amygdala dispenses rewards.
 
-# Walkthrough - Phase 35: Brain Persistence & Inference Mode (v2.0)
+## Walkthrough - Phase 35: Brain Persistence & Inference Mode (v2.0)
 
-## Overview
+### Overview Phase 35
+
 Implemented core features to transition the prototype to v2.0, adding capabilities to save/load trained models, evaluate performance in inference mode, accelerate supervised learning via bursting, and export telemetry for Grafana.
 
-## Key Implementation Details
+### Key Implementation Details Phase 35
 
 1. **Brain Persistence (Save/Load)**:
    - Handled serialization/deserialization of `NetworkGraph` along with environment states using `bincode`.
@@ -100,13 +106,13 @@ Implemented core features to transition the prototype to v2.0, adding capabiliti
 5. **Robust UI Connectivity**:
    - Hardened `streamer.rs` WebSocket connection handler to silently suppress generic connection drops (e.g., during a browser refresh) and wait for reconnection instead of crashing the process or printing repetitive errors.
 
-# Walkthrough - Phase 33 & 34: Dendritic Compartments & Architecture Stability
+## Walkthrough - Phase 33 & 34: Dendritic Compartments & Architecture Stability
 
-## Overview
+### Overview Phase 33 & 34
 
 Transformed point neurons into complex dendritic trees with 8 fixed-size compartments. This enables non-linear spatial summation and NMDA-spike logic. Resolved memory alignment and biological physics bugs to solidify the engine architecture.
 
-## Key Implementation Details
+### Key Implementation Details Phase 33 & 34
 
 ### 1. Dendritic Architecture (8-Compartment Tree)
 
@@ -144,13 +150,17 @@ Transformed point neurons into complex dendritic trees with 8 fixed-size compart
 - **TPS:** ~1900-2000 (Mock CPU)
 - **Overhead:** BaseNeuron is perfectly memory aligned to 128 bytes (2 cache lines) removing cache latency bottlenecks.
 
-## Phase 34: Stability & Hardware Alignment
+## Walkthrough - Phase 34: Stability & Hardware Alignment
+
+### Overview Phase 34
 
 - **Memory Geometry:** `Compartment` packed to exactly 8 bytes (using `uint16_t` fixed point for `voltage` and `nmda_threshold`). `BaseNeuron` padded and packed to exactly 128 bytes with strict 64-byte alignment (`alignas(64)` in C++, `#[repr(align(64))]` in Rust).
 - **Passive Leak:** Analog signals below the NMDA threshold now leak a small percentage of charge directly into the soma every tick, solving the "digital deafness" problem.
 - **Refractory Branches:** Prevented the "eternal high" infinite spike loop by implementing a 3-tick branch refractory block after an NMDA spike, during which incoming chemicals are consumed without voltage generation.
 
-## Phase 35: The Sleep Cycle, Observability & Hardcode Cleanup
+## Walkthrough - Phase 35: The Sleep Cycle, Observability & Hardcode Cleanup
+
+### Overview Phase 35.1
 
 - **Binary Serialization:** Integrated `serde` and `bincode` to dump/load the entire 1000-neuron graph in milliseconds, preserving perfect memory alignment on both Rust and C++ sides.
 - **Sleep Manager:** The network dynamically tracks `metabolic_wear`. When the fatigue threshold triggers, it enters an offline cycle to prune weak synapses (weights `< 0.05`) and fully replenish cell ATP and calcium states.
@@ -582,7 +592,7 @@ This phase concludes the foundation of the architecture. The simulation now func
 
 **Objective:** Validate the classification loop via functional testing and expose accuracy metrics during MNIST training.
 
-### What was done
+### What was done here
 
 1. **Training Telemetry & Live Accuracy (`modes.rs`)**:
    - Added telemetry logs outputting to terminal at the end of every image exposure (every 500 ticks) in `--mnist` mode.
@@ -598,8 +608,8 @@ This phase concludes the foundation of the architecture. The simulation now func
    - Removed the blocking infinite loop (`loop { sleep }`) when running `--ui-test`, allowing CI/CD to finish and exit naturally when the specified ticks are completed.
    - Added a default value of `50,000` ticks for `--ui-test` if the user does not specify `--ticks` explicitly, preventing it from running just 10 ticks and dying immediately.
 
-### Verification steps
-- All 62+ tests are passing, including the new functional tests.
+### Verification proof
+
+- All 81+ tests are passing, including the new functional tests.
 - Terminal outputs proper telemetry logs during MNIST training.
 - `--ui-test` finishes and exits cleanly.
-

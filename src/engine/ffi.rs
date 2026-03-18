@@ -71,8 +71,9 @@ pub struct BaseNeuron {
     pub last_spike_tick: u32,
     
     pub axonal_delay: u8,
-    pub _pad_block2: [u8; 15],
-    
+    pub _pad_block2: [u8; 11],
+    pub active_branches_mask: u32,
+
     // --- Blocks 3-4 (128-255 bytes): Expanded Dendritic Array ---
     pub branches: [Compartment; 16],
 }

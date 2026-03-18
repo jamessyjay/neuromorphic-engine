@@ -54,7 +54,9 @@ fn test_sequence_recall() {
     graph.add_neuron(NeuronType::Pyramidal); // A (0)
     graph.add_neuron(NeuronType::Pyramidal); // B (1)
     graph.add_neuron(NeuronType::Pyramidal); // C (2)
+    graph.neurons[1].active_branches_mask |= 1 << 4;
     graph.neurons[1].branches[4].branch_type = 1;
+    graph.neurons[2].active_branches_mask |= 1 << 4;
     graph.neurons[2].branches[4].branch_type = 1;
 
     // Connect via basal dendrites (Branch 1)

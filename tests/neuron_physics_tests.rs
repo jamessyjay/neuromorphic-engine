@@ -349,6 +349,7 @@ fn test_htm_predictive_state_coincidence() {
     let env = default_env();
     
     // Set up branch 3 (Basal/Context) and branch 0 (Proximal/Trigger)
+    neuron.active_branches_mask |= (1 << 4) | (1 << 0);
     neuron.branches[4].branch_type = 1;
     neuron.branches[0].branch_type = 1;
 

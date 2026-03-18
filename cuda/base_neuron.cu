@@ -146,7 +146,12 @@ static inline __device__ void update_metabolism(BaseNeuron* n, Environment env, 
         // As oxygen drops below 0.5, penalty scales up dramatically (up to 0.5 ATP per tick)
         hypoxia_penalty = (0.5f - env.global_oxygen_level) * 1.0f; 
     }
-    float passive_drain = BASELINE_LEAK_RATE + hypoxia_penalty;
+    
+    // Fast proxy for incoming activity cost (1/10th of spike cost for processing signals)
+    // Avoids atomic collisions from thousands of incoming synapses
+    float active_processing_cost = (n->spikes_in_last_window * 0.1f);
+    
+    float passive_drain = BASELINE_LEAK_RATE + hypoxia_penalty + active_processing_cost;
     
     // Phase 14: Metabolic Calibration (Protocol "Evolution")
     if (current_tick < NETWORK_GRACE_PERIOD_TICKS) {
@@ -192,7 +197,10 @@ static inline __device__ void update_calcium(BaseNeuron* n, uint32_t current_tic
 }
 
 static inline __device__ void evaluate_branches(BaseNeuron* n) {
-    for (int i = 0; i < NUM_BRANCHES; i++) {
+    #pragma unroll
+    for (int i = 0; i < 16; i++) {
+        if (!(n->active_branches_mask & (1 << i))) continue;
+        
         Compartment* b = &n->branches[i];
         if (b->branch_type == 0) continue;
 
@@ -388,19 +396,39 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     
     // Trace-based LTP (Potentiation)
     // If target just spiked, apply LTP based on source's existing trace
-    if (!is_inhibitory && target->last_spike_tick == current_tick && source->last_spike_tick > 0 && source->last_spike_tick < target->last_spike_tick) {
-        int branch_id = s->flags & 0x0F;
-        float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
-        float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
-        
-        // Phase 55: Amygdala 3-Factor STDP
-        // Dopamine operates as a gating multiplier. If dopamine is <= 0.0 or neutral, 
-        // STDP shouldn't blindly reinforce things anymore.
-        float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
-        s->weight += delta_w * dopa_factor * branch_activity;
+    if (env.stdp_learning_rate > 0.0f) {
+        if (!is_inhibitory && target->last_spike_tick == current_tick && source->last_spike_tick > 0 && source->last_spike_tick < target->last_spike_tick) {
+            int branch_id = s->flags & 0x0F;
+            float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
+            float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
+            
+            // Phase 55: Amygdala 3-Factor STDP
+            // Dopamine operates as a gating multiplier. If dopamine is <= 0.0 or neutral, 
+            // LTP is suppressed.
+            float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
+            
+            s->weight += delta_w * branch_activity * dopa_factor;
+        }
     }
 
-    
+    // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
+    if (env.stdp_learning_rate > 0.0f) {
+        if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= ((s->flags & 0x20) != 0 ? MYELINATED_DELIVERY_TICKS : source->axonal_delay) + 2) {
+            // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
+            // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
+            // If target fired BEFORE source, target->last_spike_tick will be LESS than source->last_spike_tick (LTD territory)
+            if (target->last_spike_tick < source->last_spike_tick) {
+                int branch_id = s->flags & 0x0F;
+                float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
+                float delta_w = target->spike_trace * env.stdp_learning_rate * STDP_A_MINUS;
+                
+                // Phase 55: Dopamine gating for LTD too
+                float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
+                s->weight -= delta_w * branch_activity * dopa_factor;
+            }
+        }
+    }
+
     // Homeostatic Scaling of Weights (Phase 23)
     if (target->spikes_in_last_window > SYNAPSE_SCALING_HIGH) {
         s->weight -= SYNAPSE_PENALTY;
@@ -626,6 +654,10 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= syn_count) return;
     
+    // Cache heavily used environment variables in registers (Phase 28 Optimization)
+    float local_dopamine = env.dopamine_multiplier;
+    float local_learning_rate = env.stdp_learning_rate;
+    
     Synapse* s = &synapses[idx];
     
     // Tombstoned synapses (Soft Delete) are ignored
@@ -645,7 +677,13 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
         return;
     }
 
-    process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], env, current_tick);
+    // Pass the modified Environment with cached values back into process_synapse
+    // (We modify a local copy of env for the struct to avoid changing function signature)
+    Environment local_env = env;
+    local_env.dopamine_multiplier = local_dopamine;
+    local_env.stdp_learning_rate = local_learning_rate;
+
+    process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], local_env, current_tick);
 }
 
 // --- MACRO BIOLOGY SERVICES ---
