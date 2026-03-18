@@ -126,7 +126,7 @@ static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t cu
     uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * THERMAL_NOISE_MAGIC_C;
     uint32_t rand_int = (word >> 22u) ^ word;
     // Map to [-1.0, 1.5]
-    float normalized = (float)(rand_int & 0xFFFF) / 65535.0f; 
+    float normalized = (float)(rand_int % 10000) / 10000.0f; 
     return (normalized * THERMAL_NOISE_SCALE * noise_scale) - 1.0f;
 }
 
