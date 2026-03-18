@@ -62,6 +62,13 @@ impl NetworkGraph {
         let pruned = initial_synapses - self.synapses.len();
         println!("  -> Pruned {} weak synapses during sleep.", pruned);
 
+        // Phase 53: Complete recalculation of `outgoing_counts` to sync with C++ tombstones or just pruning
+        // We zero out the array and count everything that actually survived the retain filter
+        self.outgoing_counts.fill(0);
+        for s in &self.synapses {
+            self.outgoing_counts[s.source_id as usize] += 1;
+        }
+
         // Consolidation & Recovery
         for n in &mut self.neurons {
             if n.is_alive == 1 {
