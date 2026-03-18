@@ -275,7 +275,7 @@ typedef struct {
     uint32_t last_activation_tick;
     uint32_t ticks_below_threshold;
     uint8_t ticks_until_delivery;
-    uint8_t flags; // Bits 0-3: branch_id, Bit 4: is_inhibitory, Bit 5: is_myelinated
+    uint8_t flags; // Bits 0-3: branch_id, Bit 4: is_inhibitory, Bit 5: is_myelinated, Bit 6: is_photoreceptor
     uint8_t _padding[2];
 } Synapse;
 

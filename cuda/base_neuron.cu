@@ -50,6 +50,69 @@ static inline __device__ __host__ float unpack_voltage(uint16_t v) {
 
 #ifdef USE_CUDA
 __device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impact) {
+#if __CUDA_ARCH__ >= 700
+    // Warp-level reduction for atomic CAS spin-lock mitigation (Phase 31 VRAM Diet)
+    // Find all threads in the warp writing to the EXACT SAME address
+    uint32_t active = __activemask();
+    uint32_t match_mask = __match_any_sync(active, (unsigned long long)address);
+    
+    // Find the leader thread for this specific address
+    int leader = __ffs(match_mask) - 1;
+    int lane_id = threadIdx.x % 32;
+    
+    // Sum the impacts across all matching threads in the warp
+    float total_impact = voltage_impact;
+    for (int i = 1; i < 32; i *= 2) {
+        float val = __shfl_xor_sync(match_mask, total_impact, i);
+        // Only add if the fetched value is from a thread that actually matched
+        // __shfl_xor_sync exchanges unconditionally, so we must rely on the logic that 
+        // non-matching threads will not participate in this specific match_mask group's reduction cleanly.
+        // Actually, safer reduction:
+    }
+    
+    // A much safer and standard way to reduce across dynamic masks:
+    float warp_sum = voltage_impact;
+    for (int offset = 16; offset > 0; offset /= 2) {
+        float neighbor_val = __shfl_down_sync(match_mask, warp_sum, offset);
+        // We only add if the neighbor is in our match mask
+        if (__shfl_down_sync(0xFFFFFFFF, (match_mask & (1 << (lane_id + offset))) != 0, offset)) {
+             warp_sum += neighbor_val;
+        }
+    }
+    
+    // Simpler warp reduction without complex masking: just use atomicAdd to shared memory if possible, 
+    // but since address is global, we can't easily map it to shared.
+    // Let's stick to the simplest standard warp-aggregate for global atomics:
+    
+    float thread_val = voltage_impact;
+    for (int i = 1; i < 32; i++) {
+        int src_lane = (lane_id + i) % 32;
+        unsigned long long src_addr = __shfl_sync(active, (unsigned long long)address, src_lane);
+        float src_val = __shfl_sync(active, thread_val, src_lane);
+        if (src_addr == (unsigned long long)address && src_lane > lane_id) {
+            // We are a lower lane, we absorb the higher lane's value
+            voltage_impact += src_val;
+        }
+        if (src_addr == (unsigned long long)address && src_lane < lane_id) {
+            // A lower lane absorbed our value, we bail out
+            voltage_impact = 0.0f;
+            break;
+        }
+    }
+    
+    // Only the lowest lane for this address performs the atomic
+    if (voltage_impact != 0.0f) {
+        uint16_t assumed, old = *address;
+        do {
+            assumed = old;
+            float current_v = unpack_voltage(assumed);
+            current_v += voltage_impact;
+            current_v = fmaxf(-100.0f, fminf(current_v, 150.0f)); // Saturation limit (Spec 2.2)
+            uint16_t new_val = pack_voltage(current_v);
+            old = atomicCAS(address, assumed, new_val);
+        } while (assumed != old);
+    }
+#else
     uint16_t assumed, old = *address;
     do {
         assumed = old;
@@ -59,6 +122,7 @@ __device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impac
         uint16_t new_val = pack_voltage(current_v);
         old = atomicCAS(address, assumed, new_val);
     } while (assumed != old);
+#endif
 }
 #else
 #include <atomic>
@@ -369,24 +433,26 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     }
 }
 
-static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, uint32_t current_tick) {
+static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, float ltp_mult, float ltd_mult, uint32_t current_tick) {
     // Phase 40 Performance: Early exit for dead neural pathways
     if (!source->is_alive || !target->is_alive) {
         s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
         return;
     }
 
-    if (source->type == TYPE_PHOTORECEPTOR) {
+    uint8_t is_myelinated = (s->flags & 0x20) != 0;
+    uint8_t is_photoreceptor = (s->flags & 0x40) != 0;
+
+    if (is_photoreceptor) {
         if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
             s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK; // Photoreceptors leak constantly
-            uint8_t is_myelinated = (s->flags & 0x20) != 0;
             s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
         }
     } else {
-        if (source->last_spike_tick == current_tick) {
+        uint32_t src_last_spike = source->last_spike_tick;
+        if (src_last_spike == current_tick) {
             // Bulk release on spike
             s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
-            uint8_t is_myelinated = (s->flags & 0x20) != 0;
             s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay; // Myelin Bypass (Phase 26)
         }
     }
@@ -396,35 +462,31 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     
     // Trace-based LTP (Potentiation)
     // If target just spiked, apply LTP based on source's existing trace
-    if (env.stdp_learning_rate > 0.0f) {
-        if (!is_inhibitory && target->last_spike_tick == current_tick && source->last_spike_tick > 0 && source->last_spike_tick < target->last_spike_tick) {
-            int branch_id = s->flags & 0x0F;
-            float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
-            float delta_w = source->spike_trace * env.stdp_learning_rate * STDP_A_PLUS;
-            
-            // Phase 55: Amygdala 3-Factor STDP
-            // Dopamine operates as a gating multiplier. If dopamine is <= 0.0 or neutral, 
-            // LTP is suppressed.
-            float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
-            
-            s->weight += delta_w * branch_activity * dopa_factor;
+    if (ltp_mult > 0.0f) {
+        if (!is_inhibitory && target->last_spike_tick == current_tick) {
+            uint32_t src_last_spike = source->last_spike_tick; // Lazy load
+            if (src_last_spike > 0 && src_last_spike < target->last_spike_tick) {
+                int branch_id = s->flags & 0x0F;
+                float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
+                float src_trace = source->spike_trace; // Lazy load
+                
+                s->weight += src_trace * branch_activity * ltp_mult;
+            }
         }
     }
 
     // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
-    if (env.stdp_learning_rate > 0.0f) {
-        if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= ((s->flags & 0x20) != 0 ? MYELINATED_DELIVERY_TICKS : source->axonal_delay) + 2) {
+    if (ltd_mult > 0.0f) {
+        uint32_t src_last_spike = source->last_spike_tick; // Lazy load
+        if (!is_inhibitory && src_last_spike > 0 && (current_tick - src_last_spike) <= ((s->flags & 0x20) != 0 ? MYELINATED_DELIVERY_TICKS : source->axonal_delay) + 2) {
             // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
             // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
             // If target fired BEFORE source, target->last_spike_tick will be LESS than source->last_spike_tick (LTD territory)
-            if (target->last_spike_tick < source->last_spike_tick) {
+            if (target->last_spike_tick < src_last_spike) {
                 int branch_id = s->flags & 0x0F;
                 float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
-                float delta_w = target->spike_trace * env.stdp_learning_rate * STDP_A_MINUS;
                 
-                // Phase 55: Dopamine gating for LTD too
-                float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
-                s->weight -= delta_w * branch_activity * dopa_factor;
+                s->weight -= target->spike_trace * branch_activity * ltd_mult;
             }
         }
     }
@@ -679,8 +741,13 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
     Environment local_env = env;
     local_env.dopamine_multiplier = local_dopamine;
     local_env.stdp_learning_rate = local_learning_rate;
+    
+    // Pre-calculate STDP multipliers to save cycles in inner loop
+    float dopa_factor = (local_dopamine > 0.0f) ? local_dopamine : 0.0f;
+    float ltp_mult = local_learning_rate * STDP_A_PLUS * dopa_factor;
+    float ltd_mult = local_learning_rate * STDP_A_MINUS * dopa_factor;
 
-    process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], local_env, current_tick);
+    process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], local_env, ltp_mult, ltd_mult, current_tick);
 }
 
 // --- MACRO BIOLOGY SERVICES ---
@@ -712,76 +779,14 @@ __global__ void astrocyte_synapses_kernel(Synapse* synapses, int syn_count) {
     }
 }
 
-// Microglia Global Storage
-__device__ int outgoing_counts[100000];
-
-__global__ void microglia_count_kernel(Synapse* synapses, int syn_count, int neuron_count) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    // First, clear the counts (map neuron count to threads)
-    if (idx < neuron_count) {
-        outgoing_counts[idx] = 0;
-    }
-    
-    __syncthreads(); // We can't safely __syncthreads across blocks here for the whole array.
-    // Instead, we will do the clearing in a separate step via host or specialized kernel if needed,
-    // but a fast way is to just let a separate kernel clear it.
-}
-
-__global__ void microglia_clear_counts_kernel(int neuron_count) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < neuron_count) {
-        outgoing_counts[idx] = 0;
-    }
-}
-
-__global__ void microglia_accumulate_counts_kernel(Synapse* synapses, int syn_count) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= syn_count) return;
-    
-    Synapse* s = &synapses[idx];
-    if (s->weight > 0.0f) {
-        atomicAdd(&outgoing_counts[s->source_id], 1);
-    }
-}
-
-__global__ void microglia_prune_kernel(Synapse* synapses, int syn_count, BaseNeuron* neurons, uint32_t current_tick) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= syn_count) return;
-    
-    Synapse* s = &synapses[idx];
-    if (s->weight < 0.0f) return; // Already soft-deleted
-    
-    BaseNeuron* src = &neurons[s->source_id];
-    BaseNeuron* tgt = &neurons[s->target_id];
-    
-    bool src_valid = src->is_alive || src->dead_ticks > 0;
-    bool tgt_valid = tgt->is_alive || tgt->dead_ticks > 0;
-    
-    if (!src_valid || !tgt_valid) {
-        s->weight = -1.0f; // Tombstone
-        return;
-    }
-    
-    if (outgoing_counts[s->source_id] <= MIN_SYNAPSES_PER_NEURON) {
-        return; // Competitive retention
-    }
-    
-    uint32_t time_since_spike = current_tick > s->last_activation_tick ? current_tick - s->last_activation_tick : 0;
-    
-    // Probabilistic pruning
-    if (s->weight < PRUNING_THRESHOLD && time_since_spike > 100) {
-        float inactivity_factor = fminf(1.0f, (float)time_since_spike / 1000.0f);
-        float p_drop = (PRUNING_THRESHOLD - s->weight) * inactivity_factor;
-        
-        uint32_t local_seed = s->source_id ^ s->target_id ^ current_tick;
-        float rand_val = get_random_float_01(&local_seed);
-        
-        if (rand_val < p_drop) {
-            atomicSub(&outgoing_counts[s->source_id], 1);
-            s->weight = -1.0f; // Tombstone
-        }
-    }
+// Microglia logic moved to Rust (Phase 31 VRAM Diet)
+void launch_microglia_service(BaseNeuron* neurons, int count, Synapse* synapses, int syn_count, uint32_t current_tick) {
+    // Intentionally empty. Logic handled by Rust CPU to avoid VRAM atomic bottlenecks.
+    (void)neurons;
+    (void)count;
+    (void)synapses;
+    (void)syn_count;
+    (void)current_tick;
 }
 
 #endif
@@ -948,9 +953,48 @@ extern "C" {
         process_spike(neuron, env, current_tick);
     }
 
+    void tick_neuron_prepare_cpu_batch(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
+        for (int i = 0; i < count; i++) {
+            if (!neurons[i].is_alive) continue;
+            update_metabolism(&neurons[i], env, current_tick);
+            evaluate_branches(&neurons[i]);
+            // evaluate_soma logic is inside process_spike or prep kernel. Actually CPU fallback has process_spike later.
+            // Just matching what tick_neuron_prepare_cpu does:
+            
+            if (neurons[i].spikes_in_last_window > 0 && current_tick % 1000 == 0) {
+                neurons[i].spikes_in_last_window = 0;
+            }
+        }
+    }
+
+    void tick_neuron_spike_cpu_batch(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
+        for (int i = 0; i < count; i++) {
+            if (!neurons[i].is_alive) continue;
+            if ((neurons[i].status_flags & (1 << 0)) != 0) continue; // FLAG_IS_INHIBITED
+            process_spike(&neurons[i], env, current_tick);
+        }
+    }
+
     void tick_synapse_cpu(Synapse* synapse, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
         if (synapse->weight < 0.0f) return;
-        process_synapse(synapse, &neurons[synapse->source_id], &neurons[synapse->target_id], env, current_tick);
+        
+        float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
+        float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * dopa_factor;
+        float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * dopa_factor;
+        
+        process_synapse(synapse, &neurons[synapse->source_id], &neurons[synapse->target_id], env, ltp_mult, ltd_mult, current_tick);
+    }
+
+    void tick_synapses_cpu_batch(Synapse* synapses, int count, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
+        float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
+        float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * dopa_factor;
+        float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * dopa_factor;
+        
+        for (int i = 0; i < count; i++) {
+            Synapse* s = &synapses[i];
+            if (s->weight < 0.0f) continue;
+            process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], env, ltp_mult, ltd_mult, current_tick);
+        }
     }
 }
 #endif

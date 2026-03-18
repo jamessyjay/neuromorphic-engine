@@ -269,68 +269,75 @@ impl NetworkGraph {
     }
 
     pub fn tick(&mut self, current_tick: u32, env: crate::engine::ffi::Environment) {
-        // Phase 3: Reset (happens at the beginning of tick)
-        for n in &mut self.neurons {
-            n.status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
-        }
-
         #[cfg(target_os = "macos")]
         {
-            // MacOS CPU Fallback using Rayon Multi-Threading
-            self.neurons.par_iter_mut().for_each(|n| {
-                unsafe { crate::engine::ffi::tick_neuron_prepare_cpu(n, env, current_tick); }
+            // MacOS CPU Fallback using Rayon Multi-Threading with Batching
+            let chunk_size = 512;
+            
+            self.neurons.par_chunks_mut(chunk_size).for_each(|chunk| {
+                for n in chunk.iter_mut() {
+                    n.status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
+                }
+                unsafe { 
+                    crate::engine::ffi::tick_neuron_prepare_cpu_batch(chunk.as_mut_ptr(), chunk.len() as libc::c_int, env, current_tick); 
+                }
             });
 
             // Phase 2: WTA and Bursting
-            use std::collections::HashMap;
-            // Map from (column_id, minicolumn_id) -> (winner_id, winner_v, is_predictive)
-            let mut minicolumn_winners: HashMap<(u16, u8), (u32, f32, bool)> = HashMap::new();
+            // We assume max 100 columns and 50 minicolumns for the flattened array to avoid HashMap
+            let mut minicolumn_winners = vec![(u32::MAX, -1000.0f32, false); 100 * 50];
             
             for n in &self.neurons {
                 if n.is_alive == 1 && n.current_voltage > n.activation_threshold && (n.type_ == 0 || n.type_ == 2) {
-                    let key = (n.column_id, n.minicolumn_id);
-                    let is_pred = (n.status_flags & crate::engine::constants::FLAG_IS_PREDICTIVE) != 0;
-                    let effective_v = if is_pred { n.current_voltage + 1000.0 } else { n.current_voltage };
-                    
-                    if let Some(current_winner) = minicolumn_winners.get_mut(&key) {
-                        let (_, winner_eff_v, _) = *current_winner;
-                        if effective_v > winner_eff_v || (effective_v == winner_eff_v && n.id < current_winner.0) {
-                            *current_winner = (n.id, effective_v, is_pred);
+                    let idx = (n.column_id as usize) * 50 + (n.minicolumn_id as usize);
+                    if idx < minicolumn_winners.len() {
+                        let is_pred = (n.status_flags & crate::engine::constants::FLAG_IS_PREDICTIVE) != 0;
+                        let effective_v = if is_pred { n.current_voltage + 1000.0 } else { n.current_voltage };
+                        
+                        let current_winner = minicolumn_winners[idx];
+                        if effective_v > current_winner.1 || (effective_v == current_winner.1 && n.id < current_winner.0) {
+                            minicolumn_winners[idx] = (n.id, effective_v, is_pred);
                         }
-                    } else {
-                        minicolumn_winners.insert(key, (n.id, effective_v, is_pred));
                     }
                 }
             }
 
             for n in &mut self.neurons {
                 if n.is_alive == 1 && (n.type_ == 0 || n.type_ == 2) {
-                    let key = (n.column_id, n.minicolumn_id);
-                    if let Some(&(winner_id, _, winner_was_predictive)) = minicolumn_winners.get(&key) {
-                        if !winner_was_predictive {
-                            // Surprise! Bursting (No predictive neurons crossed threshold)
-                            if n.current_voltage <= n.activation_threshold {
-                                n.current_voltage = n.activation_threshold + 5.0;
+                    let idx = (n.column_id as usize) * 50 + (n.minicolumn_id as usize);
+                    if idx < minicolumn_winners.len() {
+                        let winner = minicolumn_winners[idx];
+                        if winner.0 != u32::MAX {
+                            if !winner.2 { // !winner_was_predictive
+                                // Surprise! Bursting (No predictive neurons crossed threshold)
+                                if n.current_voltage <= n.activation_threshold {
+                                    n.current_voltage = n.activation_threshold + 5.0;
+                                }
+                            } else if n.id != winner.0 {
+                                n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
+                                n.current_voltage = n.resting_voltage - 10.0;
+                                n.refractory_time_left = 5.0;
                             }
-                        } else if n.id != winner_id {
-                            n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
-                            n.current_voltage = n.resting_voltage - 10.0;
-                            n.refractory_time_left = 5.0;
                         }
                     }
                 }
             }
             
-            self.neurons.par_iter_mut().for_each(|n| {
-                unsafe { crate::engine::ffi::tick_neuron_spike_cpu(n, env, current_tick); }
+            self.neurons.par_chunks_mut(chunk_size).for_each(|chunk| {
+                unsafe { 
+                    crate::engine::ffi::tick_neuron_spike_cpu_batch(chunk.as_mut_ptr(), chunk.len() as libc::c_int, env, current_tick); 
+                }
             });
 
             // Convert pointer to usize to make it trivially Send+Sync
             let neurons_ptr_usize = self.neurons.as_mut_ptr() as usize;
             
-            self.synapses.par_iter_mut().for_each(|s| {
+            let syn_chunk_size = 2048;
+            self.synapses.par_chunks_mut(syn_chunk_size).for_each(|chunk| {
                 let ptr = neurons_ptr_usize as *mut crate::engine::ffi::BaseNeuron;
-                unsafe { crate::engine::ffi::tick_synapse_cpu(s, ptr, env, current_tick); }
+                unsafe { 
+                    crate::engine::ffi::tick_synapses_cpu_batch(chunk.as_mut_ptr(), chunk.len() as libc::c_int, ptr, env, current_tick); 
+                }
             });
         }
         

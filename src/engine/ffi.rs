@@ -135,6 +135,11 @@ extern "C" {
     pub fn tick_neuron_prepare_cpu(neuron: *mut BaseNeuron, env: Environment, current_tick: u32);
     pub fn tick_neuron_spike_cpu(neuron: *mut BaseNeuron, env: Environment, current_tick: u32);
     pub fn tick_synapse_cpu(synapse: *mut Synapse, neurons: *mut BaseNeuron, env: Environment, current_tick: u32);
+    
+    // CPU Fallback Batch bindings (for Rayon chunking)
+    pub fn tick_neuron_prepare_cpu_batch(neurons: *mut BaseNeuron, count: libc::c_int, env: Environment, current_tick: u32);
+    pub fn tick_neuron_spike_cpu_batch(neurons: *mut BaseNeuron, count: libc::c_int, env: Environment, current_tick: u32);
+    pub fn tick_synapses_cpu_batch(synapses: *mut Synapse, count: libc::c_int, neurons: *mut BaseNeuron, env: Environment, current_tick: u32);
 
     pub fn init_neuron(neuron: *mut BaseNeuron, id: u32, type_: NeuronType, seed: u32);
     pub fn synchronize_device();
