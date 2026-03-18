@@ -1549,9 +1549,31 @@ pub async fn run_mnist_mode(
                         graph.neurons[rand_proc].current_voltage += 40.0;
                     }
                 }
-
+            } else if current_tick % 500 == 250 {
+                // Phase 56b: Desuppression Shock
+                // If STILL silent halfway through, the network is likely suppressed by lateral inhibition.
+                // Apply a MASSIVE jolt to wake it up and clear inhibition
+                let mut any_spiked = false;
+                for i in 0..10 {
+                    if graph.neurons[1784 + i].last_spike_tick > current_tick - 250 {
+                        any_spiked = true;
+                        break;
+                    }
+                }
+                if !any_spiked {
+                    let mut rng = rand::rng();
+                    let rand_idx = rand::RngExt::random_range(&mut rng, 0..10) as usize; 
+                    graph.neurons[1784 + rand_idx].current_voltage += 50.0;
+                    
+                    // Clear all inhibition flags in the network 
+                    for n in &mut graph.neurons {
+                        n.status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
+                        n.refractory_time_left = 0.0;
+                    }
+                }
             }
         } else if is_inference && current_label < 10 {
+
              // Ensure no external input in inference mode
              graph.neurons[1784 + current_label as usize].external_input = 0.0;
         }
