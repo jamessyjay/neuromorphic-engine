@@ -41,6 +41,7 @@ impl EnvironmentRegulator {
             light_level: base_env.light_level,
             stdp_learning_rate: base_env.stdp_learning_rate,
             wakefulness_multiplier,
+            thermal_noise_scale: base_env.thermal_noise_scale,
         }
     }
 }

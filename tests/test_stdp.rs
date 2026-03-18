@@ -14,6 +14,7 @@ fn default_env() -> Environment {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     }
 }
 
@@ -708,7 +709,7 @@ fn test_mnist_classifier_competition() {
     assert_eq!((flags_7 & neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED), neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED, "Neuron 7 SHOULD be inhibited by lateral inhibition");
     
     // Voltage of 7 should be reduced by 20.0
-    assert_eq!(graph.neurons[1784 + 7].current_voltage, 25.0, "Neuron 7 voltage should be penalized by 20.0mV");
+    assert_eq!(graph.neurons[1784 + 7].current_voltage, -5.0, "Neuron 7 voltage should be penalized by 50.0mV");
 }
 
 #[test]

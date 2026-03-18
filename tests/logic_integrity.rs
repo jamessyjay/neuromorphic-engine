@@ -11,6 +11,7 @@ fn default_env() -> Environment {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     }
 }
 

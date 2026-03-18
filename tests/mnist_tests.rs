@@ -82,6 +82,7 @@ fn test_retina_stimulation() {
         light_level: 1.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     // Pre-tick voltage check

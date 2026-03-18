@@ -121,7 +121,7 @@ static inline void atomic_add_packed_voltage(uint16_t* address, float voltage_im
 
 
 // Fast stateless PRNG (PCG32-lite) for Thermal Noise
-static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t current_tick) {
+static inline __device__ float get_thermal_noise(uint32_t neuron_id, uint32_t current_tick, Environment env) {
     uint32_t state = (neuron_id ^ current_tick) * THERMAL_NOISE_MAGIC_A + THERMAL_NOISE_MAGIC_B;
     uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * THERMAL_NOISE_MAGIC_C;
     uint32_t rand_int = (word >> 22u) ^ word;
@@ -464,7 +464,13 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
                 int branch_id = s->flags & 0x0F;
                 float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
                 
-                s->weight -= target->spike_trace * branch_activity * ltd_mult;
+                // Cyber Mutant: Synaptic Consolidation (Weight Locking)
+                if (s->weight < MAX_SYNAPSE_WEIGHT * 0.9f) {
+                    s->weight -= target->spike_trace * branch_activity * ltd_mult;
+                } else {
+                    // Small LTD for consolidated synapses
+                    s->weight -= target->spike_trace * branch_activity * ltd_mult * 0.1f;
+                }
             }
         }
     }
@@ -590,7 +596,7 @@ __global__ void tick_neurons_prep_and_vote_kernel(BaseNeuron* neurons, int count
     evaluate_branches(n);
     
     // Thermal Noise
-    n->current_voltage += get_thermal_noise(n->id, current_tick);
+    n->current_voltage += get_thermal_noise(n->id, current_tick, env);
     
     // WTA Voting Phase
     if (n->type != TYPE_PYRAMIDAL && n->type != TYPE_INTERNEURON) return;
@@ -660,7 +666,7 @@ __global__ void wta_apply_and_spike_kernel(BaseNeuron* neurons, int count, Envir
                 }
             } else if (n->id != w_id) {
                 n->status_flags |= FLAG_IS_INHIBITED;
-                n->current_voltage = n->resting_voltage - 10.0f;
+                n->current_voltage = n->resting_voltage - 50.0f;
                 n->refractory_time_left = 5.0f;
             }
         }
@@ -905,7 +911,7 @@ extern "C" {
         update_calcium(neuron, current_tick);
         evaluate_branches(neuron);
         
-        neuron->current_voltage += get_thermal_noise(neuron->id, current_tick);
+        neuron->current_voltage += get_thermal_noise(neuron->id, current_tick, env);
     }
 
     void tick_neuron_spike_cpu(BaseNeuron* neuron, Environment env, uint32_t current_tick) {
@@ -935,7 +941,7 @@ extern "C" {
             update_calcium(&neurons[i], current_tick);
             evaluate_branches(&neurons[i]);
             
-            neurons[i].current_voltage += get_thermal_noise(neurons[i].id, current_tick);
+            neurons[i].current_voltage += get_thermal_noise(neurons[i].id, current_tick, env);
             
             if (neurons[i].spikes_in_last_window > 0 && current_tick % 1000 == 0) {
                 neurons[i].spikes_in_last_window = 0;

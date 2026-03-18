@@ -46,6 +46,7 @@ fn test_minicolumn_wta_inhibition() {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     // Force spike on Neuron 1 and make it predictive
@@ -238,6 +239,7 @@ fn test_wta_suppression() {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     // Force spike on Neuron A and make it predictive to trigger WTA instead of Bursting

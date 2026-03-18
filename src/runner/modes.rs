@@ -434,6 +434,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         toxin_levels: DEFAULT_TOXINS,
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -586,6 +587,7 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
             light_level: 0.0,
             stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
         }));
         let _ = run_benchmark_mode(num_neurons, num_synapses, crate::engine::constants::SCALING_BENCHMARK_TICKS, None, dummy_env, false).await?;
         let elapsed = start.elapsed().as_secs_f64();
@@ -627,6 +629,7 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     });
     
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -725,6 +728,7 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     for i in 0..10 {
@@ -798,6 +802,7 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED;
@@ -842,7 +847,8 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
-            wakefulness_multiplier: 1.0, 
+            wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0, 
     };
 
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -889,6 +895,7 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
         toxin_levels: DEFAULT_TOXINS,
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -936,7 +943,8 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
         dopamine_multiplier: 1.0, 
         toxin_levels: 0.0, 
         light_level: 0.0, stdp_learning_rate: 0.01,
-            wakefulness_multiplier: 1.0, 
+            wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0, 
     };
 
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -986,7 +994,8 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
-            wakefulness_multiplier: 1.0, 
+            wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0, 
     };
 
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -1038,7 +1047,8 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
         dopamine_multiplier: DEFAULT_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
-            wakefulness_multiplier: 1.0, 
+            wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0, 
     };
 
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -1087,6 +1097,7 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -1126,7 +1137,8 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         dopamine_multiplier: EMERGENCE_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
-            wakefulness_multiplier: 1.0, 
+            wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0, 
     };
 
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -1169,7 +1181,8 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
         dopamine_multiplier: MORPHOLOGY_DOPAMINE, 
         toxin_levels: DEFAULT_TOXINS, 
         light_level: DEFAULT_LIGHT, stdp_learning_rate: 0.01,
-            wakefulness_multiplier: 1.0, 
+            wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0, 
     };
 
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
@@ -1235,6 +1248,7 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
             toxin_levels: 0.0,
             light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
         };
         
         let start = Instant::now();
@@ -1367,6 +1381,7 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     println!("Network Ready. Initiating slow tick loop for visualizer debugging...");
@@ -1625,11 +1640,24 @@ pub async fn run_mnist_mode(
         
         let env = {
             let mut guard = shared_env.lock().unwrap();
+            
+            let preview_correct = correct_guesses_history.iter().filter(|&&c| c).count();
+            let preview_len = std::cmp::max(1, correct_guesses_history.len());
+            let accuracy = (preview_correct as f32 / preview_len as f32) * 100.0;
+
             if is_inference {
                 guard.stdp_learning_rate = 0.0;
             }
+            if total_images_processed > 10000 {
+                // Final Exam Mode
+                guard.thermal_noise_scale = 0.0;
+                guard.stdp_learning_rate = 0.0;
+            } else {
+                guard.thermal_noise_scale = 1.0 - (accuracy / 100.0).clamp(0.0, 1.0);
+            }
             *guard
         };
+
         
         // Tick the network
         graph.tick(current_tick, env.clone());
@@ -1658,14 +1686,21 @@ pub async fn run_mnist_mode(
                 total_images_processed += 1;
                 if is_correct {
                     total_correct_guesses += 1;
+                    // Cyber Mutant: Reward-Driven Growth for the winning output neuron
+                    graph.run_targeted_neurogenesis(1784 + best_guess as u32, current_tick);
                 }
+
+                let mut preview_correct = correct_guesses_history.iter().filter(|&&c| c).count();
+                if is_correct { preview_correct += 1; }
+                let preview_len = std::cmp::min(100, correct_guesses_history.len() + 1);
+                let accuracy = (preview_correct as f32 / preview_len as f32) * 100.0;
 
                 // Phase 55: Amygdala Reward/Punishment
                 let mut guard = shared_env.lock().unwrap();
                 if is_correct {
-                    current_dopamine_level = 1.0; // Reward!
+                    current_dopamine_level = 1.0 + (1.0 - (accuracy / 100.0)) * 5.0; // Dynamic Reward Scaling!
                 } else {
-                    current_dopamine_level = -0.2; // Punishment!
+                    current_dopamine_level = -2.0; // Punishment!
                 }
                 guard.dopamine_multiplier = current_dopamine_level;
                 dopamine_timer = 50; // Maintain for 50 ticks
@@ -1675,6 +1710,7 @@ pub async fn run_mnist_mode(
                     correct_guesses_history.pop_front();
                 }
                 correct_guesses_history.push_back(is_correct);
+
                 
                 let correct_count = correct_guesses_history.iter().filter(|&&c| c).count();
                 let accuracy = (correct_count as f32 / correct_guesses_history.len() as f32) * 100.0;

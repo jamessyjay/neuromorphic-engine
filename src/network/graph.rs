@@ -389,7 +389,7 @@ impl NetworkGraph {
                 if winner.current_voltage >= winner.activation_threshold || winner.last_spike_tick == current_tick {
                     for i in start_idx..end_idx {
                         if i != w_id && self.neurons[i].is_alive == 1 {
-                            self.neurons[i].current_voltage -= 20.0; // Hard suppression penalty
+                            self.neurons[i].current_voltage -= 50.0; // Hard suppression penalty
                             self.neurons[i].status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
                         }
                     }
@@ -796,6 +796,56 @@ impl Drop for NetworkGraph {
             // For now, we simulate the hook by passing null to demonstrate the structure, 
             // since calling `free` on a Rust Vec buffer causes a double-free segfault.
             crate::engine::ffi::cleanup_gpu_resources(std::ptr::null_mut());
+        }
+    }
+}
+
+impl NetworkGraph {
+    // TЗ №31: Cyber Mutant - Reward-Driven Growth
+    pub fn run_targeted_neurogenesis(&mut self, target_id: u32, _current_tick: u32) {
+        let mut rng = rand::rng();
+        if self.synapses.len() >= crate::engine::constants::MAX_SYNAPSES_TOTAL { return; }
+        if target_id >= self.neurons.len() as u32 { return; }
+
+        let n_target = self.neurons[target_id as usize].clone();
+        if n_target.is_alive == 0 { return; }
+
+        let x2 = n_target.x as f32 / crate::engine::constants::COORD_SCALE;
+        let y2 = n_target.y as f32 / crate::engine::constants::COORD_SCALE;
+        let z2 = n_target.z as f32 / crate::engine::constants::COORD_SCALE;
+
+        let check_count = 50; 
+        for _ in 0..check_count {
+            let i = rng.random_range(0..self.neurons.len());
+            if i as u32 == target_id { continue; }
+
+            let n_source = &self.neurons[i];
+            if n_source.is_alive == 0 { continue; }
+            if self.outgoing_counts[i] >= crate::engine::constants::MAX_SYNAPSES_PER_NEURON as u32 { continue; }
+
+            let x1 = n_source.x as f32 / crate::engine::constants::COORD_SCALE;
+            let y1 = n_source.y as f32 / crate::engine::constants::COORD_SCALE;
+            let z1 = n_source.z as f32 / crate::engine::constants::COORD_SCALE;
+
+            let dx = x1 - x2;
+            let dy = y1 - y2;
+            let dz = z1 - z2;
+            let dist_sq = dx*dx + dy*dy + dz*dz;
+
+            if dist_sq >= crate::engine::constants::CLUSTERING_RADIUS_SQ * 2.0 { continue; }
+
+            let mut max_trace = 0;
+            let mut best_branch = rng.random_range(0..16) as u8;
+            for b in 0..16 {
+                let trace = self.neurons[target_id as usize].branches[b].local_trace;
+                if trace > max_trace {
+                    max_trace = trace;
+                    best_branch = b as u8;
+                }
+            }
+
+            self.connect(i as u32, target_id, 5.0, best_branch, false, false);
+            break; 
         }
     }
 }

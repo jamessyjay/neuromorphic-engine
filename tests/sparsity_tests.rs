@@ -35,6 +35,7 @@ fn test_sdr_activity_limit() {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     // Process tick (WTA + Physics)

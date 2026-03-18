@@ -10,7 +10,8 @@ fn mock_base_env() -> Environment {
         toxin_levels: 0.0,
         light_level: 1.0,
         stdp_learning_rate: 1.0,
-        wakefulness_multiplier: 1.0
+        wakefulness_multiplier: 1.0,
+        thermal_noise_scale: 1.0,
     }
 }
 
@@ -77,7 +78,8 @@ async fn test_homeostasis_loop_integration() {
         toxin_levels: 0.0,
         light_level: 1.0,
         stdp_learning_rate: 1.0,
-        wakefulness_multiplier: 1.0
+        wakefulness_multiplier: 1.0,
+        thermal_noise_scale: 1.0,
     };
     
     let use_dynamic_homeostasis = true;

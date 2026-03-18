@@ -102,6 +102,7 @@ pub struct Environment {
     pub light_level: f32,
     pub stdp_learning_rate: f32,
     pub wakefulness_multiplier: f32,
+    pub thermal_noise_scale: f32,
 }
 
 #[link(name = "neuron_kernels", kind = "static")]

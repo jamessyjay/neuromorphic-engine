@@ -146,7 +146,7 @@ extern "C" {
 #define THERMAL_NOISE_MAGIC_A 747796405u
 #define THERMAL_NOISE_MAGIC_B 2891336453u
 #define THERMAL_NOISE_MAGIC_C 277803737u
-#define THERMAL_NOISE_SCALE 2.5f
+#define THERMAL_NOISE_SCALE (2.5f * env.thermal_noise_scale)
 
 // Flags
 #define FLAG_IS_INHIBITED (1 << 0)
@@ -263,7 +263,8 @@ typedef struct {
     float toxin_levels;           
     float light_level;            
     float stdp_learning_rate;
-    float wakefulness_multiplier;                
+    float wakefulness_multiplier;
+    float thermal_noise_scale;                
 } Environment;
 
 // Synaptic buffer representation (Packed: 24 bytes)

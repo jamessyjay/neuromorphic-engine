@@ -24,6 +24,7 @@ fn test_atomic_hammer() {
         light_level: 1.0,
         stdp_learning_rate: 0.0, 
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     let branch_id = 1;
@@ -71,6 +72,7 @@ fn test_sequence_recall() {
         light_level: 1.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     // Training 5 times
@@ -166,6 +168,7 @@ fn test_seizure() {
         light_level: 1.0,
         stdp_learning_rate: 0.0,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     // Induce seizure
@@ -218,6 +221,7 @@ fn test_signal_race_condition() {
         light_level: 1.0,
         stdp_learning_rate: 0.0,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     for tick in 1..=14 {
@@ -271,6 +275,7 @@ fn test_metabolic_darwinism() {
         light_level: 1.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     for tick in 1..=2000 {
@@ -314,6 +319,7 @@ fn test_inhibitory_stdp() {
         light_level: 1.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     
     for tick in 1..=100 {
@@ -368,6 +374,7 @@ fn test_reverberating_circuit() {
         light_level: 1.0,
         stdp_learning_rate: 0.0,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     // Give them a pre-loaded buffer so they don't fail transmission

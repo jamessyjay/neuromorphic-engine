@@ -72,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         light_level: 0.0,
         stdp_learning_rate: 0.01,
             wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
     let shared_env = Arc::new(Mutex::new(default_env));
 

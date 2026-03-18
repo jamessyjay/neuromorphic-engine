@@ -45,6 +45,7 @@ fn test_circadian_startup_grace() {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     // First 100 ticks (inside 5000 grace period) - massive lag, should not drop oxygen
@@ -72,6 +73,7 @@ fn test_thermal_noise_prevents_freezing() {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     // Tick it 50 times in a vacuum
@@ -99,6 +101,7 @@ fn test_phoenix_resurrection() {
         light_level: 0.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
+            thermal_noise_scale: 1.0,
     };
 
     // Tick 999 times - should remain dead

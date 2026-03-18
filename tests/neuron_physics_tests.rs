@@ -12,7 +12,8 @@ fn default_env() -> Environment {
         toxin_levels: 0.0,
         light_level: 0.5,
         stdp_learning_rate: 0.01,
-        wakefulness_multiplier: 1.0
+        wakefulness_multiplier: 1.0,
+        thermal_noise_scale: 1.0,
     }
 }
 
