@@ -1504,6 +1504,60 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         }
     }
     
+        // 2.5 Connect Processing Neurons to each other
+        let mut actual_synapses = 0;
+        while actual_synapses < 10000 {
+            let source_idx = rand::RngExt::random_range(&mut rng, 784..1784);
+            let target_idx = rand::RngExt::random_range(&mut rng, 784..1784);
+            if source_idx == target_idx { continue; }
+    
+            let n_source = &graph.neurons[source_idx];
+            let n_target = &graph.neurons[target_idx];
+    
+            // Rules of connectivity v0.5
+            let mut prob;
+    
+            let mut target_distal = false;
+            if n_source.column_id == n_target.column_id {
+                if n_source.minicolumn_id == n_target.minicolumn_id {
+                    prob = 0.90; // Minicolumnar vertical stitch
+                } else {
+                    let layer_diff = (n_source.layer_id as i32 - n_target.layer_id as i32).abs();
+                    if layer_diff == 1 || layer_diff == 2 {
+                        prob = 0.80; // Vertical intra-columnar connections
+                    } else {
+                        prob = 0.10; // Sparse random inside column
+                    }
+                }
+            } else if n_source.layer_id == 2 && n_target.layer_id == 2 {
+                prob = 0.05; // Horizontal L2/3 voting
+                target_distal = true; // Voting targets distal dendrites
+            } else {
+                prob = 0.01; // Ultra sparse random long-range
+                target_distal = true; // Long-range context targets distal
+            }
+    
+            // Ban: L6 cannot directly fire to L5
+            if n_source.layer_id == 6 && n_target.layer_id == 5 {
+                prob = 0.0;
+            }
+    
+            if rand::RngExt::random_bool(&mut rng, prob as f64) {
+                let base_weight = crate::runner::modes::get_gaussian(&mut rng, crate::engine::constants::DEFAULT_WEIGHT * crate::engine::constants::BASE_WEIGHT_MODIFIER, crate::engine::constants::WEIGHT_SIGMA).max(0.5).min(10.0);
+                let is_inhib = n_source.type_ == crate::engine::ffi::NeuronType::Interneuron as u8;
+                let weight = if is_inhib { -base_weight } else { base_weight };
+                let is_myelin = rand::RngExt::random_bool(&mut rng, crate::engine::constants::MYELIN_PROB);
+                
+                let branch_id = if target_distal {
+                    rand::RngExt::random_range(&mut rng, 4..12) // Distal branches (4-11)
+                } else {
+                    rand::RngExt::random_range(&mut rng, 0..4)  // Proximal branches (0-3)
+                };
+    
+                graph.connect(source_idx as u32, target_idx as u32, weight, branch_id, is_inhib, is_myelin);
+                actual_synapses += 1;
+            }
+        }
     // 3. Create 10 Output Neurons (Labels 0-9)
     for i in 0..10 {
         let id = graph.add_neuron(crate::engine::ffi::NeuronType::Pyramidal);
