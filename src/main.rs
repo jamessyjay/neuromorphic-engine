@@ -113,12 +113,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             save_path.clone(),
             load_path.clone()
         ).await?;
-        if is_ui_enabled {
-            println!("MNIST simulation finished. Keeping WebSocket server alive for UI. Press Ctrl+C to exit.");
-            loop { tokio::time::sleep(tokio::time::Duration::from_secs(1)).await; }
-        }
+        println!("✅ MNIST Simulation finished. Running final diagnostics...");
         return Ok(());
     } else if is_ui_test {
+
         run_ui_test(tx_option.clone(), shared_env.clone()).await?;
         println!("UI test simulation finished.");
     } else if is_sleep_test {
