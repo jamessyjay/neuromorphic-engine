@@ -263,17 +263,19 @@ impl NetworkGraph {
             if tid < weight_sums.len() {
                 let count = synapse_counts[tid] as f32;
                 if count > 0.0 {
-                    let target_sum = count * 2.0; // Target average weight is 2.0
+                    let target_sum = 20.0; // Fixed budget per neuron
                     let current_sum = weight_sums[tid];
-                    // If sum of weights exceeds the target, scale them down proportionally
                     if current_sum > target_sum {
                         let scale = target_sum / current_sum;
-                        s.weight *= scale;
+                        let new_weight = s.weight * scale;
+                        s.weight = new_weight.max(0.1);
                     }
                 }
             }
         }
     }
+
+
 
     pub fn tick(&mut self, current_tick: u32, env: crate::engine::ffi::Environment) {
         #[cfg(target_os = "macos")]

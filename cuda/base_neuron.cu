@@ -439,41 +439,41 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     uint8_t is_inhibitory = (s->flags & 0x10) != 0;
     
     // Trace-based LTP (Potentiation)
-    // If target just spiked, apply LTP based on source's existing trace
     if (ltp_mult > 0.0f) {
         if (!is_inhibitory && target->last_spike_tick == current_tick) {
-            uint32_t src_last_spike = source->last_spike_tick; // Lazy load
+            uint32_t src_last_spike = source->last_spike_tick; 
             if (src_last_spike > 0 && src_last_spike < target->last_spike_tick) {
                 int branch_id = s->flags & 0x0F;
                 float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
-                float src_trace = source->spike_trace; // Lazy load
+                float src_trace = source->spike_trace; 
                 
-                s->weight += src_trace * branch_activity * ltp_mult;
+                // Diminishing returns for LTP near max weight
+                float head_room = (MAX_SYNAPSE_WEIGHT - s->weight) / MAX_SYNAPSE_WEIGHT;
+                s->weight += src_trace * branch_activity * ltp_mult * head_room;
             }
         }
     }
 
-    // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
+    // Trace-based LTD (Depression) 
     if (ltd_mult > 0.0f) {
-        uint32_t src_last_spike = source->last_spike_tick; // Lazy load
+        uint32_t src_last_spike = source->last_spike_tick; 
         if (!is_inhibitory && src_last_spike > 0 && (current_tick - src_last_spike) <= ((s->flags & 0x20) != 0 ? MYELINATED_DELIVERY_TICKS : source->axonal_delay) + 2) {
-            // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
-            // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
-            // If target fired BEFORE source, target->last_spike_tick will be LESS than source->last_spike_tick (LTD territory)
             if (target->last_spike_tick < src_last_spike) {
                 int branch_id = s->flags & 0x0F;
                 float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
                 
-                // Cyber Mutant: Synaptic Consolidation (Weight Locking)
+                // Stronger LTD for heavier weights
+                float weight_factor = s->weight / MAX_SYNAPSE_WEIGHT;
+                
                 if (s->weight < MAX_SYNAPSE_WEIGHT * 0.9f) {
-                    s->weight -= target->spike_trace * branch_activity * ltd_mult;
+                    s->weight -= target->spike_trace * branch_activity * ltd_mult * (1.0f + weight_factor);
                 } else {
-                    // Small LTD for consolidated synapses
-                    s->weight -= target->spike_trace * branch_activity * ltd_mult * 0.1f;
+                    s->weight -= target->spike_trace * branch_activity * ltd_mult * 0.2f * (1.0f + weight_factor);
                 }
             }
         }
     }
+
 
     // Homeostatic Scaling of Weights (Phase 23)
     if (target->spikes_in_last_window > SYNAPSE_SCALING_HIGH) {
