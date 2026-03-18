@@ -1537,9 +1537,19 @@ pub async fn run_mnist_mode(
                     }
                 }
                 if !any_spiked {
-                    let rand_idx = (current_tick % 10) as usize; // Pseudo-random based on tick
-                    graph.neurons[1784 + rand_idx].external_input = 0.5;
+                    // Pick a random guess but favor exploration (so it doesnt get stuck on 0)
+                    let mut rng = rand::rng();
+                    let rand_idx = rand::RngExt::random_range(&mut rng, 0..10) as usize; 
+                    // Direct voltage injection to force a spike (needs to cross threshold)
+                    graph.neurons[1784 + rand_idx].current_voltage += 50.0;
+                    
+                    // Strong burst of random noise to the processing layer to jumpstart activity
+                    for _ in 0..100 {
+                        let rand_proc = rand::RngExt::random_range(&mut rng, 784..1784) as usize;
+                        graph.neurons[rand_proc].current_voltage += 40.0;
+                    }
                 }
+
             }
         } else if is_inference && current_label < 10 {
              // Ensure no external input in inference mode
