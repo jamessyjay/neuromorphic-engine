@@ -81,12 +81,22 @@ fn test_neurogenesis_rate() {
         graph.neurons[id as usize].z = 1000;
         graph.neurons[id as usize].last_spike_tick = 400; // active in window
     }
+
+    graph.voxel_grid.clear();
+    for n in &graph.neurons {
+        let voxel_size = 10.0;
+        let true_x = (n.x as f32 / neuromorphic_engine::engine::constants::COORD_SCALE) / voxel_size;
+        let true_y = (n.y as f32 / neuromorphic_engine::engine::constants::COORD_SCALE) / voxel_size;
+        let true_z = (n.z as f32 / neuromorphic_engine::engine::constants::COORD_SCALE) / voxel_size;
+        let voxel_key = (true_x as i16, true_y as i16, true_z as i16);
+        graph.voxel_grid.entry(voxel_key).or_insert_with(Vec::new).push(n.id);
+    }
     
     let initial_synapses = graph.synapses.len();
     
     // Neurogenesis is highly stochastic (1% per check, checks = 2*N = 20 per call)
     // Run it enough times to guarantee a hit
-    for _ in 0..500 {
+    for _ in 0..5000 {
         graph.run_neurogenesis_service(500); // Pass 500 so `tick % NEUROGENESIS_INTERVAL == 0` is true
     }
     

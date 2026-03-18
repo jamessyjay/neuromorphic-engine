@@ -10,9 +10,11 @@ use rayon::prelude::*; // For massive parallelism over CPU
 pub struct NetworkGraph {
     pub neurons: Vec<BaseNeuron>,
     pub synapses: Vec<Synapse>,
+    #[serde(skip)]
+    pub voxel_grid: HashMap<(i16, i16, i16), Vec<u32>>,
+    #[serde(skip)]
+    pub outgoing_counts: Vec<u32>,
 }
-
-
 
 impl Default for NetworkGraph {
     fn default() -> Self {
@@ -25,6 +27,8 @@ impl NetworkGraph {
         NetworkGraph {
             neurons: Vec::new(),
             synapses: Vec::new(),
+            voxel_grid: HashMap::new(),
+            outgoing_counts: Vec::new(),
         }
     }
 
@@ -165,6 +169,11 @@ impl NetworkGraph {
     pub fn add_neuron(&mut self, type_: NeuronType) -> u32 {
         let mut rng = rand::rng();
         let id = self.neurons.len() as u32;
+        
+        let x = (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16;
+        let y = (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16;
+        let z = (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16;
+        
         let mut neuron = BaseNeuron {
             id,
             type_: type_ as u8,
@@ -185,9 +194,7 @@ impl NetworkGraph {
             spikes_in_last_window: 0,
             predictive_ticks: 0,
             metabolic_wear: 0,
-            x: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
-            y: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
-            z: (rng.random_range(0.0..MAX_COORD) * COORD_SCALE) as u16,
+            x, y, z,
             dead_ticks: 0,
             column_id: 0,
             minicolumn_id: 0,
@@ -218,6 +225,17 @@ impl NetworkGraph {
         }
         
         self.neurons.push(neuron);
+        self.outgoing_counts.push(0);
+        
+        // Voxel registration
+        let voxel_size = 10.0;
+        let true_x = (x as f32 / COORD_SCALE) / voxel_size;
+        let true_y = (y as f32 / COORD_SCALE) / voxel_size;
+        let true_z = (z as f32 / COORD_SCALE) / voxel_size;
+        
+        let voxel_key = (true_x as i16, true_y as i16, true_z as i16);
+        self.voxel_grid.entry(voxel_key).or_insert_with(Vec::new).push(id);
+        
         id
     }
 
@@ -422,6 +440,10 @@ impl NetworkGraph {
         if target_id < self.neurons.len() as u32 {
             self.neurons[target_id as usize].active_branches_mask |= 1 << branch_id;
         }
+        
+        if source_id < self.outgoing_counts.len() as u32 {
+            self.outgoing_counts[source_id as usize] += 1;
+        }
 
         // TЗ №27: Allow multi-synaptic connections! We no longer block duplicates or augment them.
         // A single source neuron can now synapse onto multiple different branches (or even the same branch multiple times biologically) of the target.
@@ -474,36 +496,44 @@ impl NetworkGraph {
         let num_neurons = self.neurons.len();
         if num_neurons < 2 { return; }
 
-        // Large Scale Mapping: Stochastic sampling instead of O(N^2)
-        // We check num_neurons * 2 pairs per service call to maintain biological speed
-        // Limit total synapses to prevent "spaghetti"
         if self.synapses.len() >= MAX_SYNAPSES_TOTAL { return; }
-
-        // O(1) Pre-compute outgoing synapse counts to avoid O(N_synapses) per neurogenesis attempt
-        let mut outgoing_counts = vec![0; num_neurons];
-        for s in &self.synapses {
-            if (s.source_id as usize) < num_neurons {
-                outgoing_counts[s.source_id as usize] += 1;
-            }
-        }
 
         let check_count = num_neurons * 2; 
         
+        let voxel_keys: Vec<_> = self.voxel_grid.keys().cloned().collect();
+        if voxel_keys.is_empty() { return; }
+
         for _ in 0..check_count {
-            let i = rng.random_range(0..num_neurons);
-            let j = rng.random_range(0..num_neurons);
+            // Pick a random voxel
+            let voxel_key = voxel_keys[rng.random_range(0..voxel_keys.len())];
+            let voxel_neurons = &self.voxel_grid[&voxel_key];
+            if voxel_neurons.is_empty() { continue; }
+            
+            // Pick random source from this voxel
+            let i = voxel_neurons[rng.random_range(0..voxel_neurons.len())] as usize;
+            
+            // Pick a neighbor voxel (or self)
+            let dx = rng.random_range(-1..=1);
+            let dy = rng.random_range(-1..=1);
+            let dz = rng.random_range(-1..=1);
+            let target_voxel_key = (voxel_key.0 + dx, voxel_key.1 + dy, voxel_key.2 + dz);
+            
+            let Some(target_neurons) = self.voxel_grid.get(&target_voxel_key) else { continue; };
+            if target_neurons.is_empty() { continue; }
+            
+            // Pick random target
+            let j = target_neurons[rng.random_range(0..target_neurons.len())] as usize;
+
             if i == j { continue; }
 
             let n_source = &self.neurons[i];
             let n_target = &self.neurons[j];
 
-            // 1. Metabolic Check: Can source afford to grow? (ATP > 40)
-            if n_source.is_alive == 0 || n_target.is_alive == 0 || n_source.energy_atp < 40.0 { continue; } 
+            if n_source.is_alive == 0 || n_target.is_alive == 0 { continue; }
+            if n_source.energy_atp < 40.0 { continue; }
 
-            // Hard Limit: Max outgoing synapses per neuron (Phase 37) using O(1) lookup
-            if outgoing_counts[i] >= MAX_SYNAPSES_PER_NEURON { continue; }
+            if self.outgoing_counts[i] >= MAX_SYNAPSES_PER_NEURON as u32 { continue; }
 
-            // 2. Spatial Check: Are they close? (CLUSTERING_RADIUS_SQ * 1.5)
             let x1 = n_source.x as f32 / COORD_SCALE;
             let y1 = n_source.y as f32 / COORD_SCALE;
             let z1 = n_source.z as f32 / COORD_SCALE;
@@ -517,80 +547,93 @@ impl NetworkGraph {
             let dz = z1 - z2;
             let dist_sq = dx*dx + dy*dy + dz*dz;
 
-            if dist_sq < CLUSTERING_RADIUS_SQ * 1.5 { 
-                // TЗ №27: -3/2 Topological Law (P(L) ~ L^(-3/2))
-                let distance = dist_sq.sqrt();
-                // Prevent division by zero
-                let safe_dist = if distance < 1.0 { 1.0 } else { distance };
-                
-                // Probability roughly proportional to L^(-1.5)
-                // We normalize it slightly to keep it within a reasonable range [0.0, 1.0]
-                // If distance is 1.0, prob is 1.0. If distance is 10.0, prob is ~0.031.
-                let topo_prob = 1.0 / safe_dist.powf(1.5);
-                
-                // Only proceed if we pass the topological probability check
-                if rng.random_bool(topo_prob.clamp(0.01, 1.0) as f64) {
-                    // 3. Activity Correlation: Both spiked recently? (Window: 500 ticks)
-                    let s_active = current_tick.saturating_sub(n_source.last_spike_tick) < 500; 
-                    let t_active = current_tick.saturating_sub(n_target.last_spike_tick) < 500;
+            if dist_sq >= CLUSTERING_RADIUS_SQ * 1.5 { continue; }
 
-                    if s_active && t_active {
-                        // 4. Stochastic Growth (Phase 37: Use STOCHASTIC_GROWTH_PROB from constants)
-                        if rng.random_bool(STOCHASTIC_GROWTH_PROB) {
-                            // Preferential Attachment (ТЗ №26):
-                            // "Rich get richer" for active branches, but if overloaded, find an empty/inactive one
-                            let mut branch_id = 0;
-                            if n_target.energy_atp < 70.0 { // threshold for "overloaded"
-                                // Seek the quietest branch to balance load
-                                let mut min_trace = 255;
-                                for b in 0..16 {
-                                    if n_target.branches[b].local_trace < min_trace {
-                                        min_trace = n_target.branches[b].local_trace;
-                                        branch_id = b as u8;
-                                    }
-                                }
-                            } else {
-                                // "Rich get richer": seek the most active branch
-                                let mut max_trace = 0;
-                                for b in 0..16 {
-                                    if n_target.branches[b].local_trace >= max_trace {
-                                        max_trace = n_target.branches[b].local_trace;
-                                        branch_id = b as u8;
-                                    }
-                                }
-                                // If everything is completely dead, pick a random branch among all 16
-                                if max_trace == 0 {
-                                    branch_id = rng.random_range(0..16) as u8;
-                                }
-                            }
-                            
-                            let is_inhib = rng.random_bool(0.1); 
-                            self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
-                            outgoing_counts[i] += 1;
-                            if current_tick % 1000 == 0 {
-                                println!("NeuroGenesis: New synapse {} -> {} on branch {} at tick {}", i, j, branch_id, current_tick);
-                            }
-                        }
+            let distance = dist_sq.sqrt();
+            let safe_dist = if distance < 1.0 { 1.0 } else { distance };
+            
+            // TЗ №27: -3/2 Topological Law (P(L) ~ L^(-3/2))
+            let topo_prob = 1.0 / safe_dist.powf(1.5);
+            
+            if !rng.random_bool(topo_prob.clamp(0.01, 1.0) as f64) { continue; }
+
+            let s_active = current_tick.saturating_sub(n_source.last_spike_tick) < 500; 
+            let t_active = current_tick.saturating_sub(n_target.last_spike_tick) < 500;
+
+            if !s_active || !t_active { continue; }
+            if !rng.random_bool(STOCHASTIC_GROWTH_PROB) { continue; }
+
+            // Preferential Attachment (ТЗ №26) with Tie-Breaking (ТЗ №29)
+            let mut best_branches = [0u8; 16];
+            let mut best_count = 0;
+
+            if n_target.energy_atp < 70.0 {
+                // Seek the quietest branch
+                let mut min_trace = 255;
+                for b in 0..16 {
+                    let trace = n_target.branches[b].local_trace;
+                    if trace < min_trace {
+                        min_trace = trace;
+                        best_branches[0] = b as u8;
+                        best_count = 1;
+                    } else if trace == min_trace {
+                        best_branches[best_count] = b as u8;
+                        best_count += 1;
                     }
                 }
+            } else {
+                // Seek the most active branch
+                let mut max_trace = 0;
+                for b in 0..16 {
+                    let trace = n_target.branches[b].local_trace;
+                    if trace > max_trace {
+                        max_trace = trace;
+                        best_branches[0] = b as u8;
+                        best_count = 1;
+                    } else if trace == max_trace {
+                        best_branches[best_count] = b as u8;
+                        best_count += 1;
+                    }
+                }
+                
+                // If everything is completely dead, pick randomly from all 16
+                if max_trace == 0 {
+                    for b in 0..16 {
+                        best_branches[b] = b as u8;
+                    }
+                    best_count = 16;
+                }
+            }
+            
+            // Tie-breaking: pick a random branch from the best candidates
+            let branch_id = best_branches[rng.random_range(0..best_count)];
+            let is_inhib = rng.random_bool(0.1); 
+            
+            self.connect(i as u32, j as u32, SEED_WEIGHT, branch_id, is_inhib, false);
+            
+            if current_tick % 1000 == 0 {
+                println!("NeuroGenesis: New synapse {} -> {} on branch {} at tick {}", i, j, branch_id, current_tick);
             }
         }
         
-        // Auto-Optimization: keep memory layout coalesced if synapses were added
         self.optimize_memory_layout();
     }
 
     // Cortical Column WTA Inhibition (v0.5.0)
     pub fn apply_wta_inhibition(&mut self) {
+        #[cfg(feature = "cuda")]
+        return; // Skip Rust CPU WTA if running on CUDA
+
         for n in &mut self.neurons {
             n.status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
         }
-        // Collect spike data per minicolumn
-        // A minicolumn is defined by its column_id and minicolumn_id
-        use std::collections::HashMap;
-        
-        let mut minicolumn_winners: HashMap<(u16, u8), u32> = HashMap::new();
-        
+
+        // We assume max 100 columns and 50 minicolumns for the flattened array to avoid HashMap
+        // This easily covers our 10,000 neuron scale.
+        // Index = column_id * 50 + minicolumn_id
+        let mut minicolumn_winners = vec![u32::MAX; 100 * 50]; 
+        let mut minicolumn_winner_v = vec![-1000.0f32; 100 * 50];
+
         // Find winners (highest voltage or first to spike)
         for n in &self.neurons {
             if n.is_alive == 0 { continue; }
@@ -602,11 +645,12 @@ impl NetworkGraph {
             }
             
             if n.current_voltage > n.activation_threshold {
-                let key = (n.column_id, n.minicolumn_id);
-                // Simple WTA: First one found or highest voltage wins
-                let current_winner_v = minicolumn_winners.get(&key).map(|&id| self.neurons[id as usize].current_voltage).unwrap_or(-1000.0);
-                if n.current_voltage > current_winner_v {
-                    minicolumn_winners.insert(key, n.id);
+                let idx = (n.column_id as usize) * 50 + (n.minicolumn_id as usize);
+                if idx < minicolumn_winners.len() {
+                    if n.current_voltage > minicolumn_winner_v[idx] {
+                        minicolumn_winners[idx] = n.id;
+                        minicolumn_winner_v[idx] = n.current_voltage;
+                    }
                 }
             }
         }
@@ -615,9 +659,10 @@ impl NetworkGraph {
         for n in &mut self.neurons {
             if n.is_alive == 0 { continue; }
             
-            let key = (n.column_id, n.minicolumn_id);
-            if let Some(&winner_id) = minicolumn_winners.get(&key) {
-                if n.id != winner_id {
+            let idx = (n.column_id as usize) * 50 + (n.minicolumn_id as usize);
+            if idx < minicolumn_winners.len() {
+                let winner_id = minicolumn_winners[idx];
+                if winner_id != u32::MAX && n.id != winner_id {
                     n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
                     // Lateral inhibition hyperpolarizes the neuron
                     n.current_voltage = n.resting_voltage - 10.0;
@@ -632,15 +677,15 @@ impl NetworkGraph {
         let num_branches = rng.random_range(2..=4);
         let n = &mut self.neurons[neuron_id as usize];
         
-        // Fisher-Yates shuffle to pick unique branch indices
-        let mut indices: Vec<usize> = (0..8).collect();
+        // Zero-alloc unique branch selection using a fixed array
+        let mut indices: [u8; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
         for i in (1..8).rev() {
             let j = rng.random_range(0..=i);
             indices.swap(i, j);
         }
 
         for i in 0..num_branches {
-            let idx = indices[i];
+            let idx = indices[i as usize] as usize;
             let b_type = rng.random_range(1..=3) as u8;
             n.branches[idx].branch_type = b_type;
             n.active_branches_mask |= 1 << idx;

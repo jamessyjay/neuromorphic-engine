@@ -1,3 +1,31 @@
+# Walkthrough - TK #29: Architectural Purity & Spatial Indexing (v2.2)
+
+## Overview
+Deep refactoring of the Rust layer (`graph.rs`) to eradicate $O(N^2)$ bottlenecks, reduce heap allocations, and implement proper spatial indexing for biological growth processes.
+
+## Key Implementation Details
+
+1. **Voxel Grid Spatial Indexing**:
+   - Replaced global random pairs sampling in `run_neurogenesis_service` with a `HashMap<(i16, i16, i16), Vec<u32>>` Voxel Grid.
+   - Space is partitioned into 10.0 $\mu m$ voxels. New synapses now strictly search for candidates within the same or directly adjacent (26) voxels, radically improving the speed and biological accuracy of finding nearby connection targets.
+   - Tested and verified the $-3/2$ thermodynamic distance law ($P(L) \propto L^{-1.5}$) mathematically bounds new connection lengths.
+
+2. **$O(1)$ Incremental Synapse Counters**:
+   - Eliminated the costly dynamic `for s in &self.synapses` loop that counted outgoing connections during every neurogenesis tick.
+   - Added a tracked `outgoing_counts: Vec<u32>` directly to `NetworkGraph` that strictly increments during `connect()` and decrements during microglia pruning.
+
+3. **Flat WTA (Winner-Takes-All) Arrays**:
+   - Ripped out `std::collections::HashMap` from the inner hot-loop of `apply_wta_inhibition`.
+   - Replaced with a pre-sized 1D flat vector indexed by `column_id * 50 + minicolumn_id`. This eliminates heap allocations and provides instant CPU cache hits.
+   - Added a `#[cfg(feature = "cuda")] return;` guard to completely skip the redundant Rust fallback WTA if the CUDA engine is active.
+
+4. **Zero-Alloc Dendritic Growth**:
+   - Rewrote `grow_dendritic_tree` to use a tiny fixed-size stack array `[u8; 8]` and an in-place Fisher-Yates shuffle instead of `Vec<usize>`, stopping unnecessary dynamic memory allocation.
+
+5. **Guard Clauses & Tie-Breaking**:
+   - Flattened the massive nested `if` pyramid inside `run_neurogenesis_service` using strict guard clauses (`if !condition { continue; }`).
+   - Fixed the "15th Branch Bug" where synapses stuck to the highest index. Introduced strict tie-breaking arrays (`best_branches`) that randomly pick between equally viable dendritic branches.
+
 # Walkthrough - TK #26 & TK #27: Synaptic X-Ray & Circuits Topology
 
 ## Overview
