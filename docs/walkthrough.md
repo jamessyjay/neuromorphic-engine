@@ -1,6 +1,9 @@
-# Walkthrough - TK #29: Architectural Purity & Spatial Indexing (v2.2)
+# Walkthrough of the project
 
-## Overview
+## Walkthrough - TK #29: Architectural Purity & Spatial Indexing (v2.2)
+
+## Overview Task 29
+
 Deep refactoring of the Rust layer (`graph.rs`) to eradicate $O(N^2)$ bottlenecks, reduce heap allocations, and implement proper spatial indexing for biological growth processes.
 
 ## Key Implementation Details
@@ -26,13 +29,13 @@ Deep refactoring of the Rust layer (`graph.rs`) to eradicate $O(N^2)$ bottleneck
    - Flattened the massive nested `if` pyramid inside `run_neurogenesis_service` using strict guard clauses (`if !condition { continue; }`).
    - Fixed the "15th Branch Bug" where synapses stuck to the highest index. Introduced strict tie-breaking arrays (`best_branches`) that randomly pick between equally viable dendritic branches.
 
-# Walkthrough - TK #26 & TK #27: Synaptic X-Ray & Circuits Topology
+## Walkthrough - TK #26 & TK #27: Synaptic X-Ray & Circuits Topology
 
-## Overview
+### Overview for Tasks 26-27
 
 Implemented deep topological diagnostics and completely restructured the synaptic connection rules to support reverberating memory circuits and realistic axonal delivery delays.
 
-## TK #26: Synaptic X-Ray
+### TK #26: Synaptic X-Ray
 
 1. **Dendritic Array Expansion**:
    - Expanded `branches` to 16 in `Compartment` array.
@@ -45,7 +48,7 @@ Implemented deep topological diagnostics and completely restructured the synapti
    - "Rich get richer": new synapses seek the most active dendritic branches (`local_trace`).
    - "Load balancing": if the target neuron is metabolically stressed (`energy_ATP < 70.0`), new synapses hunt for the quietest branch to distribute the processing load.
 
-## TK #27: Synaptic Circuits & Axonal Topology
+### TK #27: Synaptic Circuits & Axonal Topology
 
 1. **The Axonal Bottleneck**:
    - Introduced `axonal_delay` into `BaseNeuron` (randomized between 1-5 ticks during `init_neuron`).
@@ -67,7 +70,7 @@ Implemented deep topological diagnostics and completely restructured the synapti
 
 Addressed the issue of the network remaining silent ("10.7% Acc") after the transition to the Amygdala Reward Loop. The output neurons weren't firing on their own, meaning the Winner-Takes-All (WTA) logic never triggered, and no useful synaptic associations could form.
 
-## Key Implementation Details
+## Key Implementation Details for Phase 37
 
 1. **WTA Output Threshold Lowering**:
    - Lowered the default `activation_threshold` of the 10 MNIST output neurons (indices 1784..1793) from `50.0` to `20.0` in `setup_mnist_network()`. This makes them hyper-sensitive during initial training, encouraging baseline firing.

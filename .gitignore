@@ -1,17 +1,28 @@
-target
+# Workspace artifacts
+.agents
 .agents/*
 .DS_Store
-brain_save.bin
-logs/*
-!logs/.placeholder
-reports/*
-!reports/.placeholder
-graphs/*
-!graphs/.placeholder
 .windsurf/
-.agents
-output.log
+
+# Exclude placeholders
+!graphs/.placeholder
+!logs/.placeholder
+!reports/.placeholder
+
 # Keep golden states for regression testing
 !reports/neuron_golden_state.json
-doce/todo/backlog.mddata/
+
+# Run artifacts
+brain_save.bin
+logs/*
+graphs/*
+metrics.jsonl
+reports/*
+output.log
+target
+
+# MnisT Data files
 data/
+
+# Documentation
+docs/todo/backlog.md
