@@ -1876,7 +1876,7 @@ pub async fn run_mnist_mode(
     
     if let Some(path) = save_path {
         crate::engine::snapshot::BrainSnapshot::save_test_snapshot(current_tick, &graph, &path);
-        println!("💾 BRAIN SAVED TO: {}", path);
+        println!("💾 MUTANT SAVED TO: {}", path);
     }
     
     if total_images_processed > 0 {
@@ -1890,4 +1890,5 @@ pub async fn run_mnist_mode(
     
     Ok(())
 }
+
 

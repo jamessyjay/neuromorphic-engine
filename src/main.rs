@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             save_path.clone(),
             load_path.clone()
         ).await?;
-        println!("✅ MNIST Simulation finished. Running final diagnostics...");
+        println!("✅ MNIST Simulation finished.");
         return Ok(());
     } else if is_ui_test {
 
