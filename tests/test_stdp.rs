@@ -2,6 +2,14 @@ use neuromorphic_engine::network::graph::NetworkGraph;
 use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse, BaseNeuron};
 use std::mem;
 use std::time::Instant;
+
+// Helper to match C++ packing
+fn pack_voltage(v: f32) -> u16 {
+    let shifted = v + 100.0;
+    let clamped = shifted.max(0.0).min(200.0);
+    let scaled = clamped * 100.0;
+    scaled as u16
+}
 use serial_test::serial;
 
 fn default_env() -> Environment {
@@ -477,6 +485,132 @@ fn test_stdp_associative_persistence_under_noise() {
         assert!(trace <= 1.0, "Spike trace for group A did not decay properly, was {}", trace);
     }
 }
+#[test]
+fn test_stdp_biological_accuracy() {
+    let mut graph = NetworkGraph::new();
+    let tgt = graph.add_neuron(NeuronType::Pyramidal);
+    let s1 = graph.add_neuron(NeuronType::Pyramidal); // Early Pre
+    let s2 = graph.add_neuron(NeuronType::Pyramidal); // Just-in-time Pre
+    let s3 = graph.add_neuron(NeuronType::Pyramidal); // Late Pre
+    
+    // Minimal noise/delays
+    for n in &mut graph.neurons {
+        n.axonal_delay = 1;
+        n.column_id = n.id as u16; // Prevent WTA
+        n.resting_voltage = -100.0; // Prevent thermal noise from triggering random spikes
+        n.activation_threshold = 10000.0; // Prevent accidental spikes from inputs
+        n.current_voltage = -100.0;
+    }
+    graph.neurons[tgt as usize].active_branches_mask |= 1 << 0;
+    graph.neurons[tgt as usize].branches[0].branch_type = 1;
+    graph.neurons[tgt as usize].branches[0].nmda_threshold = 20000; // 100mV packed, prevents accidental NMDA spikes
+    
+    let mut env = default_env();
+    env.dopamine_multiplier = 1.0;
+    env.stdp_learning_rate = 1.0; 
+    
+    let w_init = 2.5;
+    
+    graph.synapses.push(Synapse {
+        source_id: s1, target_id: tgt, weight: w_init,
+        neurotransmitter_buffer: 0.0, last_activation_tick: 0,
+        ticks_below_threshold: 0, ticks_until_delivery: 0, flags: 0, _padding: [0; 2]
+    });
+    graph.synapses.push(Synapse {
+        source_id: s2, target_id: tgt, weight: w_init,
+        neurotransmitter_buffer: 0.0, last_activation_tick: 0,
+        ticks_below_threshold: 0, ticks_until_delivery: 0, flags: 0, _padding: [0; 2]
+    });
+    graph.synapses.push(Synapse {
+        source_id: s3, target_id: tgt, weight: w_init,
+        neurotransmitter_buffer: 0.0, last_activation_tick: 0,
+        ticks_below_threshold: 0, ticks_until_delivery: 0, flags: 0, _padding: [0; 2]
+    });
+
+    let run_experiment = |dopa: f32, g: &mut NetworkGraph| {
+        let mut e = env.clone();
+        e.dopamine_multiplier = dopa;
+        
+        let mut tick = 1;
+        
+        let step = |g: &mut NetworkGraph, t: &mut u32| {
+            g.neurons[tgt as usize].spikes_in_last_window = 10;
+            g.tick(*t, e.clone()); 
+            if g.neurons[tgt as usize].last_spike_tick == *t {
+                println!("Target spiked at tick {}! Voltage: {}, Threshold: {}", *t, g.neurons[tgt as usize].current_voltage, g.neurons[tgt as usize].activation_threshold);
+            }
+            *t += 1;
+        };
+        
+        // S1 fires at tick 10 (Target at 50, so delta = 40)
+        while tick < 10 { step(g, &mut tick); }
+        g.neurons[s1 as usize].activation_threshold = 0.0;
+        g.neurons[s1 as usize].current_voltage = 40.0;
+        step(g, &mut tick);
+        g.neurons[s1 as usize].activation_threshold = 1000.0;
+        
+        // Wait...
+        while tick < 45 { step(g, &mut tick); }
+        
+        // S2 fires at tick 45 (Target at 50, so delta = 5)
+        g.neurons[s2 as usize].activation_threshold = 0.0;
+        g.neurons[s2 as usize].current_voltage = 40.0;
+        step(g, &mut tick);
+        g.neurons[s2 as usize].activation_threshold = 1000.0;
+        
+        while tick < 50 { 
+            let w2 = g.synapses[1].weight;
+            step(g, &mut tick); 
+            if g.synapses[1].weight != w2 {
+                println!("Tick {} S2 weight changed: {} -> {}", tick, w2, g.synapses[1].weight);
+            }
+        }
+        
+        println!("At tick 50, S1 trace: {:.4}, S2 trace: {:.4}, Tgt trace: {:.4}", g.neurons[s1 as usize].spike_trace, g.neurons[s2 as usize].spike_trace, g.neurons[tgt as usize].spike_trace);
+        
+        // Target fires at tick 50
+        g.neurons[tgt as usize].activation_threshold = 0.0;
+        g.neurons[tgt as usize].current_voltage = 40.0;
+        g.neurons[tgt as usize].branches[0].local_trace = 255;
+        step(g, &mut tick);
+        g.neurons[tgt as usize].activation_threshold = 1000.0;
+        
+        while tick < 60 { step(g, &mut tick); }
+        
+        // S3 fires at tick 60 (Target at 50, so delta = -10, Late Pre / LTD)
+        g.neurons[s3 as usize].activation_threshold = 0.0;
+        g.neurons[s3 as usize].current_voltage = 40.0;
+        step(g, &mut tick);
+        g.neurons[s3 as usize].activation_threshold = 1000.0;
+        
+        // Let deliveries finish
+        while tick < 65 { step(g, &mut tick); }
+        
+        (g.synapses[0].weight, g.synapses[1].weight, g.synapses[2].weight)
+    };
+    
+    // Test 1: Dopamine = 1.0
+    let mut g1 = graph.clone();
+    let (w1, w2, w3) = run_experiment(1.0, &mut g1);
+    
+    println!("[STDP VALIDATION] S1 (Early): {:.4} | S2 (Ideal): {:.4} | S3 (Late): {:.4}", w1, w2, w3);
+    
+    assert!(w1 > w_init, "S1 (Early) should have slight LTP");
+    assert!(w2 > w1, "S2 (Ideal) should have massive LTP compared to S1");
+    assert!(w3 < w_init, "S3 (Late) should have LTD (Depression)");
+    
+    // Test 2: Dopamine = 0.0
+    let mut g2 = graph.clone();
+    let (z1, z2, z3) = run_experiment(0.0, &mut g2);
+    
+    println!("[STDP VALIDATION 0-DOPA] S1 (Early): {:.4} | S2 (Ideal): {:.4} | S3 (Late): {:.4}", z1, z2, z3);
+    
+    // We add epsilon check due to floating point and passive drift, but they should be effectively unchanged
+    assert!((z1 - w_init).abs() < 0.001, "Weight S1 should not change with zero dopamine");
+    assert!((z2 - w_init).abs() < 0.001, "Weight S2 should not change with zero dopamine");
+    assert!((z3 - w_init).abs() < 0.001, "Weight S3 should not change with zero dopamine");
+}
+
 #[test]
 #[serial]
 fn bench_stdp_overhead() {

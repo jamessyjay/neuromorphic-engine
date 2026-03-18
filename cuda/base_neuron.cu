@@ -481,9 +481,6 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
 
             // 2. Buffer Capacity
             if (s->neurotransmitter_buffer > MAX_VESICLES) s->neurotransmitter_buffer = MAX_VESICLES;
-
-            // Target consumes a tiny bit of ATP to process the signal
-            atomicAdd(&target->energy_ATP, -0.1f);
             
             // Apply bounds to weight (Phase 40 Performance)
             s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
