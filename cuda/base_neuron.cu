@@ -54,31 +54,7 @@ __device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impac
     // Warp-level reduction for atomic CAS spin-lock mitigation (Phase 31 VRAM Diet)
     // Find all threads in the warp writing to the EXACT SAME address
     uint32_t active = __activemask();
-    uint32_t match_mask = __match_any_sync(active, (unsigned long long)address);
-    
-    // Find the leader thread for this specific address
-    int leader = __ffs(match_mask) - 1;
     int lane_id = threadIdx.x % 32;
-    
-    // Sum the impacts across all matching threads in the warp
-    float total_impact = voltage_impact;
-    for (int i = 1; i < 32; i *= 2) {
-        float val = __shfl_xor_sync(match_mask, total_impact, i);
-        // Only add if the fetched value is from a thread that actually matched
-        // __shfl_xor_sync exchanges unconditionally, so we must rely on the logic that 
-        // non-matching threads will not participate in this specific match_mask group's reduction cleanly.
-        // Actually, safer reduction:
-    }
-    
-    // A much safer and standard way to reduce across dynamic masks:
-    float warp_sum = voltage_impact;
-    for (int offset = 16; offset > 0; offset /= 2) {
-        float neighbor_val = __shfl_down_sync(match_mask, warp_sum, offset);
-        // We only add if the neighbor is in our match mask
-        if (__shfl_down_sync(0xFFFFFFFF, (match_mask & (1 << (lane_id + offset))) != 0, offset)) {
-             warp_sum += neighbor_val;
-        }
-    }
     
     // Simpler warp reduction without complex masking: just use atomicAdd to shared memory if possible, 
     // but since address is global, we can't easily map it to shared.
@@ -101,6 +77,8 @@ __device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impac
     }
     
     // Only the lowest lane for this address performs the atomic
+    // If voltage_impact became exactly 0.0f (either because we are a higher lane, 
+    // or because the sum was exactly 0), we can safely skip the atomic.
     if (voltage_impact != 0.0f) {
         uint16_t assumed, old = *address;
         do {
@@ -505,23 +483,6 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
         }
         
         if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
-            // Trace-based LTD (Depression) applied exactly when neurotransmitters arrive at the synapse (once per spike)
-            uint32_t expected_delivery_delay = ((s->flags & 0x20) != 0) ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
-                                                            if (!is_inhibitory && source->last_spike_tick > 0 && (current_tick - source->last_spike_tick) <= expected_delivery_delay + 2) {
-                // To avoid double LTD penalty where target fired and caused LTP, we should only apply LTD if target fired *before* source
-                // If target fired recently (LTP territory), target->last_spike_tick will be GREATER than source->last_spike_tick
-                // If target fired BEFORE source, target->last_spike_tick will be LESS than source->last_spike_tick (LTD territory)
-                if (target->last_spike_tick < source->last_spike_tick) {
-                    int branch_id = s->flags & 0x0F;
-                    float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
-                    float delta_w = target->spike_trace * env.stdp_learning_rate * STDP_A_MINUS;
-                    
-                    // Phase 55: Dopamine gating for LTD too
-                    float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
-                    s->weight -= delta_w * dopa_factor * branch_activity;
-                }
-            }
-            
             // Phase 35: Resource Delivery Check
             if (target->energy_ATP < 5.0f) {
                 // Synaptic failure! Target lacks ATP to process incoming neurotransmitters.
