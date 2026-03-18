@@ -3,13 +3,6 @@ use neuromorphic_engine::engine::ffi::{Environment, NeuronType, Synapse, BaseNeu
 use std::mem;
 use std::time::Instant;
 
-// Helper to match C++ packing
-fn pack_voltage(v: f32) -> u16 {
-    let shifted = v + 100.0;
-    let clamped = shifted.max(0.0).min(200.0);
-    let scaled = clamped * 100.0;
-    scaled as u16
-}
 use serial_test::serial;
 
 fn default_env() -> Environment {

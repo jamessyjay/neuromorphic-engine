@@ -955,11 +955,26 @@ extern "C" {
 
     void tick_neuron_prepare_cpu_batch(BaseNeuron* neurons, int count, Environment env, uint32_t current_tick) {
         for (int i = 0; i < count; i++) {
-            if (!neurons[i].is_alive) continue;
+            if (!neurons[i].is_alive) {
+                neurons[i].spike_trace = 0.0f;
+                neurons[i].predictive_ticks = 0;
+                neurons[i].dead_ticks += 1;
+                if (neurons[i].dead_ticks >= RESURRECTION_TICK_DELAY) {
+                    neurons[i].is_alive = 1;
+                    neurons[i].calcium_level = 0.0f;
+                    neurons[i].energy_ATP = neurons[i].max_atp; 
+                    neurons[i].current_voltage = neurons[i].resting_voltage;
+                    neurons[i].dead_ticks = 0;
+                    neurons[i].death_reason = 0;
+                }
+                continue;
+            }
+
             update_metabolism(&neurons[i], env, current_tick);
+            update_calcium(&neurons[i], current_tick);
             evaluate_branches(&neurons[i]);
-            // evaluate_soma logic is inside process_spike or prep kernel. Actually CPU fallback has process_spike later.
-            // Just matching what tick_neuron_prepare_cpu does:
+            
+            neurons[i].current_voltage += get_thermal_noise(neurons[i].id, current_tick);
             
             if (neurons[i].spikes_in_last_window > 0 && current_tick % 1000 == 0) {
                 neurons[i].spikes_in_last_window = 0;
