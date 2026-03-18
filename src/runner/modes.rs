@@ -7,13 +7,11 @@ use std::time::Instant;
 use tokio::sync::broadcast;
 use crate::engine::ffi::{NeuronType, Environment, Synapse};
 use crate::network::graph::NetworkGraph;
-
 use crate::monitor::telemetry::Telemetry;
 use crate::network::stimulus;
 use crate::monitor::streamer;
 use crate::engine::constants::*;
 use crate::monitor::visualization;
-
 pub struct BenchmarkData {
     pub ticks: Vec<u32>,
     pub ffi_times: Vec<f32>,
@@ -23,21 +21,18 @@ pub struct BenchmarkData {
     pub total_calcium_sum: f64,
     pub samples_count: u32,
 }
-
 pub struct SimulationData {
     pub ticks: Vec<u32>,
     pub source_v: Vec<f32>,
     pub target_v: Vec<f32>,
     pub synapse_w: Vec<f32>,
 }
-
 pub fn get_gaussian(rng: &mut rand::rngs::ThreadRng, mu: f32, sigma: f32) -> f32 {
     let u1: f32 = rand::RngExt::random(rng);
     let u2: f32 = rand::RngExt::random(rng);
     let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
     mu + sigma * z
 }
-
 // Helper: Get Visual State of a Neuron
 pub fn get_visual_state(n: &crate::engine::ffi::BaseNeuron, tick: u32, atp_pct: f32) -> f32 {
     let is_spiking_now = n.current_voltage > n.activation_threshold;
@@ -58,7 +53,6 @@ pub fn get_visual_state(n: &crate::engine::ffi::BaseNeuron, tick: u32, atp_pct: 
         0.0 
     }
 }
-
 // Helper: Generate InitialStatePayload
 pub fn generate_initial_state(graph: &NetworkGraph) -> streamer::InitialStatePayload {
     let mut initial_state = streamer::InitialStatePayload {
@@ -75,7 +69,6 @@ pub fn generate_initial_state(graph: &NetworkGraph) -> streamer::InitialStatePay
     }
     initial_state
 }
-
 // Helper: Broadcast Initial State
 pub fn broadcast_initial_state(tx: &broadcast::Sender<String>, graph: &NetworkGraph) {
     let initial_state = generate_initial_state(graph);
@@ -87,7 +80,6 @@ pub fn broadcast_initial_state(tx: &broadcast::Sender<String>, graph: &NetworkGr
         }
     });
 }
-
 // Helper: Generate and Broadcast Tick Update
 pub fn broadcast_tick_update(
     tx: &broadcast::Sender<String>,
@@ -132,7 +124,6 @@ pub fn broadcast_tick_update(
         }
     });
 }
-
 // Helper: Apply Nursery Protection
 pub fn apply_nursery_protection(graph: &mut NetworkGraph, current_env: &mut Environment, tick: u32) {
     if tick < crate::engine::constants::NURSERY_PROTECTION_TICKS {
@@ -148,7 +139,6 @@ pub fn apply_nursery_protection(graph: &mut NetworkGraph, current_env: &mut Envi
         current_env.stdp_learning_rate = 0.1;
     }
 }
-
 // Helper: Update Environment (Dynamic Homeostasis)
 pub fn update_environment(
     regulator: &mut EnvironmentRegulator,
@@ -166,7 +156,6 @@ pub fn update_environment(
         new_env
     }
 }
-
 // Helper: Export Report and Save Snapshot
 pub fn finalize_and_save_snapshot(
     graph: &NetworkGraph,
@@ -179,28 +168,22 @@ pub fn finalize_and_save_snapshot(
     telemetry.export_simulation_report(&graph.neurons, &graph.synapses, report_name);
     crate::engine::snapshot::BrainSnapshot::save_test_snapshot(tick, &graph, save_file);
 }
-
 pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGraph {
     let mut graph = NetworkGraph::new();
             let mut rng = rand::rng();
-
     println!("Generating Benchmark Network (Cortical Columns v0.5.2): {} neurons, {} synapses...", neurons_count, synapses_count);
-
     let columns = 10;
     // We strictly use 1000 per col to fit the mathematical requirements of v0.5.2.
     // If the user requests exactly 1000 neurons, we assume they mean 10 columns of 100, but the spec says "1000 neurons per column".
     // We will distribute the `neurons_count` evenly if it's not 10000, but let's stick to the spec's proportions.
     let neurons_per_col = neurons_count / columns;
-
     for col_id in 0..columns {
         let center_x = ((col_id % 5) as f32) * 12000.0 + 10000.0;
         let center_y = ((col_id / 5) as f32) * 20000.0 + 10000.0;
-
         for i in 0..neurons_per_col {
             // Distribute proportionally to 1000
             // We'll normalize 'i' to a 0..1000 scale so the proportions hold even if neurons_per_col is smaller.
             let proportion_idx = (i as f32 / neurons_per_col as f32 * 1000.0) as usize;
-
             let (n_type, layer_id, z_min, z_max) = if proportion_idx < 300 {
                 (crate::engine::ffi::NeuronType::Pyramidal, 6, 0.0, 10000.0)
             } else if proportion_idx < 500 {
@@ -212,15 +195,12 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             } else {
                 (crate::engine::ffi::NeuronType::Interneuron, 1, 60001.0, 65535.0)
             };
-
             let _id = graph.add_neuron(n_type);
             let n_id = {
                 let n = graph.neurons.last_mut().unwrap();
-
                 n.column_id = col_id as u16;
                 n.layer_id = layer_id as u8;
                 n.minicolumn_id = (i / 20) as u8;
-
                 // Local scatter
                 let dx = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
                 let dy = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
@@ -231,23 +211,18 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
                 
                 n.id
             };
-
             graph.grow_dendritic_tree(n_id);
         }
     }
-
     let mut actual_synapses = 0;
     while actual_synapses < synapses_count {
         let source_idx = rand::RngExt::random_range(&mut rng, 0..graph.neurons.len());
         let target_idx = rand::RngExt::random_range(&mut rng, 0..graph.neurons.len());
         if source_idx == target_idx { continue; }
-
         let n_source = &graph.neurons[source_idx];
         let n_target = &graph.neurons[target_idx];
-
         // Rules of connectivity v0.5
         let mut prob;
-
         let mut target_distal = false;
         if n_source.column_id == n_target.column_id {
             if n_source.minicolumn_id == n_target.minicolumn_id {
@@ -267,12 +242,10 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             prob = 0.01; // Ultra sparse random long-range
             target_distal = true; // Long-range context targets distal
         }
-
         // Ban: L6 cannot directly fire to L5
         if n_source.layer_id == 6 && n_target.layer_id == 5 {
             prob = 0.0;
         }
-
         if rand::RngExt::random_bool(&mut rng, prob as f64) {
             let base_weight = crate::runner::modes::get_gaussian(&mut rng, DEFAULT_WEIGHT * BASE_WEIGHT_MODIFIER, WEIGHT_SIGMA).max(0.5).min(10.0);
             let is_inhib = n_source.type_ == NeuronType::Interneuron as u8;
@@ -284,12 +257,10 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             } else {
                 rand::RngExt::random_range(&mut rng, 0..4)  // Proximal branches (0-3)
             };
-
             graph.connect(source_idx as u32, target_idx as u32, weight, branch_id, is_inhib, is_myelin);
             actual_synapses += 1;
         }
     }
-
     for n in &mut graph.neurons {
         if rand::RngExt::random_bool(&mut rng, 0.1) {
             n.current_voltage = PRE_SEED_VOLTAGE;
@@ -297,7 +268,6 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
         n.energy_atp = n.max_atp;
         n.calcium_level = 0.0;
     }
-
     // --- Validation (Checklist) ---
     assert_eq!(graph.neurons.len(), neurons_count, "Validation Failed: Incorrect total neurons count.");
     for n in &graph.neurons {
@@ -311,16 +281,13 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
             _ => panic!("Unknown layer ID {}", n.layer_id),
         }
     }
-
     // Force memory coalescing after generation
     graph.optimize_memory_layout();
-
     // 1. Elimination of Orphans
     let mut outgoing_synapses: Vec<Vec<u32>> = vec![Vec::new(); graph.neurons.len()];
     for s in &graph.synapses {
         outgoing_synapses[s.source_id as usize].push(s.target_id);
     }
-
     let mut new_synapses = Vec::new();
     for i in 0..graph.neurons.len() {
         let n_layer = graph.neurons[i].layer_id;
@@ -385,7 +352,6 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
                 if graph.neurons[i].layer_id == 6 && graph.neurons[candidates[k].0].layer_id == 5 {
                     continue;
                 }
-
                 // Add to outgoing_synapses to prevent next checks from reusing it if logic changes
                 outgoing_synapses[i].push(target_id); 
                 
@@ -403,11 +369,9 @@ pub fn setup_benchmark(neurons_count: usize, synapses_count: usize) -> NetworkGr
     
     // Re-optimize memory layout after adding new orphan-saving synapses
     graph.optimize_memory_layout();
-
     println!("Network generation complete.");
     graph
 }
-
 pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, total_ticks: u32, tx: Option<broadcast::Sender<String>>, _shared_env: Arc<Mutex<crate::engine::ffi::Environment>>, use_dynamic_homeostasis: bool) -> Result<BenchmarkData, Box<dyn std::error::Error>> {
     let mut start_tick = 0;
     let mut graph = if let Some(loaded_snapshot) = BrainSnapshot::load_from_disk("brain_save.bin") {
@@ -424,7 +388,6 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
     } else {
         setup_benchmark(neurons_count, synapses_count)
     };
-
     println!("Executing BENCHMARK for {} ticks...", total_ticks);
     
     let mut current_env = Environment {
@@ -441,12 +404,10 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
     
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
-
     let total_elements = graph.neurons.len() + graph.synapses.len();
     let sampling_interval = (total_elements as f32 / 1000.0).ceil() as u32;
     let sampling_interval = if sampling_interval < 1 { 1 } else { sampling_interval };
     let expected_capacity = (total_ticks / sampling_interval) as usize + 1;
-
     let mut data = BenchmarkData {
         ticks: Vec::with_capacity(expected_capacity),
         ffi_times: Vec::with_capacity(expected_capacity),
@@ -456,44 +417,35 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         total_calcium_sum: 0.0,
         samples_count: 0,
     };
-
     let mut total_ffi_time = std::time::Duration::new(0, 0);
     let mut total_rust_time = std::time::Duration::new(0, 0);
     let mut telemetry = Telemetry::new();
     let mut accumulated_spikes = 0;
     let mut regulator = EnvironmentRegulator::new();
     let mut last_synapse_count = graph.synapses.len();
-
     for tick in (start_tick + 1)..=(start_tick + total_ticks) {
         let tick_start = Instant::now();
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
-
         // Nursery Protection Improvement (v0.4.7)
         apply_nursery_protection(&mut graph, &mut current_env, tick);
-
         // Accumulate spikes from all neurons that spiked in THIS tick
         for n in &graph.neurons {
             if n.last_spike_tick == tick {
                 accumulated_spikes += 1;
             }
         }
-
         let num_neurons = graph.neurons.len() as i32;
-
         let ffi_start = Instant::now();
         graph.tick(tick, current_env);
         let ffi_elapsed = ffi_start.elapsed();
         total_ffi_time += ffi_elapsed;
-
         if tick % ASYNC_YIELD_INTERVAL == 0 {
             tokio::task::yield_now().await;
         }
-
         if let Some(ref tx) = tx {
             if tx.receiver_count() > 0 && (tick == start_tick + 1 || tick % WS_INITIAL_STATE_INTERVAL == 0) {
                 broadcast_initial_state(tx, &graph);
             }
-
             if tx.receiver_count() > 0 && tick % WS_SNAPSHOT_INTERVAL_BENCHMARK == 0 {
                 let current_synapse_count = graph.synapses.len();
                 let should_send_synapses = tick % crate::engine::constants::WS_SYNAPSE_FORCE_SYNC_INTERVAL == 0 || current_synapse_count != last_synapse_count;
@@ -512,13 +464,11 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
                 );
             }
         }
-
         if tick % 1000 == 0 && graph.is_sleep_needed() {
             println!("Fatigue threshold reached. Entering Sleep Cycle...");
             graph.initiate_sleep_cycle();
             println!("Wake up! Network consolidated.");
         }
-
         let mut spikes = 0;
         let mut atp_sum = 0.0;
         let mut calcium_sum = 0.0;
@@ -531,7 +481,6 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
             spikes = accumulated_spikes;
             accumulated_spikes = 0; // Reset for next interval
         }
-
         let mut tick_rust_time = std::time::Duration::new(0, 0);
         if tick % SERVICE_TICK_INTERVAL == 0 {
             let rust_start = Instant::now();
@@ -541,9 +490,7 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
             tick_rust_time = rust_start.elapsed();
             total_rust_time += tick_rust_time;
         }
-
         telemetry.update(tick);
-
         let elapsed_ms = tick_start.elapsed().as_secs_f32() * crate::engine::constants::SECONDS_TO_MS;
         current_env = update_environment(&mut regulator, &current_env, use_dynamic_homeostasis, tick, elapsed_ms);
         
@@ -551,7 +498,6 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
             let dead_count = graph.neurons.iter().filter(|n| n.is_alive == 0).count();
             telemetry.print_report(graph.neurons.len(), graph.synapses.len(), dead_count, &graph.neurons);
         }
-
         data.ticks.push(tick);
         data.ffi_times.push(ffi_elapsed.as_secs_f32() * crate::engine::constants::SECONDS_TO_MS);
         data.rust_times.push(tick_rust_time.as_secs_f32() * crate::engine::constants::SECONDS_TO_MS);
@@ -560,21 +506,17 @@ pub async fn run_benchmark_mode(neurons_count: usize, synapses_count: usize, tot
         data.total_calcium_sum += (calcium_sum / num_neurons as f32) as f64;
         data.samples_count += 1;
     }
-
     println!("--- BENCHMARK RESULTS (macOS Mock CPU) ---");
     println!("FFI / CUDA Math Time: {:?}", total_ffi_time);
     println!("Rust Services Time: {:?}", total_rust_time);
     
     finalize_and_save_snapshot(&graph, start_tick + total_ticks, "reports/simulation_report.json", "brain_save.bin");
-
     Ok(data)
 }
-
 pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING SCALING PERFORMANCE ANALYSIS (1K to 1M) ---");
     let sizes = [1_000, 10_000, 100_000, 1_000_000];
     let mut results = String::from("# Performance Scaling Report\n\n| Neurons | Synapses | TPS | Total Time (s) | Memory (KB) |\n|---|---|---|---|---|\n");
-
     for &num_neurons in &sizes {
         println!("\n>> Testing Scale: {} Neurons...", num_neurons);
         let num_synapses = num_neurons * crate::engine::constants::SCALING_SYNAPSE_DENSITY;
@@ -596,30 +538,24 @@ pub async fn run_scaling_benchmarks() -> Result<(), Box<dyn std::error::Error>> 
         let neuron_mem = std::mem::size_of::<crate::engine::ffi::BaseNeuron>();
         let synapse_mem = std::mem::size_of::<crate::engine::ffi::Synapse>();
         let total_mem_kb = (num_neurons * neuron_mem + num_synapses * synapse_mem) as f32 / crate::engine::constants::BYTES_TO_KB;
-
         results.push_str(&format!("| {} | {} | {:.2} | {:.2} | {:.2} |\n", num_neurons, num_synapses, tps, elapsed, total_mem_kb));
     }
-
     std::fs::create_dir_all("docs")?;
     std::fs::write("docs/performance_report.md", results)?;
     println!("Scaling Benchmarks Complete!");
-
     Ok(())
 }
-
 pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_env: Option<Environment>, total_ticks: u32, tx: Option<broadcast::Sender<String>>, use_dynamic_homeostasis: bool) -> SimulationData {
     let total_elements = graph.neurons.len() + graph.synapses.len();
     let sampling_interval = (total_elements as f32 / crate::engine::constants::UI_SAMPLING_DIVISOR).ceil() as u32;
     let sampling_interval = if sampling_interval < 1 { 1 } else { sampling_interval };
     let expected_capacity = (total_ticks / sampling_interval) as usize + 1;
-
     let mut data = SimulationData {
         ticks: Vec::with_capacity(expected_capacity),
         source_v: Vec::with_capacity(expected_capacity),
         target_v: Vec::with_capacity(expected_capacity),
         synapse_w: Vec::with_capacity(expected_capacity),
     };
-
     println!("Executing {} ticks...", total_ticks);
     
     let mut current_env = initial_env.unwrap_or(Environment {
@@ -638,7 +574,6 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
     sensory_hub.build_mapping(&graph);
     let mut regulator = EnvironmentRegulator::new();
     let mut last_synapse_count = graph.synapses.len();
-
     for tick in (start_tick + 1)..=(start_tick + total_ticks) {
         let tick_start = Instant::now();
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
@@ -652,7 +587,6 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
             if tick == start_tick + 1 || tick % WS_INITIAL_STATE_INTERVAL == 0 {
                 broadcast_initial_state(tx, &graph);
             }
-
             if tick % WS_SNAPSHOT_INTERVAL_SIMULATION == 0 {
                 let mut accumulated_spikes = 0;
                 for n in &graph.neurons {
@@ -660,7 +594,6 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
                         accumulated_spikes += 1;
                     }
                 }
-
                 let current_synapse_count = graph.synapses.len();
                 let should_send_synapses = tick % crate::engine::constants::WS_SYNAPSE_FORCE_SYNC_INTERVAL == 0 || current_synapse_count != last_synapse_count;
                 last_synapse_count = current_synapse_count;
@@ -676,7 +609,6 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
                     should_send_synapses, 
                     current_synapse_count
                 );
-
                 // Throttle: ~60 FPS visual update rate
                 tokio::time::sleep(tokio::time::Duration::from_millis(16)).await;
             }
@@ -700,12 +632,9 @@ pub async fn run_simulation(mut graph: NetworkGraph, start_tick: u32, initial_en
         let elapsed_ms = tick_start.elapsed().as_secs_f32() * crate::engine::constants::SECONDS_TO_MS;
         current_env = update_environment(&mut regulator, &current_env, use_dynamic_homeostasis, tick, elapsed_ms);
     }
-
     finalize_and_save_snapshot(&graph, start_tick + total_ticks, "reports/simulation_report.json", "brain_save.bin");
-
     data
 }
-
 pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING SPATIAL SUMMATION TEST (Non-linear Dendritic Logic) ---");
     let mut graph = NetworkGraph::new();
@@ -715,12 +644,10 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     for b in 0..8usize {
         graph.neurons[target as usize].branches[b].branch_type = 0;
     }
-
     for _ in 1..=10 {
         let id = graph.add_neuron(NeuronType::Pacemaker);
         graph.neurons[id as usize].current_voltage = SUBTHRESHOLD_VOLTAGE;
     }
-
     let env = Environment {
         global_oxygen_level: 1.0,
         global_glucose_level: 1.0,
@@ -730,12 +657,10 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0,
     };
-
     for i in 0..10 {
         let branch = ((i % 6) + 2) as u8;
         graph.connect(i as u32 + 1, target, DEFAULT_WEIGHT * 5.0, branch, false, false);
     }
-
     let mut spike_count_dist = 0;
     for tick in 1..=200 {
         graph.tick(tick, env);
@@ -744,7 +669,6 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     println!("Distributed spikes: {}", spike_count_dist);
-
     graph.synapses.clear();
     graph.neurons[target as usize].current_voltage = -70.0;
     graph.neurons[target as usize].branches[1] = crate::engine::ffi::Compartment {
@@ -758,11 +682,9 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..8usize {
         if i != 1 { graph.neurons[target as usize].branches[i].voltage = ZERO_VOLTAGE_PACKED; }
     }
-
     for i in 1..=10 {
         graph.connect(i, target, DEFAULT_WEIGHT * 5.0, 1, false, false);
     }
-
     let mut spike_count_conc = 0;
     for tick in 1..=200 {
         graph.tick(tick, env);
@@ -771,14 +693,12 @@ pub fn run_spatial_summation_test() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     println!("Concentrated spikes: {}", spike_count_conc);
-
     if spike_count_conc > spike_count_dist {
         println!("VERDICT: Dendritic non-linearity confirmed! 🧠✨");
     }
     BrainSnapshot::save_test_snapshot(50, &graph, "brain_save.bin");
     Ok(())
 }
-
 pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
     let _total_ticks = 3;
     println!("--- EXECUTING PASSIVE LEAK & REFRACTORY TEST (Fix 2 & 3 Validation) ---");
@@ -794,7 +714,6 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
         local_trace: 0,
             _pad: 0,
     };
-
     let env = Environment {
         global_oxygen_level: 1.0,
         global_glucose_level: 1.0,
@@ -804,7 +723,6 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0,
     };
-
     graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED;
     graph.tick(1, env);
     
@@ -812,23 +730,19 @@ pub fn run_passive_leak_test() -> Result<(), Box<dyn std::error::Error>> {
     if soma_v > -70.0 {
         println!("✅ FIX 2 PASS: Passive leak successfully transferred sub-threshold charge to soma.");
     }
-
     graph.neurons[target as usize].branches[1].voltage = VOLTAGE_60_PACKED;
     graph.tick(2, env);
     if graph.neurons[target as usize].branches[1].refractory_timer == 3 {
         println!("✅ FIX 3 PASS: Branch entered refractory period after NMDA spike.");
     }
-
     graph.neurons[target as usize].branches[1].voltage = VOLTAGE_10_PACKED;
     graph.tick(3, env);
     if graph.neurons[target as usize].branches[1].voltage == ZERO_VOLTAGE_PACKED {
         println!("✅ FIX 3 PASS: Refractory period effectively blocked incoming signal.");
     }
-
     BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
-
 pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING SLEEP CYCLE TEST (Phase 35 Validation) ---");
     let mut graph = if let Some(loaded_snapshot) = BrainSnapshot::load_from_disk("brain_save.bin") {
@@ -840,7 +754,6 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
         g.add_neuron(NeuronType::Pyramidal);
         g
     };
-
     let mut current_env = Environment { 
         global_oxygen_level: DEFAULT_OXYGEN, 
         global_glucose_level: DEFAULT_GLUCOSE,
@@ -850,12 +763,10 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0, 
     };
-
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
-
     for tick in 1..=crate::engine::constants::TOTAL_LONG_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         graph.tick(tick, current_env);
@@ -878,7 +789,6 @@ pub fn run_sleep_test() -> Result<(), Box<dyn std::error::Error>> {
     BrainSnapshot::save_test_snapshot(crate::engine::constants::TOTAL_LONG_TEST_TICKS, &graph, "brain_save.bin");
     Ok(())
 }
-
 pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     let _total_ticks = crate::engine::constants::TOTAL_TEST_TICKS;
     println!("--- EXECUTING INHIBITION LOOP SCENARIO (Phase 19) ---");
@@ -887,7 +797,6 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
     let i = graph.add_neuron(NeuronType::Interneuron);
     graph.connect(p, i, crate::engine::constants::WEIGHT_STRONG_BIAS, 0, false, true);
     graph.connect(i, p, crate::engine::constants::WEIGHT_STRONG_BIAS, 0, true, false);
-
     let mut env = Environment { 
         global_oxygen_level: DEFAULT_OXYGEN, 
         global_glucose_level: DEFAULT_GLUCOSE,
@@ -897,13 +806,11 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0,
     };
-
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
     let mut history = vec![];
-
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut env, tick);
         graph.neurons[0].current_voltage += crate::engine::constants::VOLTAGE_INJECTION_STEP;
@@ -913,7 +820,6 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
             graph.run_astrocyte_service(&env);
             graph.run_microglia_service(tick);
         }
-
         history.push((
             tick,
             graph.neurons[0].current_voltage,
@@ -921,12 +827,10 @@ pub fn run_inhibition_loop_mode() -> Result<(), Box<dyn std::error::Error>> {
             graph.synapses[0].weight,
         ));
     }
-
     visualization::render_inhibition_chart(&history, "graphs/inhibition_loop.png")?;
     BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
-
 pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
     let _total_ticks = crate::engine::constants::TOTAL_TEST_TICKS;
     println!("--- EXECUTING REFLEX ARC (Phase 11) ---");
@@ -936,7 +840,6 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
     let muscle = graph.add_neuron(NeuronType::Pyramidal);
     graph.connect(eye, brain, crate::engine::constants::WEIGHT_EYE_TO_BRAIN, 0, false, true);
     graph.connect(brain, muscle, crate::engine::constants::WEIGHT_BRAIN_TO_MUSCLE, 0, false, false);
-
     let mut env = Environment { 
         global_oxygen_level: 1.0, 
         global_glucose_level: 1.0,
@@ -946,13 +849,11 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0, 
     };
-
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
     let mut history = vec![];
-
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         env.light_level = if (tick / crate::engine::constants::LIGHT_CYCLE_DURATION) % 2 == 0 { LIGHT_HIGH } else { LIGHT_LOW };
         if (300..=800).contains(&tick) {
@@ -960,7 +861,6 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             env.dopamine_multiplier = DEFAULT_DOPAMINE;
         }
-
         stimulus_service.process_tick(&mut graph, &mut env, tick);
         graph.tick(tick, env);
         
@@ -968,7 +868,6 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
             graph.run_astrocyte_service(&env);
             graph.run_microglia_service(tick);
         }
-
         history.push((
             tick,
             graph.neurons[0].current_voltage,
@@ -978,12 +877,10 @@ pub fn run_reflex_arc_mode() -> Result<(), Box<dyn std::error::Error>> {
             graph.synapses[1].weight,
         ));
     }
-
     visualization::render_reflex_arc_chart(&history, "graphs/reflex_arc_boosted.png")?;
     BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
-
 pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let _total_ticks = crate::engine::constants::LONG_TEST_TICKS;
     println!("--- EXECUTING STRESS-TEST (Phase 13) ---");
@@ -997,12 +894,10 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0, 
     };
-
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
-
     for _ in 0..10 { graph.add_neuron(NeuronType::Pyramidal); }
     let n1 = graph.add_neuron(NeuronType::Pyramidal);
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
@@ -1011,7 +906,6 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     graph.connect(n2, n3, crate::engine::constants::WEIGHT_EYE_TO_BRAIN, 0, false, false);
     graph.connect(n3, n1, crate::engine::constants::WEIGHT_EYE_TO_BRAIN, 0, false, false);
     graph.neurons[n1 as usize].current_voltage = crate::engine::constants::VOLTAGE_FORCED_SPIKE;
-
     let mut results = vec![];
     for tick in 0..crate::engine::constants::TOTAL_TEST_TICKS {
         if tick == crate::engine::constants::HYPOXIA_TICK_TRIGGER { env.global_oxygen_level = HYPOXIC_OXYGEN; }
@@ -1021,13 +915,11 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
         let mut total_atp = 0.0;
         let mut dead_count = 0;
         let mut avg_wear = 0.0;
-
         for n in &graph.neurons {
             total_atp += n.energy_atp;
             avg_wear += n.metabolic_wear as f32 / (crate::engine::constants::COORD_MAX as f32);
             if !n.is_alive == 1 { dead_count += 1; }
         }
-
         results.push((tick as u32, total_atp / graph.neurons.len() as f32, dead_count, avg_wear / graph.neurons.len() as f32));
         if dead_count == graph.neurons.len() { break; }
     }
@@ -1036,7 +928,6 @@ pub fn run_stress_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     finalize_and_save_snapshot(&graph, final_tick, "reports/stress_report.json", "brain_save.bin");
     Ok(())
 }
-
 pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     let _total_ticks = crate::engine::constants::TOTAL_TEST_TICKS;
     println!("--- EXECUTING DOPAMINE RUSH (Phase 14) ---");
@@ -1050,7 +941,6 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0, 
     };
-
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     
     let mut sensory_hub = SensoryHub::new();
@@ -1058,7 +948,6 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
     let n1 = graph.add_neuron(NeuronType::Pacemaker);
     let n2 = graph.add_neuron(NeuronType::Pyramidal);
     graph.connect(n1, n2, crate::engine::constants::WEIGHT_TEST_DEFAULT, 0, false, true);
-
     let mut weight_history = vec![];
     
     for tick in 0..crate::engine::constants::DOPAMINE_PHASE_3_END {
@@ -1069,17 +958,14 @@ pub fn run_dopamine_rush_mode() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             current_env.dopamine_multiplier = DEFAULT_DOPAMINE;
         }
-
         stimulus_service.process_tick(&mut graph, &mut current_env, tick as u32);
         graph.tick(tick as u32, current_env);
         weight_history.push((tick as u32, graph.synapses[0].weight, current_env.dopamine_multiplier));
     }
-
     visualization::render_plasticity_chart(&weight_history, "graphs/dopamine_rush_results.png")?;
     BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
-
 pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let _total_ticks = crate::engine::constants::MEDIUM_TEST_TICKS;
     println!("--- EXECUTING FREQUENCY DISCRIMINATION TEST (Phase 23) ---");
@@ -1105,7 +991,6 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
     let mut history = vec![];
-
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         graph.tick(tick, current_env);
@@ -1114,18 +999,14 @@ pub fn run_frequency_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             graph.run_astrocyte_service(&current_env);
             graph.run_microglia_service(tick);
         }
-
         let s1_w = if !graph.synapses.is_empty() { graph.synapses[0].weight } else { 0.0 };
         let s2_w = if graph.synapses.len() > 1 { graph.synapses[1].weight } else { 0.0 };
-
         history.push((tick, graph.neurons[f1_det as usize].current_voltage, graph.neurons[f2_det as usize].current_voltage, s1_w, s2_w));
     }
-
     visualization::render_frequency_chart(&history, "graphs/frequency_learning.png")?;
     BrainSnapshot::save_test_snapshot(_total_ticks, &graph, "brain_save.bin");
     Ok(())
 }
-
 pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING EMERGENCE FROM CHAOS (Phase 29) ---");
     let mut graph = NetworkGraph::new();
@@ -1140,13 +1021,11 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0, 
     };
-
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
     let mut history = vec![];
-
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         if tick % crate::engine::constants::EMERGENCE_INJECTION_INTERVAL == 0 {
             for i in 0..crate::engine::constants::EMERGENCE_INJECTION_TARGETS { graph.neurons[i as usize].current_voltage += crate::engine::constants::VOLTAGE_INJECTION_STEP; }
@@ -1159,15 +1038,12 @@ pub fn run_emergence_test_mode() -> Result<(), Box<dyn std::error::Error>> {
             graph.run_microglia_service(tick);
             graph.run_neurogenesis_service(tick);
         }
-
         history.push((tick, graph.synapses.len() as u32, graph.neurons[250].current_voltage));
     }
-
     visualization::render_emergence_chart(&history, "graphs/emergence_growth.png")?;
     finalize_and_save_snapshot(&graph, crate::engine::constants::TOTAL_TEST_TICKS, "reports/emergence_report.json", "brain_save.bin");
     Ok(())
 }
-
 pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- EXECUTING SYNAPTIC MORPHOLOGY AUDIT (Phase 30) ---");
     let mut graph = NetworkGraph::new();
@@ -1184,13 +1060,11 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0, 
     };
-
         let mut stimulus_service = stimulus::StimulusService::new(STIMULUS_DEFAULT_INTERVAL);
     
     let mut sensory_hub = SensoryHub::new();
     sensory_hub.build_mapping(&graph);
     let mut history = vec![];
-
     for tick in 1..=crate::engine::constants::TOTAL_TEST_TICKS {
         stimulus_service.process_tick(&mut graph, &mut current_env, tick);
         if tick % crate::engine::constants::MORPHOLOGY_INJECTION_INTERVAL == 0 { graph.neurons[source as usize].current_voltage += crate::engine::constants::VOLTAGE_EMERGENCE_INJECTION; }
@@ -1200,19 +1074,14 @@ pub fn run_morphology_audit() -> Result<(), Box<dyn std::error::Error>> {
             graph.run_astrocyte_service(&current_env);
             graph.run_microglia_service(tick);
         }
-
         let sw = if !graph.synapses.is_empty() { graph.synapses[0].weight } else { 0.0 };
         let sb = if !graph.synapses.is_empty() { graph.synapses[0].neurotransmitter_buffer } else { 0.0 };
-
         history.push((tick, sw, graph.neurons[target as usize].current_voltage, sb));
     }
-
     visualization::render_morphology_chart(&history, "graphs/morphology_audit.png")?;
     finalize_and_save_snapshot(&graph, crate::engine::constants::TOTAL_TEST_TICKS, "reports/morphology_report.json", "brain_save.bin");
-
     Ok(())
 }
-
 pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
     println!("--- EXECUTING SCALABILITY BENCHMARKS ---");
@@ -1277,7 +1146,6 @@ pub async fn run_bench_scaling() -> Result<(), Box<dyn std::error::Error>> {
     
     Ok(())
 }
-
 pub async fn run_bench_io() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
     println!("--- EXECUTING I/O LATENCY BENCHMARK ---");
@@ -1373,7 +1241,6 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
             _padding: [0; 2],
         });
     }
-
     let env = Environment {
         global_oxygen_level: 1.0,
         global_glucose_level: 1.0,
@@ -1383,7 +1250,6 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
             wakefulness_multiplier: 1.0,
             thermal_noise_scale: 1.0,
     };
-
     println!("Network Ready. Initiating slow tick loop for visualizer debugging...");
     
     let start_time = std::time::Instant::now();
@@ -1397,7 +1263,6 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
             graph.neurons[2].current_voltage = FORCED_SPIKE_VOLTAGE;
             graph.neurons[2].energy_atp = FULL_ATP_LEVEL;
         }
-
         let current_env = {
             if let Ok(env_guard) = shared_env.lock() {
                 *env_guard
@@ -1442,7 +1307,6 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
         tick += 1;
         // Super slow loop so user can watch UI
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
         if start_time.elapsed().as_secs() >= UI_TEST_DURATION_SECS {
             println!("UI Test limit reached (5 minutes). Exiting.");
             break;
@@ -1451,8 +1315,6 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
     
     Ok(())
 }
-
-
 pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
     
     let mut graph = crate::network::graph::NetworkGraph::new();
@@ -1475,7 +1337,6 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
     for col_id in 0..10 {
         let center_x = ((col_id % 5) as f32) * 12000.0 + 10000.0;
         let center_y = ((col_id / 5) as f32) * 20000.0 + 10000.0;
-
         for i in 0..100 {
             let proportion_idx = (i as f32 / 100.0 * 1000.0) as usize;
             
@@ -1488,13 +1349,11 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
             } else {
                 (crate::engine::ffi::NeuronType::Interneuron, 1, 50001.0, 55000.0)
             };
-
             let id = graph.add_neuron(n_type);
             let n = &mut graph.neurons[id as usize];
             n.column_id = col_id as u16;
             n.layer_id = layer_id as u8;
             n.minicolumn_id = (i / 20) as u8;
-
             let dx = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
             let dy = (rand::RngExt::random::<f32>(&mut rng) * 2.0 - 1.0) * 3000.0;
             
@@ -1596,7 +1455,6 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
     graph.optimize_memory_layout();
     graph
 }
-
 pub async fn run_mnist_mode(
     total_ticks: u32,
     tx: Option<tokio::sync::broadcast::Sender<String>>,
@@ -1627,11 +1485,9 @@ pub async fn run_mnist_mode(
     let total_elements = graph.neurons.len() + graph.synapses.len();
     let sampling_interval = (total_elements as f32 / crate::engine::constants::UI_SAMPLING_DIVISOR).ceil() as u32;
     
-
     if let Some(tx_chan) = tx.as_ref() {
         crate::runner::modes::broadcast_initial_state(tx_chan, &graph);
     }
-
     let mut current_image_idx = 0;
     let mut image_pixels: Vec<f32> = vec![0.0; 784];
     let mut current_label = 0;
@@ -1646,7 +1502,6 @@ pub async fn run_mnist_mode(
         if use_ui && current_tick % 10 == 0 {
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
         }
-
         // Feed new image every 500 ticks
         if current_tick % 500 == 0 {
             if current_image_idx < images.len() {
@@ -1661,7 +1516,6 @@ pub async fn run_mnist_mode(
                 current_image_idx += 1;
             }
         }
-
         // Phase 55: Amygdala - Remove hardcoded teacher forcing
         if !is_inference && current_label < 10 {
             // In Phase 55, we no longer inject `1.5` or `3.0` directly into the correct neuron.
@@ -1698,20 +1552,21 @@ pub async fn run_mnist_mode(
             let preview_correct = correct_guesses_history.iter().filter(|&&c| c).count();
             let preview_len = std::cmp::max(1, correct_guesses_history.len());
             let accuracy = (preview_correct as f32 / preview_len as f32) * 100.0;
-
             if is_inference {
                 guard.stdp_learning_rate = 0.0;
             }
-            if total_images_processed > 10000 {
+            if total_images_processed > 50000 {
                 // Final Exam Mode
                 guard.thermal_noise_scale = 0.0;
                 guard.stdp_learning_rate = 0.0;
+            } else if total_images_processed > 10000 {
+                // Phase 2: Consolidation
+                guard.thermal_noise_scale = (1.0 - (accuracy / 100.0).clamp(0.0, 1.0)) * 0.1;
             } else {
                 guard.thermal_noise_scale = 1.0 - (accuracy / 100.0).clamp(0.0, 1.0);
             }
             *guard
         };
-
         
         // Tick the network
         graph.tick(current_tick, env.clone());
@@ -1743,12 +1598,10 @@ pub async fn run_mnist_mode(
                     // Cyber Mutant: Reward-Driven Growth for the winning output neuron
                     graph.run_targeted_neurogenesis(1784 + best_guess as u32, current_tick);
                 }
-
                 let mut preview_correct = correct_guesses_history.iter().filter(|&&c| c).count();
                 if is_correct { preview_correct += 1; }
                 let preview_len = std::cmp::min(100, correct_guesses_history.len() + 1);
                 let accuracy = (preview_correct as f32 / preview_len as f32) * 100.0;
-
                 // Phase 55: Amygdala Reward/Punishment
                 let mut guard = shared_env.lock().unwrap();
                 if is_correct {
@@ -1764,7 +1617,6 @@ pub async fn run_mnist_mode(
                     correct_guesses_history.pop_front();
                 }
                 correct_guesses_history.push_back(is_correct);
-
                 
                 let correct_count = correct_guesses_history.iter().filter(|&&c| c).count();
                 let accuracy = (correct_count as f32 / correct_guesses_history.len() as f32) * 100.0;
@@ -1890,5 +1742,3 @@ pub async fn run_mnist_mode(
     
     Ok(())
 }
-
-
