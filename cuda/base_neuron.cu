@@ -50,47 +50,6 @@ static inline __device__ __host__ float unpack_voltage(uint16_t v) {
 
 #ifdef USE_CUDA
 __device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impact) {
-#if __CUDA_ARCH__ >= 700
-    // Warp-level reduction for atomic CAS spin-lock mitigation (Phase 31 VRAM Diet)
-    // Find all threads in the warp writing to the EXACT SAME address
-    uint32_t active = __activemask();
-    int lane_id = threadIdx.x % 32;
-    
-    // Simpler warp reduction without complex masking: just use atomicAdd to shared memory if possible, 
-    // but since address is global, we can't easily map it to shared.
-    // Let's stick to the simplest standard warp-aggregate for global atomics:
-    
-    float thread_val = voltage_impact;
-    for (int i = 1; i < 32; i++) {
-        int src_lane = (lane_id + i) % 32;
-        unsigned long long src_addr = __shfl_sync(active, (unsigned long long)address, src_lane);
-        float src_val = __shfl_sync(active, thread_val, src_lane);
-        if (src_addr == (unsigned long long)address && src_lane > lane_id) {
-            // We are a lower lane, we absorb the higher lane's value
-            voltage_impact += src_val;
-        }
-        if (src_addr == (unsigned long long)address && src_lane < lane_id) {
-            // A lower lane absorbed our value, we bail out
-            voltage_impact = 0.0f;
-            break;
-        }
-    }
-    
-    // Only the lowest lane for this address performs the atomic
-    // If voltage_impact became exactly 0.0f (either because we are a higher lane, 
-    // or because the sum was exactly 0), we can safely skip the atomic.
-    if (voltage_impact != 0.0f) {
-        uint16_t assumed, old = *address;
-        do {
-            assumed = old;
-            float current_v = unpack_voltage(assumed);
-            current_v += voltage_impact;
-            current_v = fmaxf(-100.0f, fminf(current_v, 150.0f)); // Saturation limit (Spec 2.2)
-            uint16_t new_val = pack_voltage(current_v);
-            old = atomicCAS(address, assumed, new_val);
-        } while (assumed != old);
-    }
-#else
     uint16_t assumed, old = *address;
     do {
         assumed = old;
@@ -100,7 +59,6 @@ __device__ void atomic_add_packed_voltage(uint16_t* address, float voltage_impac
         uint16_t new_val = pack_voltage(current_v);
         old = atomicCAS(address, assumed, new_val);
     } while (assumed != old);
-#endif
 }
 #else
 #include <atomic>
@@ -420,19 +378,21 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
 
     uint8_t is_myelinated = (s->flags & 0x20) != 0;
     uint8_t is_photoreceptor = (s->flags & 0x40) != 0;
-
-    if (is_photoreceptor) {
-        if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
-            s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK; // Photoreceptors leak constantly
-            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
-        }
-    } else {
-        uint32_t src_last_spike = source->last_spike_tick;
-        if (src_last_spike == current_tick) {
-            // Bulk release on spike
-            s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
-            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay; // Myelin Bypass (Phase 26)
-        }
+    
+    // Evaluate conditions arithmetically
+    bool pr_condition = is_photoreceptor && (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD);
+    bool pr_fire = pr_condition && (s->ticks_until_delivery == 0) && (s->neurotransmitter_buffer <= CONSTANT_PHOTORECEPTOR_LEAK * 1.5f);
+    
+    bool reg_condition = !is_photoreceptor && (source->last_spike_tick == current_tick);
+    
+    // Apply updates based on arithmetic
+    s->neurotransmitter_buffer += (pr_condition * CONSTANT_PHOTORECEPTOR_LEAK) + (reg_condition * BULK_NEUROTRANSMITTER_RELEASE);
+    
+    bool just_fired_this_tick = pr_fire || reg_condition;
+    
+    int delivery_ticks = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
+    if (just_fired_this_tick) {
+        s->ticks_until_delivery = delivery_ticks;
     }
 
     // Phase 45: Spike-Timing-Dependent Plasticity (STDP) with Dopamine Modulation
@@ -617,35 +577,73 @@ __global__ void tick_neurons_prep_and_vote_kernel(BaseNeuron* neurons, int count
     if (n->current_voltage > n->activation_threshold) {
         int winner_idx = n->column_id * 50 + n->minicolumn_id;
         
-        unsigned long long int* addr_as_ull = &minicolumn_winners[winner_idx];
-        unsigned long long int assumed, old = *addr_as_ull;
-        uint16_t current_tick_mask = current_tick % 1024;
+        bool is_pred = (n->status_flags & FLAG_IS_PREDICTIVE) != 0;
+        float effective_v = is_pred ? n->current_voltage + 1000.0f : n->current_voltage;
         
-        do {
-            assumed = old;
+        uint32_t current_tick_mask = current_tick % 1048576;
+        unsigned long long int candidate_val = pack_wta(effective_v, n->id, current_tick_mask);
+
+#if __CUDA_ARCH__ >= 300
+        // Warp-level WTA optimization
+        uint32_t active = __activemask();
+        unsigned long long int best_val = candidate_val;
+        
+        for (int offset = 16; offset > 0; offset /= 2) {
+            unsigned long long int other_val = __shfl_down_sync(active, best_val, offset);
+            int other_winner_idx = __shfl_down_sync(active, winner_idx, offset);
             
-            float old_v;
-            uint32_t old_id;
-            uint16_t old_tick;
-            unpack_wta(assumed, &old_v, &old_id, &old_tick);
-            
-            bool is_pred = (n->status_flags & FLAG_IS_PREDICTIVE) != 0;
-            float effective_v = is_pred ? n->current_voltage + 1000.0f : n->current_voltage;
-            
-            unsigned long long int new_val;
-            
-            if (old_tick != current_tick_mask) {
-                new_val = pack_wta(effective_v, n->id, current_tick_mask);
-            } else {
-                if (effective_v > old_v || (effective_v == old_v && n->id < old_id)) {
-                    new_val = pack_wta(effective_v, n->id, current_tick_mask);
-                } else {
-                    break;
+            if (other_winner_idx == winner_idx) {
+                float v1, v2;
+                uint32_t id1, id2, t1, t2;
+                unpack_wta(best_val, &v1, &id1, &t1);
+                unpack_wta(other_val, &v2, &id2, &t2);
+                
+                if (v2 > v1 || (v2 == v1 && id2 < id1)) {
+                    best_val = other_val;
                 }
             }
+        }
+        
+        // Determine the leader (first active thread for this winner_idx)
+        int lane_id = threadIdx.x % 32;
+        int lower_winner_idx = __shfl_up_sync(active, winner_idx, 1);
+        bool is_leader = (lane_id == 0) || (lower_winner_idx != winner_idx);
+        
+        if (is_leader) {
+            candidate_val = best_val;
+#endif
+            unsigned long long int* addr_as_ull = &minicolumn_winners[winner_idx];
+            unsigned long long int assumed, old = *addr_as_ull;
             
-            old = atomicCAS(addr_as_ull, assumed, new_val);
-        } while (assumed != old);
+            do {
+                assumed = old;
+                
+                float old_v;
+                uint32_t old_id;
+                uint32_t old_tick;
+                unpack_wta(assumed, &old_v, &old_id, &old_tick);
+                
+                unsigned long long int new_val;
+                
+                if (old_tick != current_tick_mask) {
+                    new_val = candidate_val;
+                } else {
+                    float cv_local;
+                    uint32_t cid_local, ct_local;
+                    unpack_wta(candidate_val, &cv_local, &cid_local, &ct_local);
+                    
+                    if (cv_local > old_v || (cv_local == old_v && cid_local < old_id)) {
+                        new_val = candidate_val;
+                    } else {
+                        break;
+                    }
+                }
+                
+                old = atomicCAS(addr_as_ull, assumed, new_val);
+            } while (assumed != old);
+#if __CUDA_ARCH__ >= 300
+        }
+#endif
     }
 }
 
