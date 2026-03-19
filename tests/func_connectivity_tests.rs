@@ -22,7 +22,7 @@ fn default_env() -> Environment {
     }
 }
 
-// 1. Тест «Живой провод» (L4 -> L5)
+// 1. Test "Live Wire" (L4 -> L5)
 #[test]
 fn test_live_wire_propagation() {
     let mut graph = NetworkGraph::new();
@@ -65,7 +65,7 @@ graph.neurons[l4 as usize].activation_threshold = -50.0;
     assert!(graph.neurons[l5 as usize].last_spike_tick > 0, "Signal did not reach L5!");
 }
 
-// 2. Тест «Автономная предсказалка» (Distal Branches)
+// 2. Test "Autonomous Predictor" (Distal Branches)
 #[test]
 fn test_autonomous_predictor() {
     let mut graph = NetworkGraph::new();
@@ -108,7 +108,7 @@ fn test_autonomous_predictor() {
     assert!(tgt_neuron.predictive_ticks > 0, "Predictive ticks not set!");
 }
 
-// 3. Тест «Биологическое WTA» (Lateral Inhibition)
+// 3. Test "Biological WTA" (Lateral Inhibition)
 #[test]
 fn test_biological_wta() {
     let mut graph = NetworkGraph::new();
@@ -159,7 +159,7 @@ fn test_biological_wta() {
     }
 }
 
-// 4. Тест «Дофаминовый инстинкт» (Positive Feedback)
+// 4. Test "Dopamine Instinct" (Positive Feedback)
 #[test]
 fn test_dopamine_instinct() {
     let mut graph = NetworkGraph::new();
@@ -208,7 +208,7 @@ fn test_dopamine_instinct() {
     assert_eq!(best_guess, current_label, "Best guess was incorrect!");
 }
 
-// 5. Тест «Мгновенная карма» (Negative Feedback)
+// 5. Test "Instant Karma" (Negative Feedback)
 #[test]
 fn test_instant_karma() {
     let mut graph = NetworkGraph::new();

@@ -251,7 +251,7 @@ function animate() {
                     else _tempColor.copy(TYPE_COLORS.dead);
                 } else {
                     if (colorMode === 'layer') {
-                        // В режиме LAYER игнорим предиктив стейт и ингибирование - показываем чистые цвета слоев + вспышки спайков
+                        // In LAYER mode ignore predictive state and inhibition - show pure layer colors + spike flashes
                         _tempColor.copy(baseColor).lerp(new THREE.Color(1,1,1), n.visualActivity);
                     } else {
                         if (n.statusFlags & FLAG_IS_INHIBITED) {

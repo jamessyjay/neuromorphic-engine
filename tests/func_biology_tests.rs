@@ -15,7 +15,7 @@ fn default_env() -> neuromorphic_engine::engine::ffi::Environment {
     }
 }
 
-// 11. Тест «Светобоязнь» (Photoreceptor Transduction)
+// 11. Test "Photophobia" (Photoreceptor Transduction)
 #[test]
 fn test_photoreceptor_transduction() {
     let mut graph = NetworkGraph::new();
@@ -48,7 +48,7 @@ fn test_photoreceptor_transduction() {
     assert!(v_tick2 < v_tick1, "Voltage is not dropping exponentially/gradually!");
 }
 
-// 12. Тест «Эффект совпадения» (NMDA Multiplexing)
+// 12. Test "Coincidence Effect" (NMDA Multiplexing)
 #[test]
 fn test_nmda_multiplexing() {
     let mut graph = NetworkGraph::new();
@@ -93,7 +93,7 @@ fn test_nmda_multiplexing() {
     assert!(v_a > v_b, "Predictive neuron did not get the NMDA voltage boost! V_A={}, V_B={}", v_a, v_b);
 }
 
-// 13. Тест «Ресурсный голод» (Metabolic Death)
+// 13. Test "Resource Starvation" (Metabolic Death)
 #[test]
 fn test_metabolic_death() {
     let mut graph = NetworkGraph::new();
@@ -123,7 +123,7 @@ fn test_metabolic_death() {
     assert!(n.energy_atp <= 0.0, "ATP is not depleted!");
 }
 
-// 14. Тест «Синаптическая броня» (Weight Consolidation)
+// 14. Test "Synaptic Armor" (Weight Consolidation)
 #[test]
 fn test_synaptic_armor() {
     let mut graph = NetworkGraph::new();
@@ -156,7 +156,7 @@ fn test_synaptic_armor() {
     assert!(drop_weak > drop_strong * 3.0, "Armor failed! Weak dropped by {}, Strong dropped by {}", drop_weak, drop_strong);
 }
 
-// 15. Тест «Проверка проводов» (Pathfinding Audit)
+// 15. Test "Wire Check" (Pathfinding Audit)
 #[test]
 fn test_pathfinding_audit() {
     let mut graph = NetworkGraph::new();

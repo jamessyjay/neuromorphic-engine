@@ -192,22 +192,22 @@ Also, for pure results there must be no other heavy processes running on the sys
 ### Block 9: Core Biological & Functional Mechanics (Phase 16)
 
 #### Connectivity & Reaction (`func_connectivity_tests.rs`)
-- **82. test_live_wire_propagation ("Живой провод"):** Проверяет базовую проходимость сигнала от L4 до L5 слоев.
-- **83. test_autonomous_predictor ("Автономная предсказалка"):** Валидирует переход нейрона в предиктивное состояние при получении сигнала на базальные дендриты.
-- **84. test_biological_wta ("Биологическое WTA"):** Тестирует механизм латерального торможения (победитель получает все, остальные пенализируются).
-- **85. test_dopamine_instinct ("Дофаминовый инстинкт"):** Убеждается, что правильное угадывание (каузальный спайк) приводит к скачку дофамина (положительное подкрепление).
-- **86. test_instant_karma ("Мгновенная карма"):** Убеждается, что ошибочный ответ резко снижает уровень дофамина (отрицательное подкрепление).
+- **82. test_live_wire_propagation ("Live Wire"):** Validates basic signal propagation from L4 to L5 layers.
+- **83. test_autonomous_predictor ("Autonomous Predictor"):** Validates the transition of a neuron into a predictive state upon receiving a signal on basal dendrites.
+- **84. test_biological_wta ("Biological WTA"):** Tests the lateral inhibition mechanism (winner takes all, others are heavily penalized).
+- **85. test_dopamine_instinct ("Dopamine Instinct"):** Ensures that a correct guess (causal spike) leads to a dopamine spike (positive reinforcement).
+- **86. test_instant_karma ("Instant Karma"):** Ensures that a wrong answer sharply decreases the dopamine level (negative reinforcement).
 
 #### Topology & Discipline (`func_topology_tests.rs`)
-- **87. test_dopamine_washout ("Чистая память"):** Гарантирует, что уровень дофамина со временем плавно возвращается к базовому (1.0).
-- **88. test_branch_diversity ("Равномерный посев"):** Проверяет, что синапсы равномерно распределяются по дендритным ветвям без перекосов.
-- **89. test_geometric_justice ("Геометрическая справедливость"):** Валидирует закон $L^{-1.5}$: вероятность создания синапсов падает с расстоянием, коротких связей экспоненциально больше.
-- **90. test_synaptic_scaling_proportionality ("Автоматический гомеостаз"):** Гарантирует пропорциональное масштабирование весов при избыточной активности для поддержания баланса.
-- **91. test_echo_decay ("Затухание эха"):** Проверяет E/I баланс — волна активности должна быстро затухать благодаря интернейронам, не приводя к эпилепсии.
+- **87. test_dopamine_washout ("Clean Memory"):** Guarantees that the dopamine level smoothly returns to baseline (1.0) over time.
+- **88. test_branch_diversity ("Even Seeding"):** Checks that synapses are uniformly distributed across dendritic branches without skewness.
+- **89. test_geometric_justice ("Geometric Justice"):** Validates the $L^{-1.5}$ law: the probability of creating synapses drops with distance, making short connections exponentially more frequent.
+- **90. test_synaptic_scaling_proportionality ("Automatic Homeostasis"):** Guarantees proportional weight scaling during excessive activity to maintain balance.
+- **91. test_echo_decay ("Echo Decay"):** Verifies E/I balance — a wave of activity must quickly decay thanks to interneurons, preventing epilepsy.
 
 #### Biology & Logic (`func_biology_tests.rs`)
-- **92. test_photoreceptor_transduction ("Светобоязнь"):** Валидирует плавную гиперполяризацию фоторецепторов при попадании "света" (внешнего стимула).
-- **93. test_nmda_multiplexing ("Эффект совпадения"):** Проверяет логическое И (AND) — нейроны в предиктивном состоянии срабатывают легче за счет дополнительного буста напряжения.
-- **94. test_metabolic_death ("Ресурсный голод"):** Гарантирует падение нейрона в кому или смерть при исчерпании АТФ и отсутствии кислорода/глюкозы.
-- **95. test_synaptic_armor ("Синаптическая броня"):** Проверяет, что сильные (консолидированные) связи теряют вес при LTD значительно медленнее, чем слабые.
-- **96. test_pathfinding_audit ("Проверка проводов"):** Аудит графа — подтверждает, что сеть от сенсоров до выходного слоя не имеет "мертвых зон" и способна проводить сигналы.
+- **92. test_photoreceptor_transduction ("Photophobia"):** Validates the smooth hyperpolarization of photoreceptors upon receiving "light" (external stimulus).
+- **93. test_nmda_multiplexing ("Coincidence Effect"):** Verifies Logical AND — neurons in a predictive state fire easier due to an additional voltage boost.
+- **94. test_metabolic_death ("Resource Starvation"):** Guarantees a neuron falls into a coma or dies when ATP is depleted and oxygen/glucose are missing.
+- **95. test_synaptic_armor ("Synaptic Armor"):** Checks that strong (consolidated) connections lose weight during LTD significantly slower than weak ones.
+- **96. test_pathfinding_audit ("Wire Check"):** Graph audit — confirms the network from sensors to the output layer has no "dead zones" and can effectively conduct signals.

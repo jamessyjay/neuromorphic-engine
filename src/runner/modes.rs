@@ -1326,10 +1326,10 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         let n = &mut graph.neurons[id as usize];
         let row = i / 28;
         let col = i % 28;
-        // Располагаем сетку в плоскости XY с небольшим отступом
+        // Position the grid in the XY plane with a slight offset
         n.x = (col as f32 * (65535.0 / 28.0)) as u16;
         n.y = (row as f32 * (65535.0 / 28.0)) as u16;
-        n.z = 0; // Ретина всегда на переднем плане
+        n.z = 0; // Retina is always in the foreground
         n.layer_id = 4; // L4 - Input
     }
     
@@ -1426,9 +1426,9 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
     for i in 0..10 {
         let id = graph.add_neuron(crate::engine::ffi::NeuronType::Pyramidal);
         let n = &mut graph.neurons[id as usize];
-        n.x = (32768i32 + (i as i32 * 3000 - 15000)).clamp(0, 65535) as u16; // В ряд по X
-        n.y = 32768; // По центру Y
-        n.z = 60000; // На заднем плане
+        n.x = (32768i32 + (i as i32 * 3000 - 15000)).clamp(0, 65535) as u16; // In a row along X
+        n.y = 32768; // Center along Y
+        n.z = 60000; // In the background
         n.layer_id = 5; // L5 - Output
         n.activation_threshold = 20.0; // Phase 56: Lower threshold for outputs to encourage initial babbling
     }

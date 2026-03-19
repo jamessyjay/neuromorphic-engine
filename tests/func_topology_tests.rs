@@ -15,7 +15,7 @@ fn default_env() -> neuromorphic_engine::engine::ffi::Environment {
     }
 }
 
-// 6. Тест «Чистая память» (Dopamine Washout)
+// 6. Test "Clean Memory" (Dopamine Washout)
 #[test]
 fn test_dopamine_washout() {
     let mut env = default_env();
@@ -31,7 +31,7 @@ fn test_dopamine_washout() {
     assert!(env.dopamine_multiplier < 1.5, "Dopamine did not wash out correctly! Current: {}", env.dopamine_multiplier);
 }
 
-// 7. Тест «Равномерный посев» (Branch Diversity)
+// 7. Test "Even Seeding" (Branch Diversity)
 #[test]
 fn test_branch_diversity() {
     let mut graph = NetworkGraph::new();
@@ -62,7 +62,7 @@ fn test_branch_diversity() {
     }
 }
 
-// 8. Тест «Геометрическая справедливость» (Distance Law L^-1.5)
+// 8. Test "Geometric Justice" (Distance Law L^-1.5)
 #[test]
 fn test_geometric_justice() {
     let mut graph = NetworkGraph::new();
@@ -110,7 +110,7 @@ fn test_geometric_justice() {
     assert!(avg_short > avg_long * 10.0, "Short-range probability should be > 10x higher than long-range! Short: {}, Long: {}", avg_short, avg_long);
 }
 
-// 9. Тест «Автоматический гомеостаз» (Synaptic Scaling)
+// 9. Test "Automatic Homeostasis" (Synaptic Scaling)
 #[test]
 fn test_synaptic_scaling_proportionality() {
     let mut graph = NetworkGraph::new();
@@ -146,7 +146,7 @@ fn test_synaptic_scaling_proportionality() {
     assert!((ratio2 - 2.0).abs() < 0.01, "Proportionality lost! Expected ratio 2.0, got {}", ratio2);
 }
 
-// 10. Тест «Затухание эха» (E/I Balance)
+// 10. Test "Echo Decay" (E/I Balance)
 #[test]
 fn test_echo_decay() {
     let mut graph = NetworkGraph::new();

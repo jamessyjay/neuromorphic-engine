@@ -466,7 +466,7 @@ impl NetworkGraph {
             self.outgoing_counts[source_id as usize] += 1;
         }
 
-        // TЗ №27: Allow multi-synaptic connections! We no longer block duplicates or augment them.
+        // Spec #27: Allow multi-synaptic connections! We no longer block duplicates or augment them.
         // A single source neuron can now synapse onto multiple different branches (or even the same branch multiple times biologically) of the target.
         let synapse = Synapse {
             source_id,
@@ -573,7 +573,7 @@ impl NetworkGraph {
             let distance = dist_sq.sqrt();
             let safe_dist = if distance < 1.0 { 1.0 } else { distance };
             
-            // TЗ №27: -3/2 Topological Law (P(L) ~ L^(-3/2))
+            // Spec #27: -3/2 Topological Law (P(L) ~ L^(-3/2))
             let topo_prob = 1.0 / safe_dist.powf(1.5);
             
             if !rng.random_bool(topo_prob.clamp(0.01, 1.0) as f64) { continue; }
@@ -584,7 +584,7 @@ impl NetworkGraph {
             if !s_active || !t_active { continue; }
             if !rng.random_bool(STOCHASTIC_GROWTH_PROB) { continue; }
 
-            // Preferential Attachment (ТЗ №26) with Tie-Breaking (ТЗ №29)
+            // Preferential Attachment (Spec #26) with Tie-Breaking (Spec #29)
             let mut best_branches = [0u8; 16];
             let mut best_count = 0;
 
@@ -717,7 +717,7 @@ impl NetworkGraph {
     }
 
     pub fn print_synaptic_diagnostics(&self) {
-        println!("\n=== SYNAPTIC DIAGNOSTICS (ТЗ №26) ===");
+        println!("\n=== SYNAPTIC DIAGNOSTICS (Spec #26) ===");
         
         let total_synapses = self.synapses.len();
         if total_synapses == 0 {
@@ -808,7 +808,7 @@ impl Drop for NetworkGraph {
 }
 
 impl NetworkGraph {
-    // TЗ №31: Cyber Mutant - Reward-Driven Growth
+    // Spec #31: Cyber Mutant - Reward-Driven Growth
     pub fn run_targeted_neurogenesis(&mut self, target_id: u32, _current_tick: u32) {
         let mut rng = rand::rng();
         if self.synapses.len() >= crate::engine::constants::MAX_SYNAPSES_TOTAL { return; }
