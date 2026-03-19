@@ -188,3 +188,26 @@ Also, for pure results there must be no other heavy processes running on the sys
 
 - **80. test_mnist_classifier_competition:** Validates Winner-Take-All (WTA) logic. Simulates output neurons competing; ensures the neuron with the highest voltage/trace wins, and all others are penalized heavily (-20mV) and flagged with `FLAG_IS_INHIBITED`.
 - **81. test_stdp_ltd_forgetting:** Validates LTD-based forgetting mechanism. Proves that if a target neuron spikes repeatedly while a specific source neuron remains silent, the synapse weight from that source correctly decreases over time.
+
+### Block 9: Core Biological & Functional Mechanics (Phase 16)
+
+#### Connectivity & Reaction (`func_connectivity_tests.rs`)
+- **82. test_live_wire_propagation ("Живой провод"):** Проверяет базовую проходимость сигнала от L4 до L5 слоев.
+- **83. test_autonomous_predictor ("Автономная предсказалка"):** Валидирует переход нейрона в предиктивное состояние при получении сигнала на базальные дендриты.
+- **84. test_biological_wta ("Биологическое WTA"):** Тестирует механизм латерального торможения (победитель получает все, остальные пенализируются).
+- **85. test_dopamine_instinct ("Дофаминовый инстинкт"):** Убеждается, что правильное угадывание (каузальный спайк) приводит к скачку дофамина (положительное подкрепление).
+- **86. test_instant_karma ("Мгновенная карма"):** Убеждается, что ошибочный ответ резко снижает уровень дофамина (отрицательное подкрепление).
+
+#### Topology & Discipline (`func_topology_tests.rs`)
+- **87. test_dopamine_washout ("Чистая память"):** Гарантирует, что уровень дофамина со временем плавно возвращается к базовому (1.0).
+- **88. test_branch_diversity ("Равномерный посев"):** Проверяет, что синапсы равномерно распределяются по дендритным ветвям без перекосов.
+- **89. test_geometric_justice ("Геометрическая справедливость"):** Валидирует закон $L^{-1.5}$: вероятность создания синапсов падает с расстоянием, коротких связей экспоненциально больше.
+- **90. test_synaptic_scaling_proportionality ("Автоматический гомеостаз"):** Гарантирует пропорциональное масштабирование весов при избыточной активности для поддержания баланса.
+- **91. test_echo_decay ("Затухание эха"):** Проверяет E/I баланс — волна активности должна быстро затухать благодаря интернейронам, не приводя к эпилепсии.
+
+#### Biology & Logic (`func_biology_tests.rs`)
+- **92. test_photoreceptor_transduction ("Светобоязнь"):** Валидирует плавную гиперполяризацию фоторецепторов при попадании "света" (внешнего стимула).
+- **93. test_nmda_multiplexing ("Эффект совпадения"):** Проверяет логическое И (AND) — нейроны в предиктивном состоянии срабатывают легче за счет дополнительного буста напряжения.
+- **94. test_metabolic_death ("Ресурсный голод"):** Гарантирует падение нейрона в кому или смерть при исчерпании АТФ и отсутствии кислорода/глюкозы.
+- **95. test_synaptic_armor ("Синаптическая броня"):** Проверяет, что сильные (консолидированные) связи теряют вес при LTD значительно медленнее, чем слабые.
+- **96. test_pathfinding_audit ("Проверка проводов"):** Аудит графа — подтверждает, что сеть от сенсоров до выходного слоя не имеет "мертвых зон" и способна проводить сигналы.
