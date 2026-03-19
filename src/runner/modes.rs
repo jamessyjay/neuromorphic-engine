@@ -1377,24 +1377,29 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
             let mut prob;
     
             let mut target_distal = false;
+            // 3D Distance-based probability (Law -3/2 approx)
+            let dx = n_source.x as f32 - n_target.x as f32;
+            let dy = n_source.y as f32 - n_target.y as f32;
+            let dz = n_source.z as f32 - n_target.z as f32;
+            let dist = (dx*dx + dy*dy + dz*dz).sqrt();
+            
+            // Base probability decays with distance
+            let base_prob = 1.0 / (1.0 + (dist / 1000.0).powf(1.5));
+            
             if n_source.column_id == n_target.column_id {
                 if n_source.minicolumn_id == n_target.minicolumn_id {
-                    prob = 0.90; // Minicolumnar vertical stitch
+                    prob = base_prob * 2.0; // Minicolumnar boost
                 } else {
-                    let layer_diff = (n_source.layer_id as i32 - n_target.layer_id as i32).abs();
-                    if layer_diff == 1 || layer_diff == 2 {
-                        prob = 0.80; // Vertical intra-columnar connections
-                    } else {
-                        prob = 0.10; // Sparse random inside column
-                    }
+                    prob = base_prob * 1.5;
                 }
             } else if n_source.layer_id == 2 && n_target.layer_id == 2 {
-                prob = 0.05; // Horizontal L2/3 voting
-                target_distal = true; // Voting targets distal dendrites
+                prob = base_prob * 0.5; // Horizontal L2/3 voting
+                target_distal = true;
             } else {
-                prob = 0.01; // Ultra sparse random long-range
-                target_distal = true; // Long-range context targets distal
+                prob = base_prob * 0.1; // Ultra sparse random long-range
+                target_distal = true;
             }
+            prob = prob.clamp(0.001, 0.95);
     
             // Ban: L6 cannot directly fire to L5
             if n_source.layer_id == 6 && n_target.layer_id == 5 {
@@ -1439,16 +1444,19 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
             while graph.neurons[target_idx].type_ == crate::engine::ffi::NeuronType::Interneuron as u8 {
                 target_idx = rand::RngExt::random_range(&mut rng, 784..1784);
             }
-            graph.connect(pr_idx as u32, target_idx as u32, 1.0, 0, false, false);
+            let branch_id = rand::RngExt::random_range(&mut rng, 0..12);
+            graph.connect(pr_idx as u32, target_idx as u32, 1.0, branch_id, false, false);
         }
     }
     
     // 5. Connect Processing neurons to Output neurons
     // Output neurons: 1784..1794
     for out_idx in 1784..1794 {
-        for _ in 0..20 {
+        for _ in 0..250 {
             let src_idx = rand::RngExt::random_range(&mut rng, 784..1784);
-            graph.connect(src_idx as u32, out_idx as u32, 1.0, 0, false, false);
+            let branch_id = rand::RngExt::random_range(&mut rng, 0..12);
+            let is_inhib = graph.neurons[src_idx].type_ == crate::engine::ffi::NeuronType::Interneuron as u8;
+            if !is_inhib { graph.connect(src_idx as u32, out_idx as u32, 1.0, branch_id, false, false); }
         }
     }
     
@@ -1495,9 +1503,8 @@ pub async fn run_mnist_mode(
     let mut correct_guesses_history: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(100);
     let mut total_correct_guesses = 0;
     let mut total_images_processed = 0;
-    let mut dopamine_timer = 0;
-    let mut current_dopamine_level = 0.0;
-    
+    let mut frame_output_spikes = [0u32; 10];
+            
     while current_tick < total_ticks {
         if use_ui && current_tick % 10 == 0 {
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
@@ -1514,6 +1521,7 @@ pub async fn run_mnist_mode(
                     }
                 }
                 current_image_idx += 1;
+                frame_output_spikes = [0u32; 10];
             }
         }
         // Phase 55: Amygdala - Remove hardcoded teacher forcing
@@ -1541,7 +1549,7 @@ pub async fn run_mnist_mode(
                     let mut rng = rand::rng();
                     let rand_idx = rand::RngExt::random_range(&mut rng, 0..10) as usize; 
                     // Direct voltage injection to force a spike (needs to cross threshold)
-                    graph.neurons[1784 + rand_idx].current_voltage += 50.0;
+                    graph.neurons[1784 + rand_idx].current_voltage = graph.neurons[1784 + rand_idx].activation_threshold + 50.0;
                     
                     // Strong burst of random noise to the processing layer to jumpstart activity
                     for _ in 0..100 {
@@ -1563,7 +1571,7 @@ pub async fn run_mnist_mode(
                 if !any_spiked {
                     let mut rng = rand::rng();
                     let rand_idx = rand::RngExt::random_range(&mut rng, 0..10) as usize; 
-                    graph.neurons[1784 + rand_idx].current_voltage += 50.0;
+                    graph.neurons[1784 + rand_idx].current_voltage = graph.neurons[1784 + rand_idx].activation_threshold + 50.0;
                     
                     // Clear all inhibition flags in the network 
                     for n in &mut graph.neurons {
@@ -1606,19 +1614,72 @@ pub async fn run_mnist_mode(
         // Output Layer Winner-Take-All (WTA) logic for MNIST Classifier (Indices 1784..1794)
         graph.apply_classifier_wta(current_tick, 1784, 1794);
         
+        // Track spikes for the current frame
+        for i in 0..10 {
+            if graph.neurons[1784 + i].last_spike_tick == current_tick {
+                frame_output_spikes[i] += 1;
+            }
+        }
+        
+        // Continuous Amygdala (Phase 55+): Provide immediate feedback to any nascent decision
+        if !is_inference && current_label < 10 && current_tick > 0 {
+            let mut best_guess = 0;
+            let mut max_trace = -100.0;
+            
+            // Determine who is currently winning the WTA race
+            for i in 0..10 {
+                let n = &graph.neurons[1784 + i];
+                let score = n.spike_trace * 100.0 + n.current_voltage;
+                if score > max_trace {
+                    max_trace = score;
+                    best_guess = i as u8;
+                }
+            }
+            
+            // Only apply feedback if the network is actually doing something
+            if max_trace > -40.0 {
+                let is_correct = best_guess == current_label;
+                let preview_correct = correct_guesses_history.iter().filter(|&&c| c).count();
+                let preview_len = std::cmp::max(1, correct_guesses_history.len());
+                let accuracy = (preview_correct as f32 / preview_len as f32) * 100.0;
+                
+                let mut guard = shared_env.lock().unwrap();
+                if is_correct {
+                    guard.dopamine_multiplier = 1.0 + (1.0 - (accuracy / 100.0)) * 5.0; // Dynamic Reward
+                } else {
+                    guard.dopamine_multiplier = -2.0; // Instant Punishment for wrong path
+                }
+                drop(guard);
+            } else {
+                // If completely silent, return to baseline
+                let mut guard = shared_env.lock().unwrap();
+                guard.dopamine_multiplier = 1.0;
+                drop(guard);
+            }
+        }
+        
         // Log telemetry at the end of the image exposure (tick 499, 999, etc.)
         if (current_tick + 1) % 500 == 0 && current_tick > 0 && current_image_idx > 0 {
             if graph.neurons.len() >= 1794 {
                 let mut best_guess = 0;
-                let mut max_trace = -100.0;
                 
-                // Determine guess based on spike_trace or voltage
+                // Determine guess based on total spikes in the window
+                let mut max_spikes = 0;
                 for i in 0..10 {
-                    let n = &graph.neurons[1784 + i];
-                    let score = n.spike_trace * 100.0 + n.current_voltage; // prioritize recent spikes
-                    if score > max_trace {
-                        max_trace = score;
+                    if frame_output_spikes[i] > max_spikes {
+                        max_spikes = frame_output_spikes[i];
                         best_guess = i as u8;
+                    }
+                }
+                
+                // Tie breaker / silent fallback: use voltage
+                if max_spikes == 0 {
+                    let mut max_v = -1000.0;
+                    for i in 0..10 {
+                        if graph.neurons[1784 + i].current_voltage > max_v {
+                            max_v = graph.neurons[1784 + i].current_voltage;
+                            best_guess = i as u8;
+                        }
                     }
                 }
                 
@@ -1633,17 +1694,7 @@ pub async fn run_mnist_mode(
                 let mut preview_correct = correct_guesses_history.iter().filter(|&&c| c).count();
                 if is_correct { preview_correct += 1; }
                 let preview_len = std::cmp::min(100, correct_guesses_history.len() + 1);
-                let accuracy = (preview_correct as f32 / preview_len as f32) * 100.0;
-                // Phase 55: Amygdala Reward/Punishment
-                let mut guard = shared_env.lock().unwrap();
-                if is_correct {
-                    current_dopamine_level = 1.0 + (1.0 - (accuracy / 100.0)) * 5.0; // Dynamic Reward Scaling!
-                } else {
-                    current_dopamine_level = -2.0; // Punishment!
-                }
-                guard.dopamine_multiplier = current_dopamine_level;
-                dopamine_timer = 50; // Maintain for 50 ticks
-                drop(guard);
+                let _accuracy = (preview_correct as f32 / preview_len as f32) * 100.0;
                 
                 if correct_guesses_history.len() >= 100 {
                     correct_guesses_history.pop_front();
@@ -1662,13 +1713,7 @@ pub async fn run_mnist_mode(
             }
         }
         
-        // Maintain dopamine for dopamine_timer ticks
-        if dopamine_timer > 0 {
-            dopamine_timer -= 1;
-            let mut guard = shared_env.lock().unwrap();
-            guard.dopamine_multiplier = current_dopamine_level;
-            drop(guard);
-        }
+
         
         // Export metrics every 100 ticks
         if current_tick > 0 && current_tick % 100 == 0 {

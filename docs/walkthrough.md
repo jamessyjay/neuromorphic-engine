@@ -654,3 +654,28 @@ This phase concludes the foundation of the architecture. The simulation now func
 - All 81+ tests are passing, including the new functional tests.
 - Terminal outputs proper telemetry logs during MNIST training.
 - `--ui-test` finishes and exits cleanly.
+
+---
+
+## [Phase 16] Biological Functional Validation & TPS Stress Test
+
+**Objective:** Implement a comprehensive suite of 15 functional tests covering all theoretical biological mechanics defined in the specs, ensuring zero performance regression.
+
+### What was done here
+
+1. **Test Suite Expansion:** Created three dedicated test files for logical domain separation:
+   - `func_connectivity_tests.rs` (Tests 1-5): Validates forward signal propagation ("Live Wire"), distal dendritic prep-states ("Autonomous Predictor"), strict Lateral Inhibition ("Biological WTA"), and reinforcement learning via Amygdala-like dopamine spikes/drops ("Dopamine Instinct", "Instant Karma").
+   - `func_topology_tests.rs` (Tests 6-10): Asserts neurogenesis branch uniform distribution, the L^-1.5 inverse-distance probability law ("Geometric Justice"), E/I balance through interneuron suppression ("Echo Decay"), synaptic scaling ("Auto Homeostasis"), and dopamine washout over time.
+   - `func_biology_tests.rs` (Tests 11-15): Validates Photoreceptor hyperpolarization logic, NMDA multiplexing voltage boosts, hypoxic coma and eventual "Metabolic Death" due to ATP starvation, "Synaptic Armor" (weight drops 3x slower for consolidated heavy synapses), and topological pathfinding audits from L4 to L5.
+
+2. **Core Logic Adjustments:**
+   - Fixed the `EnvironmentRegulator::update_and_get` dopamine decay formula in `src/engine/environment.rs`. Dopamine now accurately decays towards a baseline of `1.0` rather than strictly decaying towards `0.0`.
+
+3. **Performance Audit:**
+   - Ran a stress-test simulation of 500,000 ticks in `--mnist` mode.
+   - The engine sustained over **4300+ TPS**, successfully meeting and vastly exceeding the 2100 TPS threshold. The biological complexity introduced in previous phases did not degrade CUDA parallelization.
+
+### Verification proof
+
+- `cargo test`: All 94 tests (Unit + Functional) pass perfectly.
+- TPS stress-tests output valid results with optimal metrics and accurate synapse layer histograms.

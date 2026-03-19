@@ -36,7 +36,7 @@ impl EnvironmentRegulator {
             global_oxygen_level: self.current_oxygen,
             global_glucose_level: self.current_glucose,
             // Decay dopamine back to baseline (0.0)
-            dopamine_multiplier: base_env.dopamine_multiplier * 0.95,
+            dopamine_multiplier: 1.0 + (base_env.dopamine_multiplier - 1.0) * 0.95,
             toxin_levels: base_env.toxin_levels,
             light_level: base_env.light_level,
             stdp_learning_rate: base_env.stdp_learning_rate,

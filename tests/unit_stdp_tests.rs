@@ -696,6 +696,9 @@ fn test_mnist_classifier_competition() {
     graph.neurons[1784 + 7].activation_threshold = 30.0;
     graph.neurons[1784 + 7].is_alive = 1;
     
+    // To trigger lateral inhibition under the new rules, the winner must actually spike.
+    graph.neurons[1784 + 3].last_spike_tick = 1;
+
     // Apply WTA
     graph.apply_classifier_wta(1, 1784, 1794);
     
@@ -708,7 +711,7 @@ fn test_mnist_classifier_competition() {
     assert_eq!((flags_3 & neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED), 0, "Neuron 3 should NOT be inhibited");
     assert_eq!((flags_7 & neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED), neuromorphic_engine::engine::constants::FLAG_IS_INHIBITED, "Neuron 7 SHOULD be inhibited by lateral inhibition");
     
-    // Voltage of 7 should be reduced by 20.0
+    // Voltage of 7 should be reduced by 50.0
     assert_eq!(graph.neurons[1784 + 7].current_voltage, -5.0, "Neuron 7 voltage should be penalized by 50.0mV");
 }
 

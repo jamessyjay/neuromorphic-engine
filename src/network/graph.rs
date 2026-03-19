@@ -263,12 +263,12 @@ impl NetworkGraph {
             if tid < weight_sums.len() {
                 let count = synapse_counts[tid] as f32;
                 if count > 0.0 {
-                    let target_sum = 20.0; // Fixed budget per neuron
+                    let target_sum = count * 0.5 + 5.0; // Target average weight is 0.5 + flat survival budget
                     let current_sum = weight_sums[tid];
                     if current_sum > target_sum {
                         let scale = target_sum / current_sum;
                         let new_weight = s.weight * scale;
-                        s.weight = new_weight.max(0.1);
+                        s.weight = new_weight.max(0.01);
                     }
                 }
             }
@@ -374,26 +374,31 @@ impl NetworkGraph {
     pub fn apply_classifier_wta(&mut self, current_tick: u32, start_idx: usize, end_idx: usize) {
         if self.neurons.len() >= end_idx {
             let mut winner_id: Option<usize> = None;
-            let mut highest_v = -100.0;
             
-            // Find the first spiking neuron or the one with the highest voltage
+            // 1. Did anyone actually spike this tick?
             for i in start_idx..end_idx {
                 let n = &self.neurons[i];
-                if n.is_alive == 1 && n.current_voltage > highest_v {
-                    highest_v = n.current_voltage;
+                if n.is_alive == 1 && n.last_spike_tick == current_tick {
                     winner_id = Some(i);
+                    break;
                 }
             }
             
             // Apply massive lateral inhibition to all other output neurons if the winner spiked
             if let Some(w_id) = winner_id {
-                let winner = &self.neurons[w_id];
-                if winner.current_voltage >= winner.activation_threshold || winner.last_spike_tick == current_tick {
-                    for i in start_idx..end_idx {
-                        if i != w_id && self.neurons[i].is_alive == 1 {
-                            self.neurons[i].current_voltage -= 50.0; // Hard suppression penalty
-                            self.neurons[i].status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
-                        }
+                for i in start_idx..end_idx {
+                    if i != w_id && self.neurons[i].is_alive == 1 {
+                        self.neurons[i].current_voltage -= 50.0; // Hard suppression penalty
+                        self.neurons[i].status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
+                        // Also clamp the trace so they don't get STDP rewards while suppressed
+                        self.neurons[i].spike_trace *= 0.1;
+                    }
+                }
+            } else {
+                // If no one spiked, slowly lift inhibition (decay)
+                for i in start_idx..end_idx {
+                    if self.neurons[i].is_alive == 1 && (self.neurons[i].status_flags & crate::engine::constants::FLAG_IS_INHIBITED) != 0 {
+                         self.neurons[i].status_flags &= !crate::engine::constants::FLAG_IS_INHIBITED;
                     }
                 }
             }

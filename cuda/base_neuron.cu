@@ -439,7 +439,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     uint8_t is_inhibitory = (s->flags & 0x10) != 0;
     
     // Trace-based LTP (Potentiation)
-    if (ltp_mult > 0.0f) {
+    if (ltp_mult != 0.0f) {
         if (!is_inhibitory && target->last_spike_tick == current_tick) {
             uint32_t src_last_spike = source->last_spike_tick; 
             if (src_last_spike > 0 && src_last_spike < target->last_spike_tick) {
@@ -447,33 +447,46 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
                 float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
                 float src_trace = source->spike_trace; 
                 
-                // Diminishing returns for LTP near max weight
-                float head_room = (MAX_SYNAPSE_WEIGHT - s->weight) / MAX_SYNAPSE_WEIGHT;
-                s->weight += src_trace * branch_activity * ltp_mult * head_room;
-            }
-        }
-    }
-
-    // Trace-based LTD (Depression) 
-    if (ltd_mult > 0.0f) {
-        uint32_t src_last_spike = source->last_spike_tick; 
-        if (!is_inhibitory && src_last_spike > 0 && (current_tick - src_last_spike) <= ((s->flags & 0x20) != 0 ? MYELINATED_DELIVERY_TICKS : source->axonal_delay) + 2) {
-            if (target->last_spike_tick < src_last_spike) {
-                int branch_id = s->flags & 0x0F;
-                float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
-                
-                // Stronger LTD for heavier weights
-                float weight_factor = s->weight / MAX_SYNAPSE_WEIGHT;
-                
-                if (s->weight < MAX_SYNAPSE_WEIGHT * 0.9f) {
-                    s->weight -= target->spike_trace * branch_activity * ltd_mult * (1.0f + weight_factor);
+                if (ltp_mult > 0.0f) {
+                    // Diminishing returns for LTP near max weight
+                    float head_room = (MAX_SYNAPSE_WEIGHT - s->weight) / MAX_SYNAPSE_WEIGHT;
+                    s->weight += src_trace * branch_activity * ltp_mult * head_room;
                 } else {
-                    s->weight -= target->spike_trace * branch_activity * ltd_mult * 0.2f * (1.0f + weight_factor);
+                    // Anti-Hebbian (Punishment): Strongly depress causal firing
+                    float weight_factor = s->weight / MAX_SYNAPSE_WEIGHT;
+                    // ltp_mult is negative during punishment, so adding it decreases weight
+                    s->weight += src_trace * branch_activity * ltp_mult * (2.0f + weight_factor * 2.0f);
                 }
             }
         }
     }
 
+    // Trace-based LTD (Depression) 
+    if (ltd_mult != 0.0f) {
+        uint32_t src_last_spike = source->last_spike_tick; 
+        if (!is_inhibitory && src_last_spike > 0 && (current_tick - src_last_spike) <= (((s->flags & 0x20) != 0) ? MYELINATED_DELIVERY_TICKS : source->axonal_delay) + 2) {
+            if (target->last_spike_tick < src_last_spike) {
+                int branch_id = s->flags & 0x0F;
+                float branch_activity = (float)target->branches[branch_id].local_trace / 255.0f;
+                
+                if (ltd_mult > 0.0f) {
+                    // Stronger LTD for heavier weights
+                    float weight_factor = s->weight / MAX_SYNAPSE_WEIGHT;
+                    if (s->weight < MAX_SYNAPSE_WEIGHT * 0.9f) {
+                        s->weight -= target->spike_trace * branch_activity * ltd_mult * (1.0f + weight_factor);
+                    } else {
+                        s->weight -= target->spike_trace * branch_activity * ltd_mult * 0.2f * (1.0f + weight_factor);
+                    }
+                } else {
+                    // Anti-Hebbian (Punishment): Potentiate acausal firing
+                    float head_room = (MAX_SYNAPSE_WEIGHT - s->weight) / MAX_SYNAPSE_WEIGHT;
+                    // ltd_mult is negative during punishment, so subtracting it increases weight
+                    // Reduce the potentiation to avoid weight explosion during punishment
+                    s->weight -= target->spike_trace * branch_activity * ltd_mult * head_room * 0.1f; 
+                }
+            }
+        }
+    }
 
     // Homeostatic Scaling of Weights (Phase 23)
     if (target->spikes_in_last_window > SYNAPSE_SCALING_HIGH) {
@@ -710,9 +723,10 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
     local_env.stdp_learning_rate = local_learning_rate;
     
     // Pre-calculate STDP multipliers to save cycles in inner loop
-    float dopa_factor = (local_dopamine > 0.0f) ? local_dopamine : 0.0f;
-    float ltp_mult = local_learning_rate * STDP_A_PLUS * dopa_factor;
-    float ltd_mult = local_learning_rate * STDP_A_MINUS * dopa_factor;
+    // Allow negative dopamine (punishment) to reverse STDP (Anti-Hebbian learning)
+    float ltp_mult = local_learning_rate * STDP_A_PLUS * local_dopamine;
+    float ltd_mult = local_learning_rate * STDP_A_MINUS * local_dopamine;
+
 
     process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], local_env, ltp_mult, ltd_mult, current_tick);
 }
@@ -956,21 +970,18 @@ extern "C" {
             process_spike(&neurons[i], env, current_tick);
         }
     }
-
     void tick_synapse_cpu(Synapse* synapse, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
         if (synapse->weight < 0.0f) return;
         
-        float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
-        float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * dopa_factor;
-        float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * dopa_factor;
+        float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * env.dopamine_multiplier;
+        float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * env.dopamine_multiplier;
         
         process_synapse(synapse, &neurons[synapse->source_id], &neurons[synapse->target_id], env, ltp_mult, ltd_mult, current_tick);
     }
 
     void tick_synapses_cpu_batch(Synapse* synapses, int count, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
-        float dopa_factor = (env.dopamine_multiplier > 0.0f) ? env.dopamine_multiplier : 0.0f;
-        float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * dopa_factor;
-        float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * dopa_factor;
+        float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * env.dopamine_multiplier;
+        float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * env.dopamine_multiplier;
         
         for (int i = 0; i < count; i++) {
             Synapse* s = &synapses[i];
