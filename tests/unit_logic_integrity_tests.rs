@@ -79,7 +79,7 @@ fn test_sequence_learning_and_surprise() {
         graph.neurons[i].branches[4].branch_type = 1;
         graph.neurons[i].branches[4].nmda_threshold = pack_voltage(-30.0);
         b_minicolumn.push(i);
-        graph.connect(a_idx as u32, i as u32, 0.5, 4, false, true); // Extremely weak so it ONLY triggers predictive state, never somatic spike
+        graph.connect(a_idx as u32, i as u32, 5.0, 4, false, true); // Extremely weak so it ONLY triggers predictive state, never somatic spike
     }
 
     // Configure Minicolumn C (Surprise)

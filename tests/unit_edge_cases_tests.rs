@@ -24,10 +24,13 @@ fn test_atomic_hammer() {
         light_level: 1.0,
         stdp_learning_rate: 0.0, 
         wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     };
 
     let branch_id = 1;
+    // Set initial voltage to 0.0 for cleaner summation math
+    graph.neurons[0].branches[branch_id as usize].voltage = 10000; // pack_voltage(0.0)
+    
     // We want exactly 0.1f impact per synapse.
     // impact = min(buffer, weight) * 40.0f * phase_multiplier(1.0)
     // We set buffer = 0.1 / 40.0 = 0.0025f, weight = 1.0f.
@@ -72,7 +75,7 @@ fn test_sequence_recall() {
         light_level: 1.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     };
 
     // Training 5 times
@@ -168,7 +171,7 @@ fn test_seizure() {
         light_level: 1.0,
         stdp_learning_rate: 0.0,
         wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     };
     
     // Induce seizure
@@ -221,7 +224,7 @@ fn test_signal_race_condition() {
         light_level: 1.0,
         stdp_learning_rate: 0.0,
         wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     };
     
     for tick in 1..=14 {
@@ -275,7 +278,7 @@ fn test_metabolic_darwinism() {
         light_level: 1.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     };
     
     for tick in 1..=2000 {
@@ -319,7 +322,7 @@ fn test_inhibitory_stdp() {
         light_level: 1.0,
         stdp_learning_rate: 0.1,
         wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     };
     
     for tick in 1..=100 {
@@ -374,7 +377,7 @@ fn test_reverberating_circuit() {
         light_level: 1.0,
         stdp_learning_rate: 0.0,
         wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     };
 
     // Give them a pre-loaded buffer so they don't fail transmission

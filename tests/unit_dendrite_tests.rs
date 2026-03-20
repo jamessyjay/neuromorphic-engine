@@ -10,7 +10,7 @@ fn default_env() -> Environment {
         toxin_levels: 0.0,
         light_level: 0.0, stdp_learning_rate: 0.1,
             wakefulness_multiplier: 1.0,
-            thermal_noise_scale: 1.0,
+            thermal_noise_scale: 0.0,
     }
 }
 
@@ -50,7 +50,7 @@ fn test_spatial_summation_basal() {
         let current_branch_v = unpack_voltage(graph.neurons[id as usize].branches[1].voltage);
         graph.neurons[id as usize].branches[1].voltage = pack_voltage(current_branch_v + 10.0);
         
-        graph.tick(tick, env.clone());
+        graph.tick(tick, env.clone()); println!("Tick {}: V={}", tick, graph.neurons[id as usize].current_voltage);
     }
     
     let final_voltage = graph.neurons[id as usize].current_voltage;

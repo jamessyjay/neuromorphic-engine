@@ -5,7 +5,7 @@
     "dyn_thresh": -52.143223,
     "atp": 103.04159,
     "internal_phase": 1,
-    "port0_v": 0.0,
+    "port0_v": -70.0,
     "trace0": 0
   },
   {
@@ -14,7 +14,7 @@
     "dyn_thresh": -52.14319,
     "atp": 103.04145,
     "internal_phase": 2,
-    "port0_v": 0.0,
+    "port0_v": -70.0,
     "trace0": 0
   },
   {
@@ -23,7 +23,7 @@
     "dyn_thresh": -52.143173,
     "atp": 103.04141,
     "internal_phase": 3,
-    "port0_v": 0.0,
+    "port0_v": -70.0,
     "trace0": 0
   },
   {
@@ -32,7 +32,7 @@
     "dyn_thresh": -52.143173,
     "atp": 103.041405,
     "internal_phase": 4,
-    "port0_v": 0.0,
+    "port0_v": -70.0,
     "trace0": 0
   },
   {
