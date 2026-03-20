@@ -14,6 +14,8 @@ pub struct NetworkGraph {
     pub voxel_grid: HashMap<(i16, i16, i16), Vec<u32>>,
     #[serde(skip)]
     pub outgoing_counts: Vec<u32>,
+    pub output_layer_start: Option<usize>,
+    pub output_layer_end: Option<usize>,
 }
 
 impl Default for NetworkGraph {
@@ -29,6 +31,8 @@ impl NetworkGraph {
             synapses: Vec::new(),
             voxel_grid: HashMap::new(),
             outgoing_counts: Vec::new(),
+            output_layer_start: None,
+            output_layer_end: None,
         }
     }
 
@@ -292,37 +296,65 @@ impl NetworkGraph {
                 }
             });
 
-            // Phase 2: WTA and Bursting
-            // We assume max 100 columns and 50 minicolumns for the flattened array to avoid HashMap
-            let mut minicolumn_winners = vec![(u32::MAX, -1000.0f32, false); 100 * 50];
+            // Phase 2: WTA and Bursting (Parallelized)
+            // We assume max 100 columns and 50 minicolumns
+            use std::sync::atomic::{AtomicU64, Ordering};
+            let num_minicolumns = 100 * 50;
+            // Pack: 32 bits float (voltage) + 1 bit (is_predictive) + 31 bits (id)
+            // To ensure safe atomic max, we need a monotonic packing.
+            // Let's use a simpler approach: Mutex or spinlock? No, AtomicU64 with a CAS loop.
+            let minicolumn_winners: Vec<AtomicU64> = (0..num_minicolumns).map(|_| AtomicU64::new(0)).collect();
             
-            for n in &self.neurons {
+            self.neurons.par_iter().for_each(|n| {
                 if n.is_alive == 1 && n.current_voltage > n.activation_threshold && (n.type_ == 0 || n.type_ == 2) {
                     let idx = (n.column_id as usize) * 50 + (n.minicolumn_id as usize);
                     if idx < minicolumn_winners.len() {
                         let is_pred = (n.status_flags & crate::engine::constants::FLAG_IS_PREDICTIVE) != 0;
                         let effective_v = if is_pred { n.current_voltage + 1000.0 } else { n.current_voltage };
                         
-                        let current_winner = minicolumn_winners[idx];
-                        if effective_v > current_winner.1 || (effective_v == current_winner.1 && n.id < current_winner.0) {
-                            minicolumn_winners[idx] = (n.id, effective_v, is_pred);
+                        // Shift voltage to be strictly positive for monotonic f32 -> u32 conversion
+                        let shifted_v = effective_v + 1000.0;
+                        let v_bits = shifted_v.to_bits() as u64;
+                        let pred_bit = if is_pred { 1u64 } else { 0u64 };
+                        let id_bits = (n.id as u64) & 0x7FFFFFFF;
+                        
+                        // We invert the ID so lower ID wins ties (higher overall packed value)
+                        let inv_id = 0x7FFFFFFF - id_bits;
+                        
+                        // Pack: [32 bit voltage][1 bit pred][31 bit inv_id]
+                        let candidate_val = (v_bits << 32) | (pred_bit << 31) | inv_id;
+                        
+                        let atomic = &minicolumn_winners[idx];
+                        let mut current = atomic.load(Ordering::Relaxed);
+                        loop {
+                            if candidate_val <= current {
+                                break;
+                            }
+                            match atomic.compare_exchange_weak(current, candidate_val, Ordering::Relaxed, Ordering::Relaxed) {
+                                Ok(_) => break,
+                                Err(actual) => current = actual,
+                            }
                         }
                     }
                 }
-            }
+            });
 
-            for n in &mut self.neurons {
+            self.neurons.par_iter_mut().for_each(|n| {
                 if n.is_alive == 1 && (n.type_ == 0 || n.type_ == 2) {
                     let idx = (n.column_id as usize) * 50 + (n.minicolumn_id as usize);
                     if idx < minicolumn_winners.len() {
-                        let winner = minicolumn_winners[idx];
-                        if winner.0 != u32::MAX {
-                            if !winner.2 { // !winner_was_predictive
+                        let winner_val = minicolumn_winners[idx].load(Ordering::Relaxed);
+                        if winner_val != 0 {
+                            let winner_was_predictive = ((winner_val >> 31) & 1) == 1;
+                            let winner_inv_id = (winner_val & 0x7FFFFFFF) as u32;
+                            let winner_id = 0x7FFFFFFF - winner_inv_id;
+                            
+                            if !winner_was_predictive {
                                 // Surprise! Bursting (No predictive neurons crossed threshold)
                                 if n.current_voltage <= n.activation_threshold {
                                     n.current_voltage = n.activation_threshold + 5.0;
                                 }
-                            } else if n.id != winner.0 {
+                            } else if n.id != winner_id {
                                 n.status_flags |= crate::engine::constants::FLAG_IS_INHIBITED;
                                 n.current_voltage = n.resting_voltage - 10.0;
                                 n.refractory_time_left = 5.0;
@@ -330,7 +362,7 @@ impl NetworkGraph {
                         }
                     }
                 }
-            }
+            });
             
             self.neurons.par_chunks_mut(chunk_size).for_each(|chunk| {
                 unsafe { 
@@ -366,6 +398,28 @@ impl NetworkGraph {
         }
 
         self.apply_sdr_tuning(current_tick);
+        
+        // Use configurable output layer boundaries instead of hardcoded 1784..1794
+        if let (Some(start), Some(end)) = (self.output_layer_start, self.output_layer_end) {
+            // Apply massive lateral inhibition to the classifier layer (MNIST digits)
+            self.apply_classifier_wta(current_tick, start, end);
+            
+            // Homeostatic threshold penalty for Output Layer
+            for i in start..end {
+                if i < self.neurons.len() {
+                    let n = &mut self.neurons[i];
+                    if n.is_alive == 1 {
+                        if n.activation_threshold > n.resting_voltage + 15.0 {
+                            n.activation_threshold -= 0.001; 
+                        }
+                        if n.last_spike_tick == current_tick {
+                            n.activation_threshold += 0.5; // Adaptive homeostasis
+                        }
+                    }
+                }
+            }
+        }
+
         if current_tick % 100 == 0 {
             self.apply_synaptic_scaling();
         }
@@ -429,24 +483,6 @@ impl NetworkGraph {
                     n.activation_threshold += adjustment;
                     // Clamp threshold to reasonable biological limits
                     n.activation_threshold = n.activation_threshold.clamp(-65.0, 10.0);
-                }
-            }
-        }
-
-        // Homeostatic threshold penalty for Output Layer (L5 / MNIST Labels)
-        // If a label neuron fires too often, we increase its threshold to give others a chance
-        for i in 1784..1794 {
-            if i < self.neurons.len() {
-                let n = &mut self.neurons[i];
-                if n.is_alive == 1 {
-                    // Decay threshold back to baseline slowly
-                    if n.activation_threshold > n.resting_voltage + 15.0 {
-                        n.activation_threshold -= 0.001; 
-                    }
-                    // Increase threshold on recent spike to prevent monopolization (The "7" Demon)
-                    if n.last_spike_tick == current_tick {
-                        n.activation_threshold += 0.5; // Adaptive homeostasis
-                    }
                 }
             }
         }
@@ -568,15 +604,17 @@ impl NetworkGraph {
             let dz = z1 - z2;
             let dist_sq = dx*dx + dy*dy + dz*dz;
 
-            if dist_sq >= CLUSTERING_RADIUS_SQ * 1.5 { continue; }
-
             let distance = dist_sq.sqrt();
             let safe_dist = if distance < 1.0 { 1.0 } else { distance };
             
             // Spec #27: -3/2 Topological Law (P(L) ~ L^(-3/2))
-            let topo_prob = 1.0 / safe_dist.powf(1.5);
+            // Мягкое обрубание для очень дальних связей вместо жесткого if dist_sq >= ...
+            let mut topo_prob = 1.0 / safe_dist.powf(1.5);
+            if dist_sq >= CLUSTERING_RADIUS_SQ * 1.5 {
+                topo_prob *= 0.1; // Сильный штраф, но не 100% бан
+            }
             
-            if !rng.random_bool(topo_prob.clamp(0.01, 1.0) as f64) { continue; }
+            if !rng.random_bool(topo_prob.clamp(0.001, 1.0) as f64) { continue; }
 
             let s_active = current_tick.saturating_sub(n_source.last_spike_tick) < 500; 
             let t_active = current_tick.saturating_sub(n_target.last_spike_tick) < 500;
@@ -710,8 +748,8 @@ impl NetworkGraph {
             let b_type = rng.random_range(1..=3) as u8;
             n.branches[idx].branch_type = b_type;
             n.active_branches_mask |= 1 << idx;
-            n.branches[idx].nmda_threshold = NMDA_THRESHOLD_PACKED;
-            n.branches[idx].voltage = 0; // 0 means pack_voltage(-100.0), which is minimum inactive state
+            n.branches[idx].nmda_threshold = crate::engine::constants::NMDA_THRESHOLD_PACKED;
+            n.branches[idx].voltage = crate::engine::constants::RESTING_VOLTAGE_PACKED;
             n.branches[idx].refractory_timer = 0;
         }
     }

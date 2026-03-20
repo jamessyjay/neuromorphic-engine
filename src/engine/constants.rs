@@ -219,7 +219,8 @@ pub const VOLTAGE_60_PACKED: u16 = 16000;  // (60.0 + 100.0) * 100.0
 pub const MAX_COORD: f32 = 100.0; // Spatial boundary size (100x100x100)
 pub const COORD_SCALE: f32 = 655.35; // 65535.0 / 100.0 (maps 0.0..100.0 to 0..65535)
 pub const ZERO_VOLTAGE_PACKED: u16 = 10000; // (0.0 + 100.0) * 100.0
-pub const NMDA_THRESHOLD_PACKED: u16 = 10500; // (5.0 + 100.0) * 100.0
+pub const RESTING_VOLTAGE_PACKED: u16 = 3000; // (-70.0 + 100.0) * 100.0
+pub const NMDA_THRESHOLD_PACKED: u16 = 5000; // (-50.0 + 100.0) * 100.0
 // --- Topology & Columnar Architecture Constants (v0.5.0) ---
 pub const COLUMNS_COUNT: u16 = 10;
 pub const NEURONS_PER_COLUMN: u32 = 1000;

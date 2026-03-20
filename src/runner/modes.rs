@@ -113,7 +113,12 @@ pub fn broadcast_tick_update(
     for n in &graph.neurons {
         let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
         let visual_state = get_visual_state(n, tick, atp_pct);
-        update.neurons.push((n.id, visual_state, atp_pct, n.status_flags));
+        update.neurons.push(streamer::NeuronUpdate {
+            id: n.id,
+            v: visual_state,
+            a: atp_pct,
+            f: n.status_flags,
+        });
     }
     
     let msg = streamer::StreamMessage::TickUpdate(update);
@@ -1296,7 +1301,12 @@ pub async fn run_ui_test(tx: Option<tokio::sync::broadcast::Sender<String>>, sha
                 for n in &graph.neurons {
                     let atp_pct = (n.energy_atp / n.max_atp) * crate::engine::constants::METRIC_MAX_F32;
                     let visual_state = get_visual_state(n, tick, atp_pct);
-                    update.neurons.push((n.id, visual_state, atp_pct, n.status_flags));
+                    update.neurons.push(crate::monitor::streamer::NeuronUpdate {
+                        id: n.id,
+                        v: visual_state,
+                        a: atp_pct,
+                        f: n.status_flags,
+                    });
                 }
                 
                 let msg = crate::monitor::streamer::StreamMessage::TickUpdate(update);
@@ -1459,6 +1469,9 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
             if !is_inhib { graph.connect(src_idx as u32, out_idx as u32, 1.0, branch_id, false, false); }
         }
     }
+    
+    graph.output_layer_start = Some(1784);
+    graph.output_layer_end = Some(1794);
     
     graph.optimize_memory_layout();
     graph

@@ -31,13 +31,21 @@ pub struct InitialStatePayload {
 }
 
 #[derive(Serialize, Clone)]
+pub struct NeuronUpdate {
+    pub id: u32,
+    pub v: f32, // visual_state / voltage
+    pub a: f32, // atp_pct
+    pub f: u32, // status_flags
+}
+
+#[derive(Serialize, Clone)]
 pub struct TickUpdatePayload {
     pub tick: u32,
     pub total_spikes: u32,
     pub global_oxygen: f32,
     pub global_glucose: f32,
     pub global_dopamine: f32,
-    pub neurons: Vec<(u32, f32, f32, u32)>, // id, visual_state, atp_pct, status_flags
+    pub neurons: Vec<NeuronUpdate>, 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub synapses: Option<Vec<(u32, u32, f32)>>, // source_id, target_id, weight
     pub synapse_count: usize,
