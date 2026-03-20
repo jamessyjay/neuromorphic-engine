@@ -369,7 +369,7 @@ static inline __device__ void process_spike(BaseNeuron* n, Environment env, uint
     }
 }
 
-static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, float ltp_mult, float ltd_mult, uint32_t current_tick) {
+static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, BaseNeuron* target, Environment env, float ltp_mult, float ltd_mult, float inv_dopa, uint32_t current_tick) {
     // Phase 40 Performance: Early exit for dead neural pathways
     if (!source->is_alive || !target->is_alive) {
         s->weight = fmaxf(MIN_SYNAPSE_WEIGHT, fminf(s->weight, MAX_SYNAPSE_WEIGHT));
@@ -379,20 +379,26 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     uint8_t is_myelinated = (s->flags & 0x20) != 0;
     uint8_t is_photoreceptor = (s->flags & 0x40) != 0;
     
-    // Evaluate conditions arithmetically
-    bool pr_condition = is_photoreceptor && (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD);
-    bool pr_fire = pr_condition && (s->ticks_until_delivery == 0) && (s->neurotransmitter_buffer <= CONSTANT_PHOTORECEPTOR_LEAK * 1.5f);
+    bool just_fired_this_tick = false;
+
+    // Smart Branching: Only read deeper memory if there's actual activity
+    uint32_t src_last_spike = source->last_spike_tick; // Single read
     
-    bool reg_condition = !is_photoreceptor && (source->last_spike_tick == current_tick);
-    
-    // Apply updates based on arithmetic
-    s->neurotransmitter_buffer += (pr_condition * CONSTANT_PHOTORECEPTOR_LEAK) + (reg_condition * BULK_NEUROTRANSMITTER_RELEASE);
-    
-    bool just_fired_this_tick = pr_fire || reg_condition;
-    
-    int delivery_ticks = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
-    if (just_fired_this_tick) {
-        s->ticks_until_delivery = delivery_ticks;
+    if (src_last_spike == current_tick || is_photoreceptor) {
+        if (is_photoreceptor) {
+            if (source->current_voltage >= PHOTO_CONSTANT_LEAK_THRESHOLD) {
+                s->neurotransmitter_buffer += CONSTANT_PHOTORECEPTOR_LEAK;
+                if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer <= CONSTANT_PHOTORECEPTOR_LEAK * 1.5f) {
+                    s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
+                    just_fired_this_tick = true;
+                }
+            }
+        } else {
+            // Bulk release on spike
+            s->neurotransmitter_buffer += BULK_NEUROTRANSMITTER_RELEASE; 
+            s->ticks_until_delivery = is_myelinated ? MYELINATED_DELIVERY_TICKS : source->axonal_delay;
+            just_fired_this_tick = true;
+        }
     }
 
     // Phase 45: Spike-Timing-Dependent Plasticity (STDP) with Dopamine Modulation
@@ -457,11 +463,11 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
     
     // AXON DELIVERY & RECEPTOR BINDING (Spec 06 & 08 + Phase 30)
     if (s->ticks_until_delivery >= 0) {
-        if (s->ticks_until_delivery > 0) {
+        if (s->ticks_until_delivery > 0 && !just_fired_this_tick) {
             s->ticks_until_delivery -= 1;
         }
         
-        if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f) {
+        if (s->ticks_until_delivery == 0 && s->neurotransmitter_buffer > 0.0f && !just_fired_this_tick) {
             // Phase 35: Resource Delivery Check
             if (target->energy_ATP < 5.0f) {
                 // Synaptic failure! Target lacks ATP to process incoming neurotransmitters.
@@ -494,7 +500,7 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
             float effective_signal = (available_chemical < receptor_limit) ? available_chemical : receptor_limit;
             
             s->last_activation_tick = current_tick;
-            s->neurotransmitter_buffer -= (effective_signal / env.dopamine_multiplier); 
+            s->neurotransmitter_buffer -= (effective_signal * inv_dopa); 
             
             int phase_diff = abs((int)source->internal_phase - (int)target->internal_phase);
             if (phase_diff > 128) phase_diff = 256 - phase_diff; // Shortest circular distance
@@ -525,19 +531,22 @@ static inline __device__ void process_synapse(Synapse* s, BaseNeuron* source, Ba
 // Bits 54-63: uint16_t tick_mask (10 bits, current_tick % 1024)
 
 __device__ inline unsigned long long int pack_wta(float v, uint32_t id, uint16_t tick_mask) {
+    // Внимание: v должен быть строго положительным (мы прибавляем 200 в vote_kernel),
+    // чтобы __float_as_uint сохранял монотонность
     uint32_t v_bits = __float_as_uint(v);
     unsigned long long int packed = 0;
-    packed |= (unsigned long long int)v_bits;
-    packed |= ((unsigned long long int)(id & 0x3FFFFF) << 32);
-    packed |= ((unsigned long long int)(tick_mask & 0x3FF) << 54);
+    packed |= ((unsigned long long int)(tick_mask & 0x3FF));
+    packed |= ((unsigned long long int)(0x3FFFFF - (id & 0x3FFFFF)) << 10);
+    packed |= ((unsigned long long int)v_bits << 32);
     return packed;
 }
 
 __device__ inline void unpack_wta(unsigned long long int packed, float* v, uint32_t* id, uint16_t* tick_mask) {
-    uint32_t v_bits = (uint32_t)(packed & 0xFFFFFFFF);
+    uint32_t v_bits = (uint32_t)(packed >> 32);
     *v = __uint_as_float(v_bits);
-    *id = (uint32_t)((packed >> 32) & 0x3FFFFF);
-    *tick_mask = (uint16_t)((packed >> 54) & 0x3FF);
+    uint32_t inv_id = (uint32_t)((packed >> 10) & 0x3FFFFF);
+    *id = 0x3FFFFF - inv_id;
+    *tick_mask = (uint16_t)(packed & 0x3FF);
 }
 
 __device__ unsigned long long int minicolumn_winners[50000]; // Assume max 1000 columns * 50 minicolumns
@@ -593,12 +602,11 @@ __global__ void tick_neurons_prep_and_vote_kernel(BaseNeuron* neurons, int count
             int other_winner_idx = __shfl_down_sync(active, winner_idx, offset);
             
             if (other_winner_idx == winner_idx) {
-                float v1, v2;
-                uint32_t id1, id2, t1, t2;
-                unpack_wta(best_val, &v1, &id1, &t1);
-                unpack_wta(other_val, &v2, &id2, &t2);
-                
-                if (v2 > v1 || (v2 == v1 && id2 < id1)) {
+                // Прямое сравнение (unsigned long long) работает благодаря умной упаковке:
+                // MSB: Voltage (float_as_uint)
+                // MID: Инвертированный ID (меньший ID -> больший MID)
+                // LSB: Tick Mask
+                if (other_val > best_val) {
                     best_val = other_val;
                 }
             }
@@ -725,8 +733,10 @@ __global__ void tick_synapses_kernel(Synapse* synapses, int syn_count, BaseNeuro
     float ltp_mult = local_learning_rate * STDP_A_PLUS * local_dopamine;
     float ltd_mult = local_learning_rate * STDP_A_MINUS * local_dopamine;
 
+    float div_dopa = (fabsf(local_dopamine) < 0.001f) ? (local_dopamine >= 0.0f ? 0.001f : -0.001f) : local_dopamine;
+    float inv_dopa = 1.0f / div_dopa;
 
-    process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], local_env, ltp_mult, ltd_mult, current_tick);
+    process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], local_env, ltp_mult, ltd_mult, inv_dopa, current_tick);
 }
 
 // --- MACRO BIOLOGY SERVICES ---
@@ -974,17 +984,23 @@ extern "C" {
         float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * env.dopamine_multiplier;
         float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * env.dopamine_multiplier;
         
-        process_synapse(synapse, &neurons[synapse->source_id], &neurons[synapse->target_id], env, ltp_mult, ltd_mult, current_tick);
+        float div_dopa = (fabsf(env.dopamine_multiplier) < 0.001f) ? (env.dopamine_multiplier >= 0.0f ? 0.001f : -0.001f) : env.dopamine_multiplier;
+        float inv_dopa = 1.0f / div_dopa;
+        
+        process_synapse(synapse, &neurons[synapse->source_id], &neurons[synapse->target_id], env, ltp_mult, ltd_mult, inv_dopa, current_tick);
     }
 
     void tick_synapses_cpu_batch(Synapse* synapses, int count, BaseNeuron* neurons, Environment env, uint32_t current_tick) {
         float ltp_mult = env.stdp_learning_rate * STDP_A_PLUS * env.dopamine_multiplier;
         float ltd_mult = env.stdp_learning_rate * STDP_A_MINUS * env.dopamine_multiplier;
         
+        float div_dopa = (fabsf(env.dopamine_multiplier) < 0.001f) ? (env.dopamine_multiplier >= 0.0f ? 0.001f : -0.001f) : env.dopamine_multiplier;
+        float inv_dopa = 1.0f / div_dopa;
+        
         for (int i = 0; i < count; i++) {
             Synapse* s = &synapses[i];
             if (s->weight < 0.0f) continue;
-            process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], env, ltp_mult, ltd_mult, current_tick);
+            process_synapse(s, &neurons[s->source_id], &neurons[s->target_id], env, ltp_mult, ltd_mult, inv_dopa, current_tick);
         }
     }
 }
@@ -1071,8 +1087,8 @@ void init_neuron(BaseNeuron* neuron, uint32_t id, NeuronType type, uint32_t seed
     for (int i = 0; i < NUM_BRANCHES; i++) {
         neuron->branches[i].branch_type = 0;
         neuron->branches[i].refractory_timer = 0;
-        neuron->branches[i].voltage = pack_voltage(0.0f);
-        neuron->branches[i].nmda_threshold = pack_voltage(0.0f);
+        neuron->branches[i].voltage = pack_voltage(-70.0f);
+        neuron->branches[i].nmda_threshold = pack_voltage(-50.0f); // 20mV above resting
         neuron->branches[i].local_trace = 0;
         neuron->branches[i]._pad = 0;
     }
