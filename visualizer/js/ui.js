@@ -5,30 +5,6 @@ import { smoothedPredictions, lastDisplayedWinner, winnerHoldTicks, setLastDispl
 
 export let retinaCtx = null;
 
-window.addEventListener('load', () => {
-    const canvas = document.getElementById('retina-canvas');
-    if (canvas) {
-        retinaCtx = canvas.getContext('2d');
-        retinaCtx.imageSmoothingEnabled = false;
-    }
-
-    // Initialize Classifier Rows
-    const classifierRowsContainer = document.getElementById('classifier-rows');
-    if (classifierRowsContainer) {
-        for (let i = 0; i < 10; i++) {
-            const row = document.createElement('div');
-            row.className = 'classifier-row';
-            row.id = `class-row-${i}`;
-            row.innerHTML = `
-                <span class="digit-label">${i}</span>
-                <div class="bar-container"><div id="bar-${i}" class="bar"></div></div>
-                <span id="val-${i}" class="digit-val">0%</span>
-            `;
-            classifierRowsContainer.appendChild(row);
-        }
-    }
-});
-
 export function toggleLayer(layer) {
     layerVisibility[layer] = !layerVisibility[layer];
 }
@@ -183,6 +159,7 @@ export function updateClassifierPanel(predictions) {
         }
     }
 }
+
 export function buildLegend() {
     const container = document.getElementById('legend-content');
     if (!container) return;
@@ -191,7 +168,8 @@ export function buildLegend() {
     
     import('./config.js').then(config => {
         Object.keys(config.TYPE_COLORS).forEach(k => {
-            const item = document.createElement('div'); item.className = 'legend-item';
+            const item = document.createElement('div'); 
+            item.className = 'legend-item';
             item.innerHTML = `<div class="color-dot" style="background-color: #${config.TYPE_COLORS[k].getHexString()}"></div>
                               <span class="label">${names[k]}</span>
                               <span id="count-${k}" class="pop-count">[0]</span>`;
@@ -216,6 +194,28 @@ export function updateLegendCounts() {
 }
 
 export function initUIEventListeners() {
+    const canvas = document.getElementById('retina-canvas');
+    if (canvas) {
+        retinaCtx = canvas.getContext('2d');
+        retinaCtx.imageSmoothingEnabled = false;
+    }
+
+    // Initialize Classifier Rows
+    const classifierRowsContainer = document.getElementById('classifier-rows');
+    if (classifierRowsContainer && classifierRowsContainer.children.length === 0) {
+        for (let i = 0; i < 10; i++) {
+            const row = document.createElement('div');
+            row.className = 'classifier-row';
+            row.id = `class-row-${i}`;
+            row.innerHTML = `
+                <span class="digit-label">${i}</span>
+                <div class="bar-container"><div id="bar-${i}" class="bar"></div></div>
+                <span id="val-${i}" class="digit-val">0%</span>
+            `;
+            classifierRowsContainer.appendChild(row);
+        }
+    }
+
     const dSlider = document.getElementById('inp-dopamine');
     if (dSlider) {
         dSlider.addEventListener('input', (e) => {

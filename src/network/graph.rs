@@ -496,6 +496,15 @@ impl NetworkGraph {
         // Ensure the branch is marked active in the mask so evaluate_branches doesn't skip it
         if target_id < self.neurons.len() as u32 {
             self.neurons[target_id as usize].active_branches_mask |= 1 << branch_id;
+            
+            // If the branch is completely uninitialized (type 0), initialize it as a default Basal branch
+            if self.neurons[target_id as usize].branches[branch_id as usize].branch_type == 0 {
+                self.neurons[target_id as usize].branches[branch_id as usize].branch_type = 1; // 1 = Basal
+                self.neurons[target_id as usize].branches[branch_id as usize].nmda_threshold = crate::engine::constants::NMDA_THRESHOLD_PACKED;
+                self.neurons[target_id as usize].branches[branch_id as usize].voltage = crate::engine::constants::RESTING_VOLTAGE_PACKED;
+                self.neurons[target_id as usize].branches[branch_id as usize].refractory_timer = 0;
+                self.neurons[target_id as usize].branches[branch_id as usize].local_trace = 0;
+            }
         }
         
         if source_id < self.outgoing_counts.len() as u32 {

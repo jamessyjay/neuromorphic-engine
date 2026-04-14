@@ -1,5 +1,5 @@
 import { nodeMap, activePulses, currentEnv } from './state.js';
-import { VISUAL_SAMPLING, MAX_PULSES } from './config.js';
+import { MAX_PULSES } from './config.js';
 import { initNetwork } from './render.js';
 import { retinaCtx, updateLegendCounts, updateClassifierPanel } from './ui.js';
 
@@ -53,7 +53,7 @@ export function connect(host) {
                         n.vState = 1.0;
                         
                         // Fire visual pulses
-                        if (Math.random() < VISUAL_SAMPLING) {
+                        if (Math.random() < 1.0) {
                             n.outgoing.forEach(out => {
                                 if (activePulses.length < MAX_PULSES) {
                                     const targetNode = nodeMap.get(out.targetId);
@@ -108,8 +108,8 @@ export function connect(host) {
             let spikesToday = 0, deadToday = 0, activeCount = 0;
             if (data.neurons && data.neurons.length > 0) {
                 for (let i = 0; i < data.neurons.length; i++) {
-                    const nDataArr = data.neurons[i];
-                    const id = nDataArr[0], state = nDataArr[1], atp = nDataArr[2], flags = nDataArr[3] || 0;
+                    const nDataObj = data.neurons[i];
+                    const id = nDataObj.id, state = nDataObj.v, atp = nDataObj.a, flags = nDataObj.f || 0;
                     const nData = nodeMap.get(id);
                     if (nData) {
                         if (state >= 3.0 && nData.isAlive) {
@@ -120,32 +120,27 @@ export function connect(host) {
                             else nData.deathReason = 'regen';
                         } else {
                             nData.isAlive = true;
+                            // Trigger visual pulses if moving from un-spiked to spiked state
+                            if (state === 1.0 && nData.vState !== 1.0) {
+                                if (activePulses.length < MAX_PULSES) {
+                                    nData.outgoing.forEach(syn => {
+                                        if (Math.random() < 1.0 && activePulses.length < MAX_PULSES) {
+                                            const t = nodeMap.get(syn.targetId);
+                                            if (t) activePulses.push({ s: nData, t, p: 0 });
+                                        }
+                                    });
+                                }
+                            }
                             nData.visualActivity = (state === 1.0) ? 1.0 : nData.visualActivity;
                         }
                         nData.atp = atp;
-                        nData.vState = state;
+                        nData.vState = state; 
                         nData.statusFlags = flags;
-
-                        if (state === 1.0 && nData.isAlive) {
-                            spikesToday++; 
-                            activeCount++;
-                            nData.visualActivity = 1.0;
-                            if (activePulses.length < MAX_PULSES) {
-                                nData.outgoing.forEach(syn => {
-                                    if (Math.random() < VISUAL_SAMPLING && activePulses.length < MAX_PULSES) {
-                                        const t = nodeMap.get(syn.targetId);
-                                        if (t) activePulses.push({ s: nData, t, p: 0 });
-                                    }
-                                });
-                            }
-                        } else if (state > 0.5 && nData.isAlive) {
-                            activeCount++;
-                        }
                     }
                 }
                 
                 document.getElementById('dead-count').innerText = Array.from(nodeMap.values()).filter(n => !n.isAlive).length;
-                document.getElementById('spike-rate').innerText = spikesToday;
+                document.getElementById('spike-rate').innerText = data.total_spikes !== undefined ? data.total_spikes : spikesToday;
             }
 
             // Sync Environment back from server

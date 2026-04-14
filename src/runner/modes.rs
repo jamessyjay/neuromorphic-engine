@@ -84,8 +84,8 @@ pub fn broadcast_initial_state(tx: &broadcast::Sender<String>, graph: &NetworkGr
 pub fn broadcast_tick_update(
     tx: &broadcast::Sender<String>,
     graph: &NetworkGraph,
-    _retina_frame: Option<Vec<f32>>,
-    _predictions: Option<Vec<f32>>,
+    retina_frame: Option<Vec<f32>>,
+    predictions: Option<Vec<f32>>,
     tick: u32,
     accumulated_spikes: u32,
     current_env: &Environment,
@@ -107,8 +107,8 @@ pub fn broadcast_tick_update(
             Some(syn_vec)
         } else { None },
         synapse_count: current_synapse_count,
-        retina_frame: _retina_frame,
-        predictions: _predictions,
+        retina_frame,
+        predictions,
     };
     for n in &graph.neurons {
         let atp_pct = (n.energy_atp / n.max_atp) * METRIC_MAX_F32;
@@ -1333,6 +1333,8 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
     // 1. Create 784 Photoreceptors (28x28 grid)
     for i in 0..784 {
         let id = graph.add_neuron(crate::engine::ffi::NeuronType::Photoreceptor);
+        graph.grow_dendritic_tree(id);
+        
         let n = &mut graph.neurons[id as usize];
         let row = i / 28;
         let col = i % 28;
@@ -1341,6 +1343,7 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
         n.y = (row as f32 * (65535.0 / 28.0)) as u16;
         n.z = 0; // Retina is always in the foreground
         n.layer_id = 4; // L4 - Input
+        n.external_input = 0.0;
     }
     
     // 2. Create 1000 Processing Neurons (10 columns x 100 neurons)
@@ -1360,6 +1363,8 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
                 (crate::engine::ffi::NeuronType::Interneuron, 1, 50001.0, 55000.0)
             };
             let id = graph.add_neuron(n_type);
+            graph.grow_dendritic_tree(id);
+            
             let n = &mut graph.neurons[id as usize];
             n.column_id = col_id as u16;
             n.layer_id = layer_id as u8;
@@ -1435,6 +1440,8 @@ pub fn setup_mnist_network() -> crate::network::graph::NetworkGraph {
     // 3. Create 10 Output Neurons (Labels 0-9)
     for i in 0..10 {
         let id = graph.add_neuron(crate::engine::ffi::NeuronType::Pyramidal);
+        graph.grow_dendritic_tree(id);
+        
         let n = &mut graph.neurons[id as usize];
         n.x = (32768i32 + (i as i32 * 3000 - 15000)).clamp(0, 65535) as u16; // In a row along X
         n.y = 32768; // Center along Y
@@ -1505,6 +1512,10 @@ pub async fn run_mnist_mode(
     let start_time = std::time::Instant::now();
     let total_elements = graph.neurons.len() + graph.synapses.len();
     let sampling_interval = (total_elements as f32 / crate::engine::constants::UI_SAMPLING_DIVISOR).ceil() as u32;
+    let sampling_interval = if sampling_interval < 1 { 1 } else { sampling_interval };
+    let mut accumulated_spikes = 0;
+    
+    println!("DEBUG: total_elements={}, sampling_interval={}, tx.is_some()={}", total_elements, sampling_interval, tx.is_some());
     
     if let Some(tx_chan) = tx.as_ref() {
         crate::runner::modes::broadcast_initial_state(tx_chan, &graph);
@@ -1530,7 +1541,11 @@ pub async fn run_mnist_mode(
                 // Set external_input for photoreceptors
                 for (i, pixel) in image_pixels.iter().enumerate() {
                     if i < 784 {
-                        graph.neurons[i].external_input = *pixel;
+                        if *pixel > 0.05 {
+                            graph.neurons[i].external_input = *pixel;
+                        } else {
+                            graph.neurons[i].external_input = 0.0;
+                        }
                     }
                 }
                 current_image_idx += 1;
@@ -1624,6 +1639,12 @@ pub async fn run_mnist_mode(
         // Tick the network
         graph.tick(current_tick, env.clone());
         
+        for n in &graph.neurons {
+            if n.last_spike_tick == current_tick {
+                accumulated_spikes += 1;
+            }
+        }
+        
         // Output Layer Winner-Take-All (WTA) logic for MNIST Classifier (Indices 1784..1794)
         graph.apply_classifier_wta(current_tick, 1784, 1794);
         
@@ -1660,7 +1681,7 @@ pub async fn run_mnist_mode(
                 if is_correct {
                     guard.dopamine_multiplier = 1.0 + (1.0 - (accuracy / 100.0)) * 5.0; // Dynamic Reward
                 } else {
-                    guard.dopamine_multiplier = -2.0; // Instant Punishment for wrong path
+                    guard.dopamine_multiplier = -0.1; // Gentle Punishment for wrong path, avoid total depression
                 }
                 drop(guard);
             } else {
@@ -1769,11 +1790,9 @@ pub async fn run_mnist_mode(
             
             let _current_neuron_count = graph.neurons.len();
             
-            let mut new_spikes = 0;
-            for n in &graph.neurons {
-                if current_tick > 0 && n.last_spike_tick == current_tick - 1 {
-                    new_spikes += 1;
-                }
+            // Periodically rescale synapses to avoid total depression (Phase 46)
+            if current_tick % 5000 == 0 {
+                graph.apply_synaptic_scaling();
             }
             
             if std::path::Path::new("SAVE_BRAIN_NOW").exists() {
@@ -1806,11 +1825,12 @@ pub async fn run_mnist_mode(
                     Some(image_pixels.clone()),
                     Some(predictions),
                     current_tick,
-                    new_spikes,
+                    accumulated_spikes,
                     &env,
                     should_send_synapses,
                     current_synapse_count,
                 );
+                accumulated_spikes = 0; // Reset counter for next interval
             }
             tokio::task::yield_now().await;
         }

@@ -434,6 +434,8 @@ fn test_stdp_associative_persistence_under_noise() {
         for a in 0..=7 {
             graph.neurons[a as usize].current_voltage = 40.0;
             graph.neurons[a as usize].energy_atp = 100.0;
+            graph.neurons[a as usize].last_spike_tick = tick;
+            graph.neurons[a as usize].spike_trace = 0.0;
         }
         graph.tick(tick, env.clone());
         tick += 1;
