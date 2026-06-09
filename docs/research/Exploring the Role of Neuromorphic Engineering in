@@ -1,0 +1,84 @@
+Exploring the Role of Neuromorphic Engineering in the Age of LLMs: https://arxiv.org/pdf/2509.24521
+Towards principles of brain network organization and function: https://arxiv.org/html/2408.02640v1
+Neural networks grown and self-organized by noise: https://proceedings.neurips.cc/paper_files/paper/2019/file/1e6e0a04d20f50967c64dac2d639a577-Paper.pdf
+A Drosophila computational brain model reveals sensorimotor processing: https://www.nature.com/articles/s41586-024-07763-9
+Building Brains on a Computer: https://press.asimov.com/articles/brains
+-------------------------------------------------
+
+Generality - is what makes the human brain so effective in learning
+
+-------------------------------------------------
+
+Jeston Orin Nano
+
+Instructions: https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit#intro
+Setup guide: https://www.jetson-ai-lab.com/tutorials/initial-setup-jetson-orin-nano/
+
+Configuration video:
+SSD installation and migration from SD card to SSD: https://youtu.be/497u-CcYvE8
+Upgrade Nano to Super: https://youtu.be/G8OkrUJxnQc?si=fLpIVpuWo29IlE1v
+Fix default RAM from 6.3 GB to 8 GB: https://youtu.be/PaHo9GEt1ms?si=1gLFuzYAon4ciV9A
+
+-------------------------------------------------
+Biological_neuron_model: https://en.wikipedia.org/wiki/Biological_neuron_model
+SNN Optimisation: https://www.mdpi.com/2313-7673/8/3/320
+Effect of Synaptic Heterogeneity on Neuronal Coordination: https://journals.aps.org/prxlife/abstract/10.1103/PRXLife.2.013013
+Explosive synchronization in networks of Type-I neurons: https://arxiv.org/html/2512.03600v1
+-------------------------------------------------
+
+```
+TASK: Phase 50 — Neuromorphic Diagnostic Suite (NDS) & Testing Framework
+Objective: Implement a comprehensive automated testing framework to validate biological accuracy, hardware performance, and learning logic. We need to move away from "visual observation" to "hard assertions."
+
+CRITICAL: The test suite must work both in macOS (CPU Mock) and Jetson (CUDA). Use the existing FFI and NetworkGraph structures.
+
+1. Architecture: The Test Harness (tests/diagnostic_harness.rs)
+Create a diagnostic module that can:
+
+Isolate a micro-circuit (1-10 neurons).
+
+Manually set initial states (ATP, Voltage, Weight).
+
+Run the simulation for exactly N ticks without the UI or Streamer overhead.
+
+Return a DiagnosticReport with delta-changes.
+
+2. Implementation: The 6 Pillars of Testing
+Implement the following test modules in src/diagnostic.rs:
+
+A. Metabolic Stress (The "Crucible" Tests):
+
+test_atp_depletion: Assert that a neuron firing at max frequency dies from DEATH_ATP_LOW within the calculated number of ticks.
+
+test_calcium_toxicity: Assert DEATH_CALCIUM_HIGH when CALCIUM_SPIKE_GAIN is artificially boosted.
+
+B. Dendritic Logic (The "Summation" Tests):
+
+test_nmda_coincidence: Stimulate one branch with sub-threshold signals and assert that they ONLY trigger a soma spike when they arrive within the temporal window.
+
+test_apical_penalty: Assert that signals on Apical Tuft consume significantly more/less ATP than Basal based on our base_neuron.h specs.
+
+C. Learning & Plasticity (The "Pavlov" Tests):
+
+test_stdp_causality: Assert that weight increases if Input-Spike < Output-Spike, and decreases if reversed.
+
+test_dopamine_modulation: Run the same STDP test with dopamine_multiplier = 1.0 and 8.0. Assert the weight change is proportionally greater.
+
+D. Hardware Performance (The "Mac Squeeze"):
+
+test_tps_scaling: A benchmark that runs 1k, 10k, and 50k neurons and logs the exact TPS floor. Fail the test if TPS drops below 1000 on 10k neurons.
+
+3. Documentation: TESTING_GUIDE.md
+Generate a comprehensive markdown guide for the developer:
+
+How to run: Detailed cargo test commands for specific modules.
+
+Metric Definitions: Explain what metabolic_wear vs calcium_level means in test logs.
+
+Troubleshooting: What to do if LTP (Long-Term Potentiation) fails to trigger.
+
+Hardware Benchmarks: A table of "Expected vs Actual" results for the current Mac hardware.
+
+4. Logic Fix (FFI Order)
+Ensure the test suite validates that spiked flags are NOT cleared prematurely. The diagnostic harness must verify that a spike in Tick N is correctly read by synapses in Tick N.
+```

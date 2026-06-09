@@ -8,14 +8,14 @@ The project is designed for deployment on edge AI hardware like **NVIDIA Jetson*
 
 ## Detailed Documentation
 
-For a deep dive into the architecture and logic of the project, visit the [docs/](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/) folder:
+For a deep dive into the architecture and logic of the project, visit the [docs/](file:///Users/dmitry.ledenyov/Documents/Projects/neuromorphic-engine/docs/) folder:
 
-- 🏗️ [Project Architecture](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/01_project_architecture.md) — Hybrid Rust/CUDA stack and memory management.
-- 🧬 [Solution Architecture](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/02_solution_architecture.md) — Biological algorithms, chaos, and metabolism.
-- ⚗️ [API & FFI Reference](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/03_api_reference.md) — Bridges between Rust and C++.
-- 📊 [Visualization & Metrics](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/04_metrics_and_viz.md) — Guide to tests and result analysis.
-- 📁 [Project Structure](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/PROJECT_STRUCTURE.md) - Project structure context.
-- 🗞️ [Research](file:///Users/dmitry.ledenyov/Documents/Personal/Self_Development/AI/neuromorphic-engine/docs/research/research.md) - Base research documentation.
+- 🏗️ [Project Architecture](file:///Users/dmitry.ledenyov/Documents/Projects/neuromorphic-engine/docs/01_project_architecture.md) — Hybrid Rust/CUDA stack and memory management.
+- 🧬 [Solution Architecture](file:///Users/dmitry.ledenyov/Documents/Projects/neuromorphic-engine/docs/02_solution_architecture.md) — Biological algorithms, chaos, and metabolism.
+- ⚗️ [API & FFI Reference](file:///Users/dmitry.ledenyov/Documents/Projects/neuromorphic-engine/docs/03_api_reference.md) — Bridges between Rust and C++.
+- 📊 [Visualization & Metrics](file:///Users/dmitry.ledenyov/Documents/Projects/neuromorphic-engine/docs/04_metrics_and_viz.md) — Guide to tests and result analysis.
+- 📁 [Project Structure](file:///Users/dmitry.ledenyov/Documents/Projects/neuromorphic-engine/docs/PROJECT_STRUCTURE.md) - Project structure context.
+- 🗞️ [Research](file:///Users/dmitry.ledenyov/Documents/Projects/neuromorphic-engine/docs/research/research.md) - Base research documentation.
 
 ---
 
